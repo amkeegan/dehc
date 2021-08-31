@@ -1,7 +1,7 @@
 import random
 from cloudant import couchdb
 from cloudant.document import Document
-from tools import read
+from globals import read
 
 # ----------------------------------------------------------------------------
 
@@ -56,7 +56,5 @@ class Database:
     def doc_get_id(self, prefix=""):
         n = hex(random.randint(0, 281474976710656))[2:]
         n = prefix+"0"*(12-len(n))+n
+        self._say(f"Generated a document id.")
         return n
-
-x = Database()
-x.doc_get_id()

@@ -4,8 +4,11 @@ from interface import GUI
 
 # ----------------------------------------------------------------------------
 
-db = Database(noisy=False)
+db = Database(noisy=True)
+db.db_create()
+
 gui = GUI(db)
 gui.run()
 
+db.db_delete()
 sys.exit(0)

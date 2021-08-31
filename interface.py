@@ -1,34 +1,11 @@
 import tkinter as tk
 from tkinter import ttk
 from db import Database
+from globals import G_FIELDS_EVACUEE
 
 # ----------------------------------------------------------------------------
 
-FIELDS_EVACUEE = ["Given Name(s)","Family Name","Sex","Date of Birth",
-"Passport Number","Nationality","Home Address","Destination Address",
-"Home Contact Number","Destination Contact Number","Next Of Kin Family Name",
-"Next Of Kin Given Name","Next Of Kin Address","Next Of Kin Contact Number",
-"Travelling With Next Of Kin","Requires Medical Attention",
-"Authority To Release Information","Evacuee Searched","Evacuee Search Date",
-"Baggage Searched","Baggage Search Date","Documentation Complete",
-"Medical Complete","Screening Complete","Accomodation","Date Of Flight",
-"Report Time","Flight Number","Depart Time","Place of Registration",
-"Registration Date","Registered Number","Registered Number System","Misc"]
-
-KEY = FIELDS_EVACUEE[0]
-
-DB_DATA = [
-    ({'Given Name(s)': 'Adrian', 'Sex':'F', "Nationality":"Australia"}),
-    ({'Given Name(s)': 'Bob', 'Sex':'M', "Nationality":"Australia"}),
-    ({'Given Name(s)': 'Carl', 'Sex':'M', "Nationality":"Australia"}),
-    ({'Given Name(s)': 'Diana', 'Sex':'F', "Nationality":"United Kingdom"}),
-    ({'Given Name(s)': 'Ethan', 'Sex':'M', "Nationality":"Australia"}),
-    ({'Given Name(s)': 'Fiona', 'Sex':'F', "Nationality":"Australia"}),
-    ({'Given Name(s)': 'George', 'Sex':'M', "Nationality":"Canada"}),
-    ({'Given Name(s)': 'Hamlet', 'Sex':'X', "Nationality":"Australia"}),
-    ({'Given Name(s)': 'Ivan', 'Sex':'M', "Nationality":"Canada"}),
-    ({'Given Name(s)': 'Juliet', 'Sex':'F', "Nationality":"United Kingdom"})
-]
+KEY, *_ = G_FIELDS_EVACUEE
 
 # ----------------------------------------------------------------------------
 
@@ -39,15 +16,7 @@ class GUI(tk.Tk):
         self.db = db
         self.search_results = []
         self.search_selected = -1
-        self.prepare_db()
         self.prepare_gui()
-    
-    def prepare_db(self):
-        '''Prepares the database.'''
-        self.db.db_create()
-        for data in DB_DATA:
-            id = self.db.doc_get_id("per-")
-            self.db.doc_edit(data, id)
     
     def prepare_gui(self):
         '''Prepares the GUI and its widgets.'''
@@ -80,7 +49,7 @@ class GUI(tk.Tk):
         self.v_svalue = tk.StringVar()
 
         self.c_search = ttk.Combobox(master=self.f_search, width=25, 
-        values=FIELDS_EVACUEE, textvariable=self.v_sfield)
+        values=G_FIELDS_EVACUEE, textvariable=self.v_sfield)
         self.c_search.set(KEY)
         self.e_search = ttk.Entry(master=self.f_search, width=25, 
         textvariable=self.v_svalue)
@@ -107,7 +76,7 @@ class GUI(tk.Tk):
         self.v_data = []
         self.t_data = []
         self.e_data = []
-        for index, field in enumerate(FIELDS_EVACUEE):
+        for index, field in enumerate(G_FIELDS_EVACUEE):
             v_data = tk.StringVar()
             t_data = ttk.Label(master=self.f_right, width=30, 
             justify=tk.LEFT, anchor="w", text=field)
@@ -145,7 +114,7 @@ class GUI(tk.Tk):
 
     def populate_data(self):
         '''Populates the input boxes on the right side with data.'''
-        for index, field in enumerate(FIELDS_EVACUEE):
+        for index, field in enumerate(G_FIELDS_EVACUEE):
             data = self.search_results[self.search_selected]
             self.e_data[index].delete(0, "end")
             self.e_data[index].insert(0, data.get(field, ""))
@@ -160,7 +129,7 @@ class GUI(tk.Tk):
         if self.search_selected >= 0:
             old_data = self.search_results[self.search_selected]
             new_data = {}
-            for index, field in enumerate(FIELDS_EVACUEE):
+            for index, field in enumerate(G_FIELDS_EVACUEE):
                 data = self.e_data[index].get()
                 if old_data.get(field,"") != data:
                     old_data[field] = data
@@ -170,7 +139,7 @@ class GUI(tk.Tk):
 
     def new_evacuee(self):
         '''Adds a new evacuee.'''
-        data = {field: "" for field in FIELDS_EVACUEE}
+        data = {field: "" for field in G_FIELDS_EVACUEE}
         id = self.db.doc_get_id("per-")
         data["_id"] = id
         data[KEY] = "New"
@@ -190,4 +159,3 @@ class GUI(tk.Tk):
     def run(self):
         '''Runs the GUI's main loop.'''
         self.mainloop()
-        self.db.db_delete()
