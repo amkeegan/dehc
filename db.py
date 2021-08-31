@@ -19,14 +19,16 @@ class Database:
     def db_create(self, dbname: str = "dehc"):
         '''Creates the dehc database.'''
         with couchdb(**self.config) as client:
-            client.create_database(dbname)
-            self._say(f"Created database \"{dbname}\".")
+            if dbname not in client.all_dbs():
+                client.create_database(dbname)
+                self._say(f"Created database \"{dbname}\".")
     
     def db_delete(self, dbname: str = "dehc"):
         '''Deletes the dehc database.'''
         with couchdb(**self.config) as client:
-            client.delete_database(dbname)
-            self._say(f"Deleted database \"{dbname}\".")
+            if dbname in client.all_dbs():
+                client.delete_database(dbname)
+                self._say(f"Deleted database \"{dbname}\".")
 
     def db_query(self, field, value, dbname: str = "dehc"):
         '''Returns all documents with field matching value.'''
