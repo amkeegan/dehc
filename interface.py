@@ -5,7 +5,7 @@ from globals import G_FIELDS_EVACUEE
 
 # ----------------------------------------------------------------------------
 
-KEY, *_ = G_FIELDS_EVACUEE
+KEY, KEY2, *_ = G_FIELDS_EVACUEE
 
 # ----------------------------------------------------------------------------
 
@@ -95,7 +95,7 @@ class GUI(tk.Tk):
     def run_search(self):
         '''Queries the database and displays the results.'''
         self.search_results = self.db.db_query(self.v_sfield.get(), 
-        self.v_svalue.get())
+        self.v_svalue.get(), KEY)
         self.populate_search()
     
     def populate_search(self):
@@ -103,7 +103,7 @@ class GUI(tk.Tk):
         self.l_list.delete(0, "end")
         if len(self.search_results) > 0:
             for index, row in enumerate(self.search_results):
-                self.l_list.insert(index, row[KEY])
+                self.l_list.insert(index, f"{row[KEY].upper()}, {row[KEY2]}")
 
     def select_evacuee(self, event):
         '''A callback which triggers when an evacuee is selected.'''

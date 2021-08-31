@@ -30,12 +30,13 @@ class Database:
                 client.delete_database(dbname)
                 self._say(f"Deleted database \"{dbname}\".")
 
-    def db_query(self, field, value, dbname: str = "dehc"):
+    def db_query(self, field: str, value: str, sortkey: str, dbname: str = "dehc"):
         '''Returns all documents with field matching value.'''
         with couchdb(**self.config) as client:
             db = client[dbname]
-            result = db.get_query_result({field:{"$eq":value}})
+            result = db.get_query_result(selector={field:{"$eq":value}})
             result = [row for row in result]
+            result.sort(key=lambda x: x[sortkey])
         self._say(f"Returned docs with \"{field}\" of \"{value}\".")
         return result
 
@@ -55,7 +56,7 @@ class Database:
                 doc["_deleted"] = True
         self._say(f"Deleted document with id \"{id}\".")
     
-    def doc_get_id(self, prefix=""):
+    def doc_get_id(self, prefix: str = ""):
         n = hex(random.randint(0, 281474976710656))[2:]
         n = prefix+"0"*(12-len(n))+n
         self._say(f"Generated a document id.")
