@@ -69,8 +69,8 @@ NATIONALITIES = ["Argentina", "Australia", "Austria", "Belarus", "Belgium",
 # ----------------------------------------------------------------------------
 
 def evacuee_test_data(db: Database, n: int):
-    for i in range(1, n+1):
-        print(f"Evacuee #{i}...")
+    '''Inserts evacuee test data into the dehc database.'''
+    for _ in range(n):
         sex, = r.choices(SEX, weights=(50,49,1))
         if sex == "M":
             name = f"{r.choice(MALE_GIVEN)}"

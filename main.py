@@ -4,7 +4,7 @@ from interface import GUI
 
 # ----------------------------------------------------------------------------
 
-db = Database(noisy=True)
+db = Database(noisy=True, logging=True)
 gui = GUI(db)
 gui.run()
 sys.exit(0)
