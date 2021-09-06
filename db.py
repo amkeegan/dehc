@@ -45,7 +45,7 @@ class Database:
                 self.log = False
                 self._log_(f"Del db {self.logname}")
 
-    def db_dump(self) -> list[dict]:
+    def db_dump(self):
         '''Returns all documents from the couchdb database. Resource intensive!'''
         with couchdb(user=self.user, passwd=self.passwd, url=self.url) as client:
             db = client[self.name]
@@ -53,17 +53,17 @@ class Database:
             self._log_(msg=f"Query *", nolog=True)
             return docs
 
-    def db_query(self, *, selector: dict = {}, fields: list[str] = [], sort: list = []) -> list[dict]:
+    def db_query(self, *, selector: dict = {}, fields: list[str] = [], sort: list = []):
         '''Returns some documents from the couchdb database.'''
         selector = {'_id': {'$exists': True}} if selector == {} else selector
         fields = None if fields == [] else fields
         with couchdb(user=self.user, passwd=self.passwd, url=self.url) as client:
             db = client[self.name]
-            docs = db.get_query_result(selector=selector, fields=fields, sort=sort, raw_result=True)['docs']
+            docs = db.get_query_result(selector=selector, fields=fields, sort=sort, raw_result=True, limit=1000)['docs']
             self._log_(msg=f"Query {'*' if fields == None else fields} where {'*'if selector == {'_id': {'$exists': True}} else selector} {'' if sort == [] else 'sorted by '+str(sort)}", nolog=True)
             return docs
 
-    def doc_get(self, *, id: str, fields: list[str] = None) -> dict:
+    def doc_get(self, *, id: str, fields: list[str] = None):
         '''Returns a single document from the couchdb database.'''
         with couchdb(user=self.user, passwd=self.passwd, url=self.url) as client:
             data = client[self.name][id]
@@ -189,7 +189,7 @@ class DEHC_Database:
         data_c = data.copy()
         self.db.doc_edit(id=id, data=data_c)
     
-    def item_get(self, *, id: str, fields: list[str] = None) -> dict:
+    def item_get(self, *, id: str, fields: list[str] = None):
         '''Gets the data for a single item in the DEHC database.'''
         return self.db.doc_get(id=id, fields=fields)
 

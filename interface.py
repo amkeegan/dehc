@@ -26,7 +26,7 @@ def GET_LISTNAME(doc: dict) -> str:
     keys = GET_KEYS(category)
     return f", ".join([doc[key] for key in keys])+f" [{category}]"
 
-def GET_SELECTOR(field: str, comparison: str, value: str) -> dict:
+def GET_SELECTOR(field: str, comparison: str, value: str):
     return {
     "=":{field:{'$eq':value}},
     "<":{field:{'$lt':value}},
@@ -172,6 +172,7 @@ class IngestApp:
         '''Performs a container search using the last query's settings.'''
         if self.co_search != None:
             data = self.db.db_search(**self.co_search)
+            print(len(data))
             self.refresh_containers(data)
 
 
@@ -231,6 +232,7 @@ class IngestApp:
         '''Performs an item search using the last query's settings.'''
         if self.it_search != None:
             data = self.db.db_search(**self.it_search)
+            print(len(data))
             self.refresh_items(data)
 
 
@@ -293,7 +295,7 @@ class IngestApp:
             return ids
 
 
-    def doc_from_id(self, *, id: str, keyonly: bool = False) -> dict:
+    def doc_from_id(self, *, id: str, keyonly: bool = False):
         '''Takes a doc id and returns its key fields.'''
         if keyonly == True:
             category = GET_CATEGORY(id)
