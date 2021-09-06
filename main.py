@@ -1,10 +1,13 @@
 import sys
-from db import Database
-from interface import GUI
+from tkinter.font import families
+
+from db import DEHC_Database
+from interface import IngestApp
 
 # ----------------------------------------------------------------------------
 
-db = Database(noisy=True, logging=True)
-gui = GUI(db)
-gui.run()
+db = DEHC_Database(create=False)
+IngestApp(db=db).run()
 sys.exit(0)
+
+# ----------------------------------------------------------------------------
