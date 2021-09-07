@@ -1,13 +1,6 @@
+#!/usr/bin/env python3
+'''The script that starts the main DEHC application.'''
+
 import sys
-from tkinter.font import families
 
-from db import DEHC_Database
-from interface import IngestApp
-
-# ----------------------------------------------------------------------------
-
-db = DEHC_Database(create=False)
-IngestApp(db=db).run()
 sys.exit(0)
-
-# ----------------------------------------------------------------------------
