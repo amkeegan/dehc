@@ -335,29 +335,123 @@ class DEHCDatabase:
     schema: Dictionary describing objects and fields in the database.
     '''
 
-    def __init__(self, config: str, loud: bool = False):
+    def __init__(self, *, config: str, loud: bool = False, quickstart: bool = False):
         '''Constructs a DEHCDatabase object.
 
         config: Path to .json file containing database server credentials.
         loud: If true, database transactions will be logged to console.
+        quickstart: Creates databases and loads schema automatically.
         '''
         self.db = Database(config=config, loud=loud)
-        self.db_list = ["items", "flags", "containers", "files", "logs"]
+        self.db_list = ["items", "containers", "files", "logs"]
         self.schema = {}
-    
+        if quickstart == True:
+            self.databases_create(lazy=True)
+            self.schema_load(schema="db_schema.json")
+            self.schema_save()
 
-    def databases_create(self):
-        '''Creates DEHC databases if they don't already exist.'''
+
+    def databases_create(self, lazy=False):
+        '''Creates DEHC databases.
+        
+        lazy: If true, won't error if databases already exist.
+        '''
         for db in self.db_list:
-            if self.db.database_exists(db) == False:
+            if lazy == False or self.db.database_exists(db) == False:
                 self.db.database_create(db)
     
     
-    def databases_delete(self):
-        '''Deletes DEHC databases if they exist.'''
+    def databases_delete(self, lazy=False):
+        '''Deletes DEHC databases.
+        
+        lazy: If true, won't error if databases don't exist.
+        '''
         for db in self.db_list:
-            if self.db.database_exists(db) == True:
+            if lazy == False or self.db.database_exists(db) == True:
                 self.db.database_delete(db)
     
+
+    def schema_load(self, schema: str = None, forcelocal: bool = False):
+        '''Loads database schema into memory.
+
+        Will look for doc "schema" in db "items" first, then locally.
+        
+        schema: Path to local .json file containing database schema.
+        forcelocal: If true, uses local schema over one stored in the database.
+        '''
+        if forcelocal == False and self.db.document_exists(dbname="items", id="schema") == True:
+            loaded_schema = self.db.document_get(dbname="items", id="schema")
+        else:
+            with open(schema, "r") as f:
+                loaded_schema = json.loads(f.read())
+        for key, value in self.schema.items():
+            if "/" in key:
+                raise ValueError("Category names cannot contain / chars.")
+                # ...because they're used in UUIDs to split category from number
+            if "category" in value["fields"]:
+                raise ValueError("category can't be a field name.")
+                # ...because it's reserved by app for identifying item types
+        self.schema = loaded_schema
+
+
+    def schema_save(self):
+        '''Saves database schema to the database.'''
+        if self.db.document_exists(dbname="items", id="schema"):
+            self.db.document_edit(dbname="items", doc=self.schema, id="schema")
+        else:
+            self.db.document_create(dbname="items", doc=self.schema, id="schema")
+
+
+    def schema_fields(self, *, cat: str = None, id: str = None):
+        '''Returns the list of fields for a particular kind of item.
+        
+        Only cat OR id needs to be provided. If both, cat is used.
+
+        cat: Category of item to recieve fields of.
+        id: Item UUID to recieve fields of.
+        '''
+        if cat == None:
+            cat, *_ = id.split("/")
+        fields = self.schema[cat]["fields"]
+        return fields
+
+
+    def schema_keys(self, *, cat: str = None, id: str = None):
+        '''Returns the list of key fields for a particular kind of item.
+        
+        Only cat OR id needs to be provided. If both, cat is used.
+
+        cat: Category of item to recieve key fields of.
+        id: Item UUID to recieve key fields of.
+        '''
+        if cat == None:
+            cat, *_ = id.split("/")
+        keys = self.schema[cat]["keys"]
+        return keys
+
+
+    def item_create(self, cat: str, doc: dict):
+        '''Creates new item in items database, returns id.
+        
+        cat: The item's category.
+        doc: The item's data: {"field": "value", ...}
+        '''
+        id = self.db.id_create(length=16, prefix=cat+"/")
+        doc['category'] = cat
+        self.db.document_create(dbname="items", doc=doc, id=id)
+        return id
+    
+
+    def item_delete(self, id: str, all: bool = True, recur: bool = False, lazy: bool = False):
+        '''Deletes item from items database.
+        
+        id: The UUID of item to delete.
+        all: If true, also deletes item's container and file docs.
+        recur: If true, also deletes all of item's children.
+        lazy: If true, won't error if document doesn't exist.
+        '''
+        if lazy == False or self.db.document_exists(dbname="items", id=id) == True:
+            self.db.document_delete(dbname="items", id=id)
+        # All and Recur are "To Be Implemented"
 
 # ----------------------------------------------------------------------------
