@@ -436,7 +436,7 @@ class DEHCDatabase:
         cat: The item's category.
         doc: The item's data: {"field": "value", ...}
         '''
-        id = self.db.id_create(length=16, prefix=cat+"/")
+        id, = self.db.id_create(length=16, prefix=cat+"/")
         doc['category'] = cat
         self.db.document_create(dbname="items", doc=doc, id=id)
         return id
