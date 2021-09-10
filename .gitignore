@@ -4,3 +4,7 @@
 # Ignore pycache
 __pycache__/
 pycache/
+
+# Ignore text documents except requirements.txt
+*.txt
+!requirements.txt

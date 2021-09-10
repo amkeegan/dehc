@@ -82,5 +82,9 @@ db.query(dbname="testb", selector={"a": {"$in": arr}}, fields=["_id"], sort=[{"_
 t2 = time.time()
 print(f"1 query for {m} values in {n} documents, with poor index, is {t2-t1} seconds")
 
+# Clean up
+db.database_delete(dbname="testa")
+db.database_delete(dbname="testb")
+
 sys.exit(0)
 

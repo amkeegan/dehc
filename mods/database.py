@@ -30,6 +30,7 @@ class Database:
         self.client = CloudantV1(authenticator=auth)
         self.client.set_service_url(data['url'])
         self.loud = loud
+        self._log("Start")
 
 
     def database_create(self, dbname: str):
@@ -67,6 +68,7 @@ class Database:
 
     def database_list(self):
         '''Returns a list of active databases.'''
+        self._log(f"List db")
         return self.client.get_all_dbs().get_result()
 
 
@@ -84,28 +86,36 @@ class Database:
         return id
 
 
-    def document_delete(self, dbname: str, id: str):
+    def document_delete(self, dbname: str, id: str, lazy: bool = False):
         '''Deletes an existing document.
         
         dbname: Name of database to delete document in.
         id: The UUID of document to delete.
+        lazy: If true, won't error if document doesn't exist.
         '''
-        doc = self.client.get_document(db=dbname, doc_id=id).get_result()
-        res = self.client.delete_document(db=dbname, doc_id=id, rev=doc["_rev"]).get_result()
-        self._log(f"Del doc {dbname} {res['id']}")
+        if lazy == False or self.document_exists(dbname=dbname, id=id) == True:
+            doc = self.client.get_document(db=dbname, doc_id=id).get_result()
+            self.client.delete_document(db=dbname, doc_id=id, rev=doc["_rev"])
+            self._log(f"Del doc {dbname} {id}")
+        else:
+            self._log(f"Del doc {dbname} {id} failed")
 
 
-    def document_edit(self, dbname: str, doc: dict, id: str):
+    def document_edit(self, dbname: str, doc: dict, id: str, lazy: bool = False):
         '''Edits an existing document.
         
         dbname: Name of database to edit document in.
         doc: Fields and values to be edited.
         id: The UUID of the document to edit.
+        lazy: If true, won't error if document doesn't exist.
         '''
-        remote_doc = self.client.get_document(db=dbname, doc_id=id).get_result()
-        remote_doc.update(doc)
-        res = self.client.post_document(db=dbname, document=remote_doc).get_result()
-        self._log(f"Edit doc {dbname} {res['id']}")
+        if lazy == False or self.document_exists(dbname="items", id=id) == True:
+            remote_doc = self.client.get_document(db=dbname, doc_id=id).get_result()
+            remote_doc.update(doc)
+            self.client.post_document(db=dbname, document=remote_doc)
+            self._log(f"Edit doc {dbname} {id}")
+        else:
+            self._log(f"Edit doc {dbname} {id} failed")
 
 
     def document_exists(self, dbname: str, id: str):
@@ -123,24 +133,20 @@ class Database:
             return False
 
 
-    def document_get(self, dbname: str, id: str):
+    def document_get(self, dbname: str, id: str, lazy: bool = False):
         '''Retrieves a document from a database and returns it.
         
         dbname: Name of database to fetch from.
         id: The UUID of document to fetch.
+        lazy: If true, won't error if document doesn't exist.
         '''
-        remote_doc = self.client.get_document(db=dbname, doc_id=id).get_result()
+        if lazy == False or self.document_exists(dbname="items", id=id) == True:
+            remote_doc = self.client.get_document(db=dbname, doc_id=id).get_result()
+            self._log(f"Get doc {dbname} {id}")
+        else:
+            remote_doc = {}
+            self._log(f"Get doc {dbname} {id} failed")
         return remote_doc
-
-
-    def document_list(self, dbname: str, limit: int = 25):
-        '''Returns a list of all documents in a database. Intensive!
-        
-        dbname: Name of database to fetch all docs from.
-        limit: Number of docs to retrieve. Set arbitrary large to fetch all.
-        '''
-        remote_docs = self.client.post_all_docs(db=dbname, include_docs=True, limit=limit).get_result()
-        return remote_docs
 
 
     def documents_create(self, dbname: str, docs: list, ids: list):
@@ -165,55 +171,89 @@ class Database:
         ids = []
         for re in res:
             id = re['id']
-            self._log(f"New doc {dbname} {id}")
+            self._log(f"Bulk new doc {dbname} {id}")
             ids.append(id)
         return ids
 
 
-    def documents_delete(self, dbname: str, ids: str):
+    def documents_delete(self, dbname: str, ids: str, lazy: bool = False):
         '''Deletes multiple documents at once.
         
         dbname: Name of database to delete documents in.
         ids: The UUIDs of the documents to delete.
+        lazy: If true, won't error if any documents doesn't exist.
         '''
-        for id in ids:
-            doc = self.client.get_document(db=dbname, doc_id=id).get_result()
-            res = self.client.delete_document(db=dbname, doc_id=id, rev=doc["_rev"]).get_result()
-            self._log(f"Del doc {dbname} {res['id']}")
+        remote_docs = self.client.post_all_docs(db=dbname, limit=len(ids), keys=ids).get_result()['rows']
+        for remote_doc in remote_docs:
+            id = remote_doc["key"]
+            if lazy == False or self.document_exists(dbname=dbname, id=id) == True:
+                rev = remote_doc["value"]["rev"]
+                self.client.delete_document(db=dbname, doc_id=id, rev=rev)
+                self._log(f"Bulk del doc {dbname} {id}")
+            else:
+                self._log(f"Bulk del doc {dbname} {id} failed")
 
 
-    def documents_edit(self, dbname: str, docs: list, ids: list):
+    def documents_edit(self, dbname: str, docs: list, ids: list, lazy: bool = False):
         '''Edits multiple documents at once, returning a list of id and rev numbers. 
         
         dbname: Name of database to edit documents in.
         docs: Lists of fields and values to be edited.
         ids:  List of IDs of documents being edited.
+        lazy: If true, won't error if any documents doesn't exist.
         '''
-        remote_docs = self.client.post_all_docs(db=dbname, include_docs=True, limit=len(ids), keys=ids).get_result()
+        remote_docs = self.client.post_all_docs(db=dbname, include_docs=True, limit=len(ids), keys=ids).get_result()['rows']
         doc_list = []
-        for remote_doc in remote_docs['rows']:
-            remote_doc = remote_doc['doc']
-            id = remote_doc["_id"]
-            rev = remote_doc["_rev"]
-            remote_doc.update(docs[ids.index(id)])
-            remote_doc = Document(id=id, rev=rev, **remote_doc)
-            doc_list.append(remote_doc)
+        for remote_doc in remote_docs:
+            id = remote_doc["key"]
+            if lazy == False or self.document_exists(dbname=dbname, id=id) == True:
+                rev = remote_doc["value"]["rev"]
+                remote_doc = remote_doc['doc']
+                remote_doc.update(docs[ids.index(id)])
+                remote_doc = Document(id=id, rev=rev, **remote_doc)
+                doc_list.append(remote_doc)
+            else:
+                self._log(f"Bulk edit doc {dbname} {id} failed")
 
         doc_list = BulkDocs(docs=doc_list)
         res = self.client.post_bulk_docs(db=dbname, bulk_docs=doc_list).get_result()
         for re in res:
-            self._log(f"Edit doc {dbname} {re['id']}")
+            self._log(f"Bulk edit doc {dbname} {re['id']}")
 
 
-    def documents_get(self, dbname: str, ids: str):
+    def documents_get(self, dbname: str, ids: str, lazy: bool = False):
         '''Retrieves multiple documents and returns them.
         
         dbname:  Name of database to get documents from.
         ids: A list of UUIDs of documents to fetch.
+        lazy: If true, won't error if any documents don't exist.
         '''
-        remote_docs = self.client.post_all_docs(db=dbname, include_docs=True, limit=len(ids), keys=ids).get_result()
-        res = [doc['doc'] for doc in remote_docs['rows']]
-        return res
+        remote_docs = self.client.post_all_docs(db=dbname, include_docs=True, limit=len(ids), keys=ids).get_result()['rows']
+        doc_list = []
+        for doc in remote_docs:
+            id = doc["key"]
+            if lazy == False or self.document_exists(dbname=dbname, id=id) == True:
+                self._log(f"Bulk get doc {dbname} {id}")
+                doc_list.append(doc['doc'])
+            else:
+                self._log(f"Bulk get doc {dbname} {id} failed")
+        return doc_list
+
+
+    def documents_list(self, dbname: str, startkey: str = None, endkey: str = None, limit: int = 25):
+        '''Returns a list of all documents in a database. Intensive!
+        
+        dbname: Name of database to fetch all docs from.
+        startkey: If included, document UUID to start fetching from.
+        endkey: If included, document UUID to stop fetching at.
+        limit: Number of docs to retrieve. Set arbitrary large to fetch all.
+        '''
+        remote_docs = self.client.post_all_docs(db=dbname, include_docs=True, startkey=startkey, endkey=endkey, limit=limit).get_result()
+        docs = []
+        for remote_doc in remote_docs['rows']:
+            docs.append(remote_doc['doc'])
+        self._log(f"List doc {dbname} {startkey if startkey != None else 'START'} to {endkey if endkey != None else 'END'}")
+        return docs
 
 
     def id_create(self, n: int = 1, length: int = 12, prefix: str = ""):
@@ -284,19 +324,20 @@ class Database:
             return False
 
 
-    def query(self, dbname: str, selector: dict, fields: list, sort: list, limit: int = 25):
+    def query(self, dbname: str, selector: dict = {}, fields: list = None, sort: list = None, limit: int = 25):
         '''Queries a database using MongoDB-style selectors & indexes.
         
         An index involving the 'sort' fields must exist, otherwise the query will fail.
         For selector operators, see: https://docs.mongodb.com/manual/reference/operator/query/
 
         db = Name of database being queried.
-        selector = A MongoDB style selector: {"FIELDNAME" : {"OPERATOR": "VALUE"}, ... }
-        fields = List of fields to return: ["FIELD1", "FIELD2", ...]
-        sort = List defining sort order: [{"FIELD1": "ASC"}, {"FIELD2": "DESC"}, ...]
+        selector = A MongoDB style selector: {"FIELDNAME" : {"OPERATOR": "VALUE"}, ... }. If omitted, returns no documents.
+        fields = List of fields to return: ["FIELD1", "FIELD2", ...]. If omitted, returns all fields.
+        sort = List defining sort order: [{"FIELD1": "ASC"}, {"FIELD2": "DESC"}, ...]. If omitted, returns in ascending UUID order.
         limit = Number of docs to retrieve. Set arbitrary large to fetch all.
         '''
         res = self.client.post_find(db=dbname, selector=selector, fields=fields, sort=sort, limit=limit).get_result()
+        self._log(f"Query {dbname} where {selector} for {fields} sort {sort}")
         return res['docs']
 
 
@@ -323,6 +364,9 @@ class Database:
                 print(f"{ts} | {msg}")
 
 
+    def __del__(self):
+        self._log("End")
+
 # ----------------------------------------------------------------------------
 
 class DEHCDatabase:
@@ -332,6 +376,7 @@ class DEHCDatabase:
     
     database: The associated Database object.
     db_list: List of DEHC database names.
+    id_len: Length of hex part of document UUIDs used in the database.
     schema: Dictionary describing objects and fields in the database.
     '''
 
@@ -344,6 +389,7 @@ class DEHCDatabase:
         '''
         self.db = Database(config=config, loud=loud)
         self.db_list = ["items", "containers", "files", "logs"]
+        self.id_len = 16
         self.schema = {}
         if quickstart == True:
             self.databases_create(lazy=True)
@@ -369,7 +415,200 @@ class DEHCDatabase:
         for db in self.db_list:
             if lazy == False or self.db.database_exists(db) == True:
                 self.db.database_delete(db)
-    
+
+
+    def id_cat(self, id: str):
+        '''Takes an id and returns its category.
+        
+        id: The UUID to extract the category of.
+        '''
+        cat, *_ = id.split("/")
+        return cat
+
+
+    def item_create(self, cat: str, doc: dict):
+        '''Creates new item in items database, returns id.
+        
+        cat: The item's category.
+        doc: The item's data: {"field": "value", ...}
+        '''
+        id, = self.db.id_create(length=self.id_len, prefix=cat+"/")
+        doc['category'] = cat
+        self.db.document_create(dbname="items", doc=doc, id=id)
+        return id
+
+
+    def item_delete(self, id: str, all: bool = True, recur: bool = False, lazy: bool = False):
+        '''Deletes item from items database.
+        
+        id: The UUID of item to delete.
+        all: If true, also deletes item's container and file docs.
+        recur: If true, also deletes all of item's children.
+        lazy: If true, won't error if document doesn't exist.
+        '''
+        self.db.document_delete(dbname="items", id=id, lazy=lazy)
+        # All and Recur are "To Be Implemented"
+
+
+    def item_edit(self, id: str, data: dict, lazy: bool = False):
+        '''Edits item in items database.
+        
+        id: The UUID of item to edit.
+        data: Dictionary of fields+values to adjust.
+        lazy: If true, won't error if document doesn't exist.
+        '''
+        self.db.document_edit(dbname="items", id=id, doc=data, lazy=lazy)
+
+
+    def item_exists(self, id: str):
+        '''Returns whether or not an item exists.
+        
+        id: The UUID of item to check.
+        '''
+        return self.db.document_exists(dbname="items", id=id)
+
+
+    def item_get(self, id: str, fields: list = None, lazy: bool = False):
+        '''Retrieves item from items database.
+        
+        id: The UUID of item to retrieve.
+        fields: If included, only returns listed fields.
+        lazy: If true, won't error if document doesn't exist.
+        '''
+        doc = self.db.document_get(dbname="items", id=id, lazy=lazy)
+        if fields != None:
+            doc = {field: doc.get(field, "") for field in fields}
+        return doc
+
+
+    def items_create(self, cat: str, docs: list):
+        '''Creates multiple new items at once, returns ids.
+        
+        cat: The items' category.
+        docs: The items' data: [{"field": "value", ...}, {"field": "value", ...}, ...]
+        '''
+        ids = self.db.id_create(n=len(docs), length=self.id_len, prefix=cat+"/")
+        new_docs = []
+        for doc in docs:
+            doc_c = doc.copy()
+            doc_c['category'] = cat
+            new_docs.append(doc_c)
+        self.db.documents_create(dbname="items", docs=new_docs, ids=ids)
+        return ids
+
+
+    def items_delete(self, ids: list, all: bool = True, recur: bool = False, lazy: bool = False):
+        '''Deletes multiple items at once, returns ids.
+        
+        ids: The UUIDs of items to delete.
+        all: If true, also deletes items' container and file docs.
+        recur: If true, also deletes all of items' children.
+        lazy: If true, won't error if document doesn't exist.
+        '''
+        self.db.documents_delete(dbname="items", ids=ids, lazy=lazy)
+        # All and Recur are "To Be Implemented"
+
+
+    def items_edit(self, ids: list, data: list, lazy: bool = False):
+        '''Edits multiple items at once.
+        
+        ids: The UUID of item to edit.
+        data: Dictionary of fields+values to adjust.
+        lazy: If true, won't error if document doesn't exist.
+        '''
+        self.db.documents_edit(dbname="items", ids=ids, docs=data, lazy=lazy)
+
+
+    def items_get(self, ids: list, fields: list = None, lazy: bool = False):
+        '''Retrieves multiple items at once.
+        
+        ids: The UUIDs of items to retrieve.
+        fields: If included, only returns listed fields.
+        lazy: If true, won't error if any documents don't exist.
+        '''
+        docs = self.db.documents_get(dbname="items", ids=ids, lazy=lazy)
+        if fields != None:
+            new_docs = []
+            for doc in docs:
+                doc = {field: doc.get(field, "") for field in fields}
+                new_docs.append(doc)
+            docs = new_docs
+        return docs
+
+
+    def items_list(self, cat: str = None, fields: str = None):
+        '''Retrieves every item in a category from items database. Intensive!
+        
+        cat: Category to return. If omitted, returns all categories.
+        fields: If included, only returns listed fields.
+        '''
+        if cat == None:
+            startkey = None
+            endkey = None
+        else:
+            startkey = cat+"/"+self.id_len*"0"
+            endkey = cat+"/"+self.id_len*"f"
+        docs = self.db.documents_list(dbname="items", startkey=startkey, endkey=endkey, limit=1000000)
+        if fields != None:
+            new_docs = []
+            for doc in docs:
+                new_doc = {field: doc.get(field, "") for field in fields}
+                new_docs.append(new_doc)
+            return new_docs
+        else:
+            return docs
+
+
+    def items_query(self, cat: str = None, selector: dict = {}, fields: list = None, sort: list = None):
+        '''Queries the item database and returns the results.
+
+        For selector operators, see: https://docs.mongodb.com/manual/reference/operator/query/
+
+        cat = Category to query. If omitted, checks all categories.
+        selector = A MongoDB style selector: {"FIELDNAME" : {"OPERATOR": "VALUE"}, ... }. If omitted, returns all items.
+        fields = List of fields to return: ["FIELD1", "FIELD2", ...]. If omitted, returns all fields.
+        sort = List defining sort order: [{"FIELD1": "ASC"}, {"FIELD2": "DESC"}, ...]. If omitted, returns in ascending UUID order.
+        '''
+        if cat != None:
+            selector['category'] = {"$eq": cat}
+        else:
+            selector['category'] = {"$ne": ""}
+        if sort != None:
+            index_name = "idx"
+            for field in sort:
+                key = next(iter(field.keys()))
+                index_name += f"-{key}"
+            if self.db.index_exists(dbname="items", name=index_name) == False:
+                self.db.index_create(dbname="items", name=index_name, fields=sort)
+        res = self.db.query(dbname="items", selector=selector, fields=fields, sort=sort, limit=1000000)
+        return res
+
+
+    def schema_fields(self, *, cat: str = None, id: str = None):
+        '''Returns the list of fields for a particular kind of item.
+
+        Only cat OR id needs to be provided. If both, cat is used.
+
+        cat: Category of item to recieve fields of.
+        id: ID of item to recieve fields of.
+        '''
+        if cat == None:
+            cat = self.id_cat(id=id)
+        return self.schema[cat]["fields"]
+
+
+    def schema_keys(self, *, cat: str = None, id: str = None):
+        '''Returns the list of key fields for a particular kind of item.
+
+        Only cat OR id needs to be provided. If both, cat is used.
+        
+        cat: Category of item to recieve key fields of.
+        id: ID of item to recieve key fields of.
+        '''
+        if cat == None:
+            cat = self.id_cat(id=id)
+        return self.schema[cat]["keys"]
+
 
     def schema_load(self, schema: str = None, forcelocal: bool = False):
         '''Loads database schema into memory.
@@ -394,6 +633,26 @@ class DEHCDatabase:
         self.schema = loaded_schema
 
 
+    def schema_name(self, doc: dict, *, cat: str = None, id: str = None):
+        '''Takes doc, returns simple list of key field values.
+
+        Priority for determining category: doc, then cat, then id.
+        
+        doc: The doc to get key values of.
+        cat: Category name, if not in doc itself.
+        id: Doc's UUID, if not in doc itself.
+        '''
+        if "category" in doc:
+            keys = self.schema_keys(cat=doc["category"])
+        elif "_id" in doc:
+            keys = self.schema_keys(id=doc["_id"])
+        elif cat != None:
+            keys = self.schema_keys(cat=cat)
+        else:
+            keys = self.schema_keys(id=id)
+        return [doc[key] for key in keys]
+
+
     def schema_save(self):
         '''Saves database schema to the database.'''
         if self.db.document_exists(dbname="items", id="schema"):
@@ -401,57 +660,5 @@ class DEHCDatabase:
         else:
             self.db.document_create(dbname="items", doc=self.schema, id="schema")
 
-
-    def schema_fields(self, *, cat: str = None, id: str = None):
-        '''Returns the list of fields for a particular kind of item.
-        
-        Only cat OR id needs to be provided. If both, cat is used.
-
-        cat: Category of item to recieve fields of.
-        id: Item UUID to recieve fields of.
-        '''
-        if cat == None:
-            cat, *_ = id.split("/")
-        fields = self.schema[cat]["fields"]
-        return fields
-
-
-    def schema_keys(self, *, cat: str = None, id: str = None):
-        '''Returns the list of key fields for a particular kind of item.
-        
-        Only cat OR id needs to be provided. If both, cat is used.
-
-        cat: Category of item to recieve key fields of.
-        id: Item UUID to recieve key fields of.
-        '''
-        if cat == None:
-            cat, *_ = id.split("/")
-        keys = self.schema[cat]["keys"]
-        return keys
-
-
-    def item_create(self, cat: str, doc: dict):
-        '''Creates new item in items database, returns id.
-        
-        cat: The item's category.
-        doc: The item's data: {"field": "value", ...}
-        '''
-        id, = self.db.id_create(length=16, prefix=cat+"/")
-        doc['category'] = cat
-        self.db.document_create(dbname="items", doc=doc, id=id)
-        return id
-    
-
-    def item_delete(self, id: str, all: bool = True, recur: bool = False, lazy: bool = False):
-        '''Deletes item from items database.
-        
-        id: The UUID of item to delete.
-        all: If true, also deletes item's container and file docs.
-        recur: If true, also deletes all of item's children.
-        lazy: If true, won't error if document doesn't exist.
-        '''
-        if lazy == False or self.db.document_exists(dbname="items", id=id) == True:
-            self.db.document_delete(dbname="items", id=id)
-        # All and Recur are "To Be Implemented"
 
 # ----------------------------------------------------------------------------
