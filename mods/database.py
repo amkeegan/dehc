@@ -30,7 +30,7 @@ class Database:
         self.client = CloudantV1(authenticator=auth)
         self.client.set_service_url(data['url'])
         self.loud = loud
-        self._log("Start")
+        self._log("start")
 
 
     def database_create(self, dbname: str):
@@ -39,7 +39,7 @@ class Database:
         dbname: Name of the database to create.
         '''
         self.client.put_database(db=dbname)
-        self._log(f"New db {dbname}")
+        self._log(f"new db {dbname}")
 
 
     def database_delete(self, dbname: str):
@@ -48,7 +48,7 @@ class Database:
         dbname: Name of the database to delete.
         '''
         self.client.delete_database(db=dbname)
-        self._log(f"Del db {dbname}")
+        self._log(f"del db {dbname}")
 
 
     def database_exists(self, dbname: str):
@@ -59,16 +59,19 @@ class Database:
         try:
             response = self.client.get_database_information(db=dbname).get_status_code()
             if response == 200:
+                self._log(f"db {dbname} exists")
                 return True
             else:
+                self._log(f"db {dbname} does not exist")
                 return False
         except:
+            self._log(f"db {dbname} does not exist")
             return False
 
 
     def database_list(self):
         '''Returns a list of active databases.'''
-        self._log(f"List db")
+        self._log(f"list db")
         return self.client.get_all_dbs().get_result()
 
 
@@ -82,7 +85,7 @@ class Database:
         doc = Document(id=self.id_get()[0], **doc) if id == None else Document(id=id, **doc)
         res = self.client.post_document(db=dbname, document=doc).get_result()
         id = res['id']
-        self._log(f"New doc {dbname} {id}")
+        self._log(f"new doc {dbname} {id}")
         return id
 
 
@@ -96,9 +99,9 @@ class Database:
         if lazy == False or self.document_exists(dbname=dbname, id=id) == True:
             doc = self.client.get_document(db=dbname, doc_id=id).get_result()
             self.client.delete_document(db=dbname, doc_id=id, rev=doc["_rev"])
-            self._log(f"Del doc {dbname} {id}")
+            self._log(f"del doc {dbname} {id}")
         else:
-            self._log(f"Del doc {dbname} {id} failed")
+            self._log(f"del doc {dbname} {id} failed")
 
 
     def document_edit(self, dbname: str, doc: dict, id: str, lazy: bool = False):
@@ -127,9 +130,12 @@ class Database:
         try:
             response = self.client.head_document(db=dbname, doc_id=id).get_status_code()
             if response == 200:
+                self._log(f"doc {dbname} {id} exists")
                 return True
+            self._log(f"doc {dbname} {id} does not exist")
             return False
         except:
+            self._log(f"doc {dbname} {id} does not exist")
             return False
 
 
@@ -142,10 +148,10 @@ class Database:
         '''
         if lazy == False or self.document_exists(dbname="items", id=id) == True:
             remote_doc = self.client.get_document(db=dbname, doc_id=id).get_result()
-            self._log(f"Get doc {dbname} {id}")
+            self._log(f"get doc {dbname} {id}")
         else:
             remote_doc = {}
-            self._log(f"Get doc {dbname} {id} failed")
+            self._log(f"get doc {dbname} {id} failed")
         return remote_doc
 
 
@@ -171,7 +177,7 @@ class Database:
         ids = []
         for re in res:
             id = re['id']
-            self._log(f"Bulk new doc {dbname} {id}")
+            self._log(f"bulk new doc {dbname} {id}")
             ids.append(id)
         return ids
 
@@ -189,9 +195,9 @@ class Database:
             if lazy == False or self.document_exists(dbname=dbname, id=id) == True:
                 rev = remote_doc["value"]["rev"]
                 self.client.delete_document(db=dbname, doc_id=id, rev=rev)
-                self._log(f"Bulk del doc {dbname} {id}")
+                self._log(f"bulk del doc {dbname} {id}")
             else:
-                self._log(f"Bulk del doc {dbname} {id} failed")
+                self._log(f"bulk del doc {dbname} {id} failed")
 
 
     def documents_edit(self, dbname: str, docs: list, ids: list, lazy: bool = False):
@@ -213,12 +219,12 @@ class Database:
                 remote_doc = Document(id=id, rev=rev, **remote_doc)
                 doc_list.append(remote_doc)
             else:
-                self._log(f"Bulk edit doc {dbname} {id} failed")
+                self._log(f"bulk edit doc {dbname} {id} failed")
 
         doc_list = BulkDocs(docs=doc_list)
         res = self.client.post_bulk_docs(db=dbname, bulk_docs=doc_list).get_result()
         for re in res:
-            self._log(f"Bulk edit doc {dbname} {re['id']}")
+            self._log(f"bulk edit doc {dbname} {re['id']}")
 
 
     def documents_get(self, dbname: str, ids: str, lazy: bool = False):
@@ -233,10 +239,10 @@ class Database:
         for doc in remote_docs:
             id = doc["key"]
             if lazy == False or self.document_exists(dbname=dbname, id=id) == True:
-                self._log(f"Bulk get doc {dbname} {id}")
+                self._log(f"bulk get doc {dbname} {id}")
                 doc_list.append(doc['doc'])
             else:
-                self._log(f"Bulk get doc {dbname} {id} failed")
+                self._log(f"bulk get doc {dbname} {id} failed")
         return doc_list
 
 
@@ -252,7 +258,7 @@ class Database:
         docs = []
         for remote_doc in remote_docs['rows']:
             docs.append(remote_doc['doc'])
-        self._log(f"List doc {dbname} {startkey if startkey != None else 'START'} to {endkey if endkey != None else 'END'}")
+        self._log(f"list doc {dbname} {startkey if startkey != None else 'START'} to {endkey if endkey != None else 'END'}")
         return docs
 
 
@@ -295,7 +301,7 @@ class Database:
         index_definition = IndexDefinition(fields=index_field_list)
         res = self.client.post_index(db=dbname, index=index_definition, ddoc=name, name=name, type="json").get_result()
         id = res['id'][8:]
-        self._log(f"New idx {dbname} {id}")
+        self._log(f"new idx {dbname} {id}")
         return id
 
 
@@ -306,7 +312,7 @@ class Database:
         name = Name of the index to be deleted.
         '''
         self.client.delete_index(db=dbname, ddoc=name, type="json", index=name)
-        self._log(f"Del idx {dbname} {name}")
+        self._log(f"del idx {dbname} {name}")
 
 
     def index_exists(self, dbname: str, name: str):
@@ -318,9 +324,12 @@ class Database:
         try:
             response = self.client.head_design_document(db=dbname, ddoc=name).get_status_code()
             if response == 200:
+                self._log(f"idx {dbname} {name} exists")
                 return True
+            self._log(f"idx {dbname} {name} does not exist")
             return False
         except:
+            self._log(f"idx {dbname} {name} does not exist")
             return False
 
 
@@ -337,7 +346,7 @@ class Database:
         limit = Number of docs to retrieve. Set arbitrary large to fetch all.
         '''
         res = self.client.post_find(db=dbname, selector=selector, fields=fields, sort=sort, limit=limit).get_result()
-        self._log(f"Query {dbname} where {selector} for {fields} sort {sort}")
+        self._log(f"query {dbname} where {selector} for {fields} sort {sort}")
         return res['docs']
 
 
@@ -365,7 +374,8 @@ class Database:
 
 
     def __del__(self):
-        self._log("End")
+        self._log("end")
+
 
 # ----------------------------------------------------------------------------
 
@@ -377,6 +387,7 @@ class DEHCDatabase:
     database: The associated Database object.
     db_list: List of DEHC database names.
     id_len: Length of hex part of document UUIDs used in the database.
+    limit: Maximum number of documents to return from _list and _query methods.
     schema: Dictionary describing objects and fields in the database.
     '''
 
@@ -388,8 +399,11 @@ class DEHCDatabase:
         quickstart: Creates databases and loads schema automatically.
         '''
         self.db = Database(config=config, loud=loud)
-        self.db_list = ["items", "containers", "files", "logs"]
-        self.id_len = 16
+
+        self.db_list = ["items", "containers", "logs"]
+        self.id_len = 12
+        self.limit = 1000000
+
         self.schema = {}
         if quickstart == True:
             self.databases_create(lazy=True)
@@ -397,7 +411,7 @@ class DEHCDatabase:
             self.schema_save()
 
 
-    def databases_create(self, lazy=False):
+    def databases_create(self, lazy: bool = False):
         '''Creates DEHC databases.
         
         lazy: If true, won't error if databases already exist.
@@ -407,7 +421,7 @@ class DEHCDatabase:
                 self.db.database_create(db)
     
     
-    def databases_delete(self, lazy=False):
+    def databases_delete(self, lazy: bool = False):
         '''Deletes DEHC databases.
         
         lazy: If true, won't error if databases don't exist.
@@ -415,6 +429,113 @@ class DEHCDatabase:
         for db in self.db_list:
             if lazy == False or self.db.database_exists(db) == True:
                 self.db.database_delete(db)
+
+
+    def container_add(self, container: str, item: str, lazy: bool = False):
+        '''Puts an item in a container.
+        
+        container: The UUID of the container.
+        item: The UUID of the item.
+        lazy: If true, won't error if item already in container.
+        '''
+        idc = container+"/"+item
+        if lazy == False or self.db.document_exists(dbname="containers", id=idc) == False:
+            doc = {"container": container, "child": item}
+            self.db.document_create(dbname="containers", doc=doc, id=idc)
+        return idc
+
+
+    def container_adds(self, container: str, items: list):
+        '''Puts multiple items in a container.
+        
+        container: The UUID of the container.
+        items: The UUIDs of the items.
+        '''
+        ids_list = [container+"/"+item for item in items]
+        docs_list = [{"container": container, "child": item} for item in items]
+        self.db.documents_create(dbname="containers", ids=ids_list, docs=docs_list)
+        return ids_list
+
+
+    def container_exists(self, container: str, item: str):
+        '''Returns whether or not a container-item relationship exists.
+        
+        container: The UUID of container to check.
+        item: The UUID of item to check.
+        '''
+        idc = container+"/"+item
+        return self.db.document_exists(dbname="containers", id=idc)
+
+
+    def containers_list(self):
+        '''Retrieves every doc from container database. Intensive!'''
+        return self.db.documents_list(dbname="containers", limit=self.limit)
+
+
+    def container_move(self, from_con: str, to_con: str, item: str, lazy: bool = False):
+        '''Moves an item from one container to another.
+        
+        from_con: The UUID of the container the item is leaving.
+        to_con: The UUID of the container the item is entering.
+        item: The UUID of the item.
+        lazy: If true, won't error if from_con doesn't exist, or to_con already exists.
+        '''
+        self.container_remove(container=from_con, item=item, lazy=lazy)
+        self.container_add(container=to_con, item=item, lazy=lazy)
+
+
+    def container_moves(self, from_con: str, to_con: str, items: list, lazy: bool = False):
+        '''Moves multiple items from one container to another.
+        
+        from_con: The UUID of the container the item is leaving.
+        to_con: The UUID of the container the item is entering.
+        items: The UUIDs of the items.
+        lazy: If true, won't error if from_con doesn't exist, or to_con already exists.
+        '''
+        self.container_removes(container=from_con, items=items, lazy=lazy)
+        self.container_adds(container=to_con, items=items)
+
+
+    def containers_query(self, selector: dict = {}, fields: list = None, sort: list = None):
+        '''Queries the container database and returns the results.
+
+        For selector operators, see: https://docs.mongodb.com/manual/reference/operator/query/
+
+        selector = A MongoDB style selector: {"FIELDNAME" : {"OPERATOR": "VALUE"}, ... }. If omitted, returns all items.
+        fields = List of fields to return: ["FIELD1", "FIELD2", ...]. If omitted, returns all fields.
+        sort = List defining sort order: [{"FIELD1": "ASC"}, {"FIELD2": "DESC"}, ...]. If omitted, returns in ascending UUID order.
+        '''
+        if sort != None:
+            index_name = "idx"
+            for field in sort:
+                key = next(iter(field.keys()))
+                index_name += f"-{key}"
+            if self.db.index_exists(dbname="containers", name=index_name) == False:
+                self.db.index_create(dbname="containers", name=index_name, fields=sort)
+        res = self.db.query(dbname="containers", selector=selector, fields=fields, sort=sort, limit=self.limit)
+        return res
+
+
+    def container_remove(self, container: str, item: str, lazy: bool = False):
+        '''Removes an item from a container.
+        
+        container: The UUID of the container.
+        item: The UUID of the item.
+        lazy: If true, won't error if container or child doesn't exist.
+        '''
+        id = container+"/"+item
+        self.db.document_delete(dbname="containers", id=id, lazy=lazy)
+
+
+    def container_removes(self, container: str, items: list, lazy: bool = False):
+        '''Removes multiple items from a container.
+        
+        container: The UUID of the container.
+        items: The UUIDs of the items.
+        lazy: If true, won't error if container or child doesn't exist.
+        '''
+        ids = [container+"/"+item for item in items]
+        self.db.documents_delete(dbname="containers", ids=ids, lazy=lazy)
 
 
     def id_cat(self, id: str):
@@ -443,11 +564,14 @@ class DEHCDatabase:
         
         id: The UUID of item to delete.
         all: If true, also deletes item's container and file docs.
-        recur: If true, also deletes all of item's children.
+        recur: If true, also deletes all of item's container's children.
         lazy: If true, won't error if document doesn't exist.
         '''
         self.db.document_delete(dbname="items", id=id, lazy=lazy)
-        # All and Recur are "To Be Implemented"
+        if all == True:
+            cid = self.item_container(id)
+            self.container_delete(id=cid, recur=recur, lazy=True)
+        # Recur is "To Be Implemented"
 
 
     def item_edit(self, id: str, data: dict, lazy: bool = False):
@@ -506,7 +630,10 @@ class DEHCDatabase:
         lazy: If true, won't error if document doesn't exist.
         '''
         self.db.documents_delete(dbname="items", ids=ids, lazy=lazy)
-        # All and Recur are "To Be Implemented"
+        if all == True:
+            cids = list(map(self.item_container, ids))
+            self.containers_delete(ids=cids, recur=recur, lazy=True)
+        # Recur is "To Be Implemented"
 
 
     def items_edit(self, ids: list, data: list, lazy: bool = False):
@@ -548,7 +675,7 @@ class DEHCDatabase:
         else:
             startkey = cat+"/"+self.id_len*"0"
             endkey = cat+"/"+self.id_len*"f"
-        docs = self.db.documents_list(dbname="items", startkey=startkey, endkey=endkey, limit=1000000)
+        docs = self.db.documents_list(dbname="items", startkey=startkey, endkey=endkey, limit=self.limit)
         if fields != None:
             new_docs = []
             for doc in docs:
@@ -580,7 +707,7 @@ class DEHCDatabase:
                 index_name += f"-{key}"
             if self.db.index_exists(dbname="items", name=index_name) == False:
                 self.db.index_create(dbname="items", name=index_name, fields=sort)
-        res = self.db.query(dbname="items", selector=selector, fields=fields, sort=sort, limit=1000000)
+        res = self.db.query(dbname="items", selector=selector, fields=fields, sort=sort, limit=self.limit)
         return res
 
 

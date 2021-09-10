@@ -9,81 +9,35 @@ from mods.database import DEHCDatabase
 
 db = DEHCDatabase(config="db_auth.json", loud=True, quickstart=True)
 
+pa = db.item_create(cat="person", doc={"Family Name": "Smith", "Given Name(s)": "Alice"})
+pb = db.item_create(cat="person", doc={"Family Name": "Jones", "Given Name(s)": "Bob"})
+pc = db.item_create(cat="person", doc={"Family Name": "Smith", "Given Name(s)": "Chris"})
+pd = db.item_create(cat="person", doc={"Family Name": "Andrews", "Given Name(s)": "David"})
+pe = db.item_create(cat="person", doc={"Family Name": "Andrews", "Given Name(s)": "Eric"})
+pf = db.item_create(cat="person", doc={"Family Name": "Jones", "Given Name(s)": "Frank"})
+pg = db.item_create(cat="person", doc={"Family Name": "Smith", "Given Name(s)": "George"})
+ph = db.item_create(cat="person", doc={"Family Name": "Clark", "Given Name(s)": "Harry"})
+fa = db.item_create(cat="family", doc={"Name": "The Smith Family"})
+fb = db.item_create(cat="family", doc={"Name": "The Jones Family"})
+fc = db.item_create(cat="family", doc={"Name": "The Andrews Family"})
+sa = db.item_create(cat="station", doc={"Station": "Ingest"})
+sb = db.item_create(cat="station", doc={"Station": "Clean Hold"})
 
-# Testing inserts
-
-x = {"Family Name": "Smith", "Given Name(s)": "Alice", "Sex": "F", "Date of Birth": "14/02/1990"}
-y = {"Family Name": "Jones", "Given Name(s)": "Bob", "Sex": "M", "Date of Birth": "22/09/1985"}
-z = {"Name": "The Test Family"}
-
-x, y = db.items_create(cat="person", docs=[x, y])
-z = db.item_create(cat="family", doc=z)
-print(x, "\n", y, "\n", z, sep="")
-
-
-# Testing schema commands
-
-a = db.schema_fields(cat="person")
-b = db.schema_fields(id=x)
-c = db.schema_keys(cat="person")
-d = db.schema_keys(id=y)
-print(a, "\n", b, "\n", c, "\n", d, sep="")
-
-
-# Testing item existance
-
-a = db.item_exists(id=x)
-b = db.item_exists(id=y)
-c = db.item_exists(id=z)
-d = db.item_exists(id="fake")
-print(a, "\n", b, "\n", c, "\n", d, sep="")
-
-
-# Testing item listing
-
-a = db.items_list()
-b = db.items_list(cat="person", fields=["_id", "Family Name", "Given Name(s)"])
-c = db.items_list(cat="family", fields=["_id", "Name"])
-print(a, "\n", b, "\n", c, sep="")
-
-
-# Testing item edits
-
-a = db.items_edit(ids=[x, y, "fake"], data=[{"Notes":"Clever."}, {"Notes":"Handsome."}], lazy=True)
-b = db.item_edit(id=z, data={"Notes":"Testy."})
-c = db.item_edit(id="fake", data={}, lazy=True)
-print(a, "\n", b, "\n", c, sep="")
-
-
-# Testing item fetching
-
-a = db.items_get(ids=[x, y, "fake"], fields=["_id", "Family Name", "Given Name(s)"], lazy=True)
-b = db.item_get(id=z)
-c = db.item_get(id="fake", fields=["_id"], lazy=True)
-print(a, "\n", b, "\n", c, sep="")
-
-
-# Testing item queries
-
-a = db.items_query(cat="person", selector={'Family Name': {"$gt":"c"}}, fields=["_id", "Family Name", "Given Name"], sort=[{"_id": "asc"}])
-b = db.items_query(selector={'Notes': {"$ne":"Handsome."}})
-c = db.items_query(cat="person", sort=[{"_id": "desc"}])
-d = db.items_query(cat="fake")
-e = db.items_query()
-print(a, "\n", b, "\n", c, "\n", d, "\n", e, sep="")
-
-
-# Testing item deletion
-
-input("Break. Press enter to continue.")
-
-a = db.items_delete(ids=[x, y, "fake"], lazy=True)
-b = db.item_delete(id=z)
-c = db.item_delete(id="fake", lazy=True)
-print(a, "\n", b, "\n", c, sep="")
-
-
-# Clean up
+db.container_adds(container=fa, items=[pa, pc, pg])
+db.container_adds(container=fb, items=[pb, pf])
+db.container_adds(container=fc, items=[pd, pe])
+db.container_add(container=sa, item=fa)
+db.container_add(container=sb, item=fb)
+db.container_add(container=sb, item=fc)
+db.container_add(container=sb, item=ph)
+db.container_remove(container=sb, item=ph)
+db.container_remove(container=sb, item=ph, lazy=True)
+db.container_removes(container=sb, items=[fb, fc])
+db.container_move(from_con=sa, to_con=sb, item=fa)
+db.container_moves(from_con=sb, to_con=sa, items=[fa, ph], lazy=True)
+print(db.container_exists(container=sa, item=ph))
+print(db.containers_list())
+print(db.containers_query())
 
 db.databases_delete()
 del db
