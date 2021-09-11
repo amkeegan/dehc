@@ -7,7 +7,7 @@ from mods.database import DEHCDatabase
 
 # Initialization
 
-db = DEHCDatabase(config="db_auth.json", loud=True, quickstart=True)
+db = DEHCDatabase(config="db_auth.json", loud=False, quickstart=True)
 
 pa = {"Family Name": "Smith", "Given Name(s)": "Alice", "Sex": "F", "Weight": "95", "Notes": "Likes walks on the beach."}
 pb = {"Family Name": "Jones", "Given Name(s)": "Bob", "Sex": "M", "Weight": "100"}

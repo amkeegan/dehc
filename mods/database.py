@@ -12,7 +12,9 @@ from ibmcloudant.cloudant_v1 import CloudantV1, BulkDocs, Document, IndexDefinit
 class Database:
     '''A class which enables communication with a CouchDB database.
     
-    This class is application agnostic and only performs basic operations. For helper methods specific to the DEHC application, use the DEHCDatabase class down below.
+    This class is application agnostic and only performs basic operations. 
+    For helper methods specific to the DEHC application, use the DEHCDatabase 
+    class down below.
     
     client: The Cloudant-CouchDB client object.
     loud: If true, database transactions will be logged to console.
@@ -26,7 +28,8 @@ class Database:
         '''
         with open(config, "r") as f:
             data = json.loads(f.read())
-        auth = CouchDbSessionAuthenticator(username=data['user'], password=data['pass'])
+        auth = CouchDbSessionAuthenticator(username=data['user'], 
+        password=data['pass'])
         self.client = CloudantV1(authenticator=auth)
         self.client.set_service_url(data['url'])
         self.loud = loud
@@ -382,12 +385,13 @@ class Database:
 class DEHCDatabase:
     '''A class which handles database transactions in DEHC applications.
     
-    This class is specific to DEHC and is the one to import into the apps. Importing the Database class up above should not be necessary.
+    This class is specific to DEHC and is the one to import into the apps. 
+    Importing the Database class up above should not be necessary.
     
     database: The associated Database object.
     db_list: List of DEHC database names.
     id_len: Length of hex part of document UUIDs used in the database.
-    limit: Maximum number of documents to return from _list and _query methods.
+    limit: Max number of documents to return from _list and _query methods.
     schema: Dictionary describing objects and fields in the database.
     '''
 
@@ -400,7 +404,7 @@ class DEHCDatabase:
         '''
         self.db = Database(config=config, loud=loud)
 
-        self.db_list = ["items", "containers", "logs"]
+        self.db_list = ["items", "containers"]
         self.id_len = 12
         self.limit = 1000000
 
@@ -516,6 +520,29 @@ class DEHCDatabase:
         '''
         idc = container+"/"+item
         return self.db.document_exists(dbname="containers", id=idc)
+
+
+    def container_flag(self, container: str, flag: str, value: int, lazy: bool = False):
+        '''Sets a flag for every child of a container to a particular value.
+        
+        container: Container to set flag for.
+        flag: Flag to set.
+        value: Numerical value to set flag to.
+        lazy: If true, won't error if container or containing items don't exist.
+        '''
+        items = [container]+self.container_children_all(container=container, result="ITEM")
+        self.items_flag(items=items, flag=flag, value=value, lazy=lazy)
+
+
+    def container_flag_get(self, container: str, flag: str, lazy: bool = False):
+        '''Retrieves the highest value of a flag among an item and its children.
+        
+        container: Container to check for flag.
+        flag: Flag to check for.
+        lazy: If true, won't error if container or containing items don't exist.
+        '''
+        items = [container]+self.container_children_all(container=container, result="ITEM")
+        return self.flags_get(items=items, flag=flag, lazy=lazy)
 
 
     def container_move(self, from_con: str, to_con: str, item: str, lazy: bool = False):
@@ -645,6 +672,29 @@ class DEHCDatabase:
         return children
 
 
+    def containers_flag(self, containers: list, flag: str, value: int, lazy: bool = False):
+        '''Sets a flag for every child of multiple containers to a particular value.
+        
+        containers: Containers to set flag for.
+        flag: Flag to set.
+        value: Numerical value to set flag to.
+        lazy: If true, won't error if container or containing items don't exist.
+        '''
+        items = containers+self.containers_children_all(containers=containers, result="ITEM")
+        self.items_flag(items=items, flag=flag, value=value, lazy=lazy)
+
+
+    def containers_flag_get(self, containers: list, flag: str, lazy: bool = False):
+        '''Retrieves the highest value of a flag among multiple items and their children.
+        
+        containers: Containers to check for flag.
+        flag: Flag to check for.
+        lazy: If true, won't error if container or containing items don't exist.
+        '''
+        items = containers+self.containers_children_all(containers=containers, result="ITEM")
+        return self.flags_get(items=items, flag=flag, lazy=lazy)
+
+
     def containers_list(self):
         '''Retrieves every doc from container database. Intensive!'''
         return self.db.documents_list(dbname="containers", limit=self.limit)
@@ -670,6 +720,28 @@ class DEHCDatabase:
         return res
 
 
+    def flag_get(self, item: str, flag: str, lazy: bool = False):
+        '''Retrieves the value of a flag for a particular item.
+        
+        item: Item to check for flag.
+        flag: Flag to check for.
+        lazy: If true, won't error if item doesn't exist.
+        '''
+        doc = self.db.document_get(dbname="items", id=item, lazy=lazy)
+        return doc.get(flag, 0)
+
+
+    def flags_get(self, items: list, flag: str, lazy: bool = False):
+        '''Retrieves the highest value of a flag among multiple items.
+        
+        items: Items to check for flag.
+        flag: Flag to check for.
+        lazy: If true, won't error if item doesn't exist.
+        '''
+        docs = self.db.documents_get(dbname="items", ids=items, lazy=lazy)
+        return max([doc.get(flag, 0) for doc in docs])
+
+
     def id_cat(self, id: str):
         '''Takes an id and returns its category.
         
@@ -691,7 +763,7 @@ class DEHCDatabase:
         return id
 
 
-    def item_delete(self, id: str, all: bool = True, lazy: bool = False):
+    def item_delete(self, id: str, all: bool = True, recur: bool = False, lazy: bool = False):
         '''Deletes item from items database.
         
         id: The UUID of item to delete.
@@ -699,6 +771,9 @@ class DEHCDatabase:
         lazy: If true, won't error if document doesn't exist.
         '''
         self.db.document_delete(dbname="items", id=id, lazy=lazy)
+        if recur == True:
+            all_children = self.container_children_all(container=id, result="ITEM")
+            self.items_delete(ids=all_children, all=all, recur=False, lazy=True)
         if all == True:
             children = self.container_children(container=id, result="CON")
             parents = self.item_parents(item=id, result="CON")
@@ -721,6 +796,17 @@ class DEHCDatabase:
         id: The UUID of item to check.
         '''
         return self.db.document_exists(dbname="items", id=id)
+
+
+    def item_flag(self, item: str, flag: str, value: int, lazy: bool = False):
+        '''Sets a flag for an item to a particular value.
+        
+        item: Item to set flag for.
+        flag: Flag to set.
+        value: Numerical value to set flag to.
+        lazy: If true, won't error if item doesn't exist.
+        '''
+        self.db.document_edit(dbname="items", doc={flag: value}, id=item, lazy=lazy)
 
 
     def item_get(self, id: str, fields: list = None, lazy: bool = False):
@@ -803,7 +889,7 @@ class DEHCDatabase:
         return ids
 
 
-    def items_delete(self, ids: list, all: bool = True, lazy: bool = False):
+    def items_delete(self, ids: list, all: bool = True, recur: bool = False, lazy: bool = False):
         '''Deletes multiple items at once, returns ids.
         
         ids: The UUIDs of items to delete.
@@ -811,6 +897,9 @@ class DEHCDatabase:
         lazy: If true, won't error if document doesn't exist.
         '''
         self.db.documents_delete(dbname="items", ids=ids, lazy=lazy)
+        if recur == True:
+            all_children = self.containers_children(containers=ids, result="ITEM")
+            self.items_delete(ids=all_children, all=all, recur=False, lazy=True)
         if all == True:
             children = self.containers_children(containers=ids, result="CON")
             parents = self.items_parents(items=ids, result="CON")
@@ -825,6 +914,17 @@ class DEHCDatabase:
         lazy: If true, won't error if document doesn't exist.
         '''
         self.db.documents_edit(dbname="items", ids=ids, docs=data, lazy=lazy)
+
+
+    def items_flag(self, items: list, flag: str, value: int, lazy: bool = False):
+        '''Sets a flag for multiple items to a particular value.
+        
+        items: Items to set flag for.
+        flag: Flag to set.
+        value: Numerical value to set flag to.
+        lazy: If true, won't error if item doesn't exist.
+        '''
+        self.db.documents_edit(dbname="items", docs=[{flag: value}]*len(items), ids=items, lazy=lazy)
 
 
     def items_get(self, ids: list, fields: list = None, lazy: bool = False):
