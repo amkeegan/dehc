@@ -1,7 +1,7 @@
 {
     "person":
     {
-        "fields": ["Family Name", "Given Name(s)", "Sex", "Date of Birth", "Notes"],
+        "fields": ["Family Name", "Given Name(s)", "Sex", "Weight", "Notes"],
         "keys": ["Family Name", "Given Name(s)"]
     },
     "family":

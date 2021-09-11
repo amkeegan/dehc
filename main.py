@@ -9,35 +9,31 @@ from mods.database import DEHCDatabase
 
 db = DEHCDatabase(config="db_auth.json", loud=True, quickstart=True)
 
-pa = db.item_create(cat="person", doc={"Family Name": "Smith", "Given Name(s)": "Alice"})
-pb = db.item_create(cat="person", doc={"Family Name": "Jones", "Given Name(s)": "Bob"})
-pc = db.item_create(cat="person", doc={"Family Name": "Smith", "Given Name(s)": "Chris"})
-pd = db.item_create(cat="person", doc={"Family Name": "Andrews", "Given Name(s)": "David"})
-pe = db.item_create(cat="person", doc={"Family Name": "Andrews", "Given Name(s)": "Eric"})
-pf = db.item_create(cat="person", doc={"Family Name": "Jones", "Given Name(s)": "Frank"})
-pg = db.item_create(cat="person", doc={"Family Name": "Smith", "Given Name(s)": "George"})
-ph = db.item_create(cat="person", doc={"Family Name": "Clark", "Given Name(s)": "Harry"})
-fa = db.item_create(cat="family", doc={"Name": "The Smith Family"})
-fb = db.item_create(cat="family", doc={"Name": "The Jones Family"})
-fc = db.item_create(cat="family", doc={"Name": "The Andrews Family"})
-sa = db.item_create(cat="station", doc={"Station": "Ingest"})
-sb = db.item_create(cat="station", doc={"Station": "Clean Hold"})
+pa = {"Family Name": "Smith", "Given Name(s)": "Alice", "Sex": "F", "Weight": "95", "Notes": "Likes walks on the beach."}
+pb = {"Family Name": "Jones", "Given Name(s)": "Bob", "Sex": "M", "Weight": "100"}
+pc = {"Family Name": "Smith", "Given Name(s)": "Curt", "Sex": "M", "Weight": "80", "Notes": "Afraid of heights."}
+pd = {"Family Name": "Andrews", "Given Name(s)": "Diana", "Sex": "F", "Weight": "75"}
+pe = {"Family Name": "Andrews", "Given Name(s)": "Eric", "Sex": "M", "Weight": "70", "Notes": "Chess world champion."}
+pf = {"Family Name": "Jones", "Given Name(s)": "Franziska", "Sex": "F", "Weight": "85"}
+pg = {"Family Name": "Smith", "Given Name(s)": "Gene", "Sex": "M", "Weight": "90", "Notes": "Can recite π to 100 places."}
+ph = {"Family Name": "Clark", "Given Name(s)": "Harry", "Sex": "M", "Weight": "120"}
+fa = {"Name": "The Smith Family", "Notes": "Won a free chocolate bar."}
+fb = {"Name": "The Jones Family"}
+fc = {"Name": "The Andrews Family", "Notes": "Seem kinda shady."}
+sa = {"Station": "Processing", "Index": "1"}
+sb = {"Station": "Clean Hold", "Index": "2"}
+
+pa, pb, pc, pd, pe, pf, pg, ph = db.items_create(cat="person", docs=[pa, pb, pc, pd, pe, pf, pg, ph])
+fa, fb, fc = db.items_create(cat="family", docs=[fa, fb, fc])
+sa, sb = db.items_create(cat="station", docs=[sa, sb])
 
 db.container_adds(container=fa, items=[pa, pc, pg])
 db.container_adds(container=fb, items=[pb, pf])
 db.container_adds(container=fc, items=[pd, pe])
 db.container_add(container=sa, item=fa)
-db.container_add(container=sb, item=fb)
-db.container_add(container=sb, item=fc)
-db.container_add(container=sb, item=ph)
-db.container_remove(container=sb, item=ph)
-db.container_remove(container=sb, item=ph, lazy=True)
-db.container_removes(container=sb, items=[fb, fc])
-db.container_move(from_con=sa, to_con=sb, item=fa)
-db.container_moves(from_con=sb, to_con=sa, items=[fa, ph], lazy=True)
-print(db.container_exists(container=sa, item=ph))
-print(db.containers_list())
-print(db.containers_query())
+db.container_adds(container=sb, items=[fb, fc, ph])
+
+input("Break. Press enter.")
 
 db.databases_delete()
 del db

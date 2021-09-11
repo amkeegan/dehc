@@ -457,6 +457,57 @@ class DEHCDatabase:
         return ids_list
 
 
+    def container_children(self, container: str, cat: str = None, result: str = "ITEM"):
+        '''Returns flat list, listing items contained by a container.
+
+        container: Container to return containing items of.
+        cat: If included, only returns children of this category.
+        result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
+        '''
+        selector = {'container': {'$eq': container}}
+        fields = ['_id', 'child']
+        sort = [{'container': 'asc'}, {'child': 'asc'}]
+        query = self.containers_query(selector=selector, fields=fields, sort=sort)
+        if result == "CON":
+            children = [row['_id'] for row in query if cat == None or self.id_cat(row['child']) == cat]
+        elif result == "ITEM" or result == "DOC":
+            children = [row['child'] for row in query if cat == None or self.id_cat(row['child']) == cat]
+            if result == "DOC":
+                children = self.db.documents_get(dbname="items", ids=children)
+        else:
+            raise ValueError("result should be one of ITEM, CON or DOC")
+        return children
+
+
+    def container_children_all(self, container: str, cat: str = None, result: str = "ITEM"):
+        '''Returns flat list, listing items contained by a container and its sub-containers, recursively.
+
+        container: Container to return containing items of.
+        cat: If included, only returns children of this category.
+        result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
+        '''
+        return self.containers_children_all(containers=[container], cat=cat, result=result)
+
+
+    def container_children_all_dict(self, container: str, cat: str = None):
+        '''Returns nested dictionary, listing items contained by a container and all sub-containers, recursively.
+    
+        container: Container to return containing items of.
+        cat: If included, only returns children of this category.
+        '''
+        return self.containers_children_all_dict(containers=[container], cat=cat)
+
+
+    def container_children_dict(self, container: str, cat: str = None):
+        '''Returns dictionary, listing items contained by a container.
+
+        container: Container to return containing items of.
+        cat: If included, only returns children of this category.
+        '''
+        children = {container: self.container_children(container=container, cat=cat)}
+        return children
+
+
     def container_exists(self, container: str, item: str):
         '''Returns whether or not a container-item relationship exists.
         
@@ -467,11 +518,6 @@ class DEHCDatabase:
         return self.db.document_exists(dbname="containers", id=idc)
 
 
-    def containers_list(self):
-        '''Retrieves every doc from container database. Intensive!'''
-        return self.db.documents_list(dbname="containers", limit=self.limit)
-
-
     def container_move(self, from_con: str, to_con: str, item: str, lazy: bool = False):
         '''Moves an item from one container to another.
         
@@ -480,8 +526,8 @@ class DEHCDatabase:
         item: The UUID of the item.
         lazy: If true, won't error if from_con doesn't exist, or to_con already exists.
         '''
-        self.container_remove(container=from_con, item=item, lazy=lazy)
         self.container_add(container=to_con, item=item, lazy=lazy)
+        self.container_remove(container=from_con, item=item, lazy=lazy)
 
 
     def container_moves(self, from_con: str, to_con: str, items: list, lazy: bool = False):
@@ -492,28 +538,8 @@ class DEHCDatabase:
         items: The UUIDs of the items.
         lazy: If true, won't error if from_con doesn't exist, or to_con already exists.
         '''
-        self.container_removes(container=from_con, items=items, lazy=lazy)
         self.container_adds(container=to_con, items=items)
-
-
-    def containers_query(self, selector: dict = {}, fields: list = None, sort: list = None):
-        '''Queries the container database and returns the results.
-
-        For selector operators, see: https://docs.mongodb.com/manual/reference/operator/query/
-
-        selector = A MongoDB style selector: {"FIELDNAME" : {"OPERATOR": "VALUE"}, ... }. If omitted, returns all items.
-        fields = List of fields to return: ["FIELD1", "FIELD2", ...]. If omitted, returns all fields.
-        sort = List defining sort order: [{"FIELD1": "ASC"}, {"FIELD2": "DESC"}, ...]. If omitted, returns in ascending UUID order.
-        '''
-        if sort != None:
-            index_name = "idx"
-            for field in sort:
-                key = next(iter(field.keys()))
-                index_name += f"-{key}"
-            if self.db.index_exists(dbname="containers", name=index_name) == False:
-                self.db.index_create(dbname="containers", name=index_name, fields=sort)
-        res = self.db.query(dbname="containers", selector=selector, fields=fields, sort=sort, limit=self.limit)
-        return res
+        self.container_removes(container=from_con, items=items, lazy=lazy)
 
 
     def container_remove(self, container: str, item: str, lazy: bool = False):
@@ -538,6 +564,112 @@ class DEHCDatabase:
         self.db.documents_delete(dbname="containers", ids=ids, lazy=lazy)
 
 
+    def containers_children(self, containers: list, cat: str = None, result: str = "ITEM"):
+        '''Returns flat list, listing items contained by multiple containers.
+
+        containers: Containers to return containing items of.
+        cat: If included, only returns children of this category.
+        result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
+        '''
+        selector = {'container': {'$in': containers}}
+        fields = ['_id', 'child']
+        sort = [{'container': 'asc'}, {'child': 'asc'}]
+        query = self.containers_query(selector=selector, fields=fields, sort=sort)
+        if result == "CON":
+            children = [row['_id'] for row in query if cat == None or self.id_cat(row['child']) == cat]
+            children = list(dict.fromkeys(children))
+        elif result == "ITEM" or result == "DOC":
+            children = [row['child'] for row in query if cat == None or self.id_cat(row['child']) == cat]
+            children = list(dict.fromkeys(children))
+            if result == "DOC":
+                children = self.db.documents_get(dbname="items", ids=children)
+        else:
+            raise ValueError("result should be one of ITEM, CON or DOC")
+        return children
+
+
+    def containers_children_all(self, containers: str, cat: str = None, result: str = "ITEM"):
+        '''Returns flat list, listing items contained by some containers and all sub-containers, recursively.
+
+        containers: Containers to return containing items of.
+        cat: If included, only returns children of this category.
+        result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
+        '''
+        children = []
+        current_containers = containers
+        while True:
+            ids = self.containers_children(containers=current_containers, result="ITEM")
+            if len(ids) > 0:
+                children += self.containers_children(containers=current_containers, result=result, cat=cat)
+                current_containers = ids
+            else:
+                break
+        return children
+
+
+    def containers_children_all_dict(self, containers: list, cat: str = None):
+        '''Returns nested dictionary, listing items contained by multiple containers and all sub-containers, recursively.
+    
+        containers: Containers to return containing items of.
+        cat: If included, only returns children of this category.
+        '''
+        results = self.containers_children_dict(containers=containers)
+        for container in containers:
+            result = results[container]
+            if len(result) > 0:
+                result = self.containers_children_all_dict(containers=result, cat=cat)
+            results[container] = result
+        if cat != None:
+            results_c = results.copy()
+            for result in results_c:
+                if len(results[result]) == 0 and self.id_cat(result) != cat:
+                    del results[result]
+        return results
+
+
+    def containers_children_dict(self, containers: list, cat: str = None):
+        '''Returns dictionary of lists, listing items contained by multiple containers.
+
+        containers: Containers to return containing items of.
+        cat: If included, only returns children of this category.
+        '''
+        selector = {'container': {'$in': containers}}
+        fields = ['_id', 'container', 'child']
+        sort = [{'container': 'asc'}, {'child': 'asc'}]
+        query = self.containers_query(selector=selector, fields=fields, sort=sort)
+        children = {container: [] for container in containers} 
+        for row in query:
+            child = row['child']
+            if cat == None or self.id_cat(child) == cat:
+                children[row['container']].append(child)
+        return children
+
+
+    def containers_list(self):
+        '''Retrieves every doc from container database. Intensive!'''
+        return self.db.documents_list(dbname="containers", limit=self.limit)
+
+
+    def containers_query(self, selector: dict = {}, fields: list = None, sort: list = None):
+        '''Queries the container database and returns the results.
+
+        For selector operators, see: https://docs.mongodb.com/manual/reference/operator/query/
+
+        selector = A MongoDB style selector: {"FIELDNAME" : {"OPERATOR": "VALUE"}, ... }. If omitted, returns all items.
+        fields = List of fields to return: ["FIELD1", "FIELD2", ...]. If omitted, returns all fields.
+        sort = List defining sort order: [{"FIELD1": "ASC"}, {"FIELD2": "DESC"}, ...]. If omitted, returns in ascending UUID order.
+        '''
+        if sort != None:
+            index_name = "idx"
+            for field in sort:
+                key = next(iter(field.keys()))
+                index_name += f"-{key}"
+            if self.db.index_exists(dbname="containers", name=index_name) == False:
+                self.db.index_create(dbname="containers", name=index_name, fields=sort)
+        res = self.db.query(dbname="containers", selector=selector, fields=fields, sort=sort, limit=self.limit)
+        return res
+
+
     def id_cat(self, id: str):
         '''Takes an id and returns its category.
         
@@ -559,19 +691,18 @@ class DEHCDatabase:
         return id
 
 
-    def item_delete(self, id: str, all: bool = True, recur: bool = False, lazy: bool = False):
+    def item_delete(self, id: str, all: bool = True, lazy: bool = False):
         '''Deletes item from items database.
         
         id: The UUID of item to delete.
         all: If true, also deletes item's container and file docs.
-        recur: If true, also deletes all of item's container's children.
         lazy: If true, won't error if document doesn't exist.
         '''
         self.db.document_delete(dbname="items", id=id, lazy=lazy)
         if all == True:
-            cid = self.item_container(id)
-            self.container_delete(id=cid, recur=recur, lazy=True)
-        # Recur is "To Be Implemented"
+            children = self.container_children(container=id, result="CON")
+            parents = self.item_parents(item=id, result="CON")
+            self.db.documents_delete(dbname="containers", ids=children+parents, lazy=lazy)
 
 
     def item_edit(self, id: str, data: dict, lazy: bool = False):
@@ -605,6 +736,57 @@ class DEHCDatabase:
         return doc
 
 
+    def item_parents(self, item: str, cat: str = None, result: str = "ITEM"):
+        '''Returns flat list, listing items containing an item.
+
+        item: Item to return containing containers of.
+        cat: If included, only returns parents of this category.
+        result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
+        '''
+        selector = {'child': {'$eq': item}}
+        fields = ['_id', 'container']
+        sort = [{'child': 'asc'}, {'container': 'asc'}]
+        query = self.containers_query(selector=selector, fields=fields, sort=sort)
+        if result == "CON":
+            parents = [row['_id'] for row in query if cat == None or self.id_cat(row['container']) == cat]
+        elif result == "ITEM" or result == "DOC":
+            parents = [row['container'] for row in query if cat == None or self.id_cat(row['container']) == cat]
+            if result == "DOC":
+                parents = self.db.documents_get(dbname="items", ids=parents)
+        else:
+            raise ValueError("result should be one of ITEM, CON or DOC")
+        return parents
+
+
+    def item_parents_all(self, item: str, cat: str = None, result: str = "ITEM"):
+        '''Returns flat list, listing all items containing an item, recursively.
+
+        item: Item to return containing containers of.
+        cat: If included, only returns parents of this category.
+        result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
+        '''
+        return self.items_parents_all(items=[item], cat=cat, result=result)
+
+
+    def item_parents_all_dict(self, item: str, cat: str = None):
+        '''Returns nested dictionary, listing all items containing an item, recursively.
+        
+        item: Item to return containing containers of.
+        cat: If included, only returns parents of this category.
+        '''
+        return self.items_parents_all_dict(items=[item], cat=cat)
+
+
+    def item_parents_dict(self, item: str, cat: str = None):
+        '''Returns dictionary, listing items containing an item.
+
+        item: Item to return containing containers of.
+        cat: If included, only returns parents of this category.
+        '''
+        parents = {item: self.item_parents(item=item, cat=cat)}
+        return parents
+
+
     def items_create(self, cat: str, docs: list):
         '''Creates multiple new items at once, returns ids.
         
@@ -621,19 +803,18 @@ class DEHCDatabase:
         return ids
 
 
-    def items_delete(self, ids: list, all: bool = True, recur: bool = False, lazy: bool = False):
+    def items_delete(self, ids: list, all: bool = True, lazy: bool = False):
         '''Deletes multiple items at once, returns ids.
         
         ids: The UUIDs of items to delete.
         all: If true, also deletes items' container and file docs.
-        recur: If true, also deletes all of items' children.
         lazy: If true, won't error if document doesn't exist.
         '''
         self.db.documents_delete(dbname="items", ids=ids, lazy=lazy)
         if all == True:
-            cids = list(map(self.item_container, ids))
-            self.containers_delete(ids=cids, recur=recur, lazy=True)
-        # Recur is "To Be Implemented"
+            children = self.containers_children(containers=ids, result="CON")
+            parents = self.items_parents(items=ids, result="CON")
+            self.db.documents_delete(dbname="containers", ids=children+parents, lazy=lazy)
 
 
     def items_edit(self, ids: list, data: list, lazy: bool = False):
@@ -663,7 +844,7 @@ class DEHCDatabase:
         return docs
 
 
-    def items_list(self, cat: str = None, fields: str = None):
+    def items_list(self, cat: str = None, fields: list = None):
         '''Retrieves every item in a category from items database. Intensive!
         
         cat: Category to return. If omitted, returns all categories.
@@ -684,6 +865,87 @@ class DEHCDatabase:
             return new_docs
         else:
             return docs
+
+
+    def items_parents(self, items: list, cat: str = None, result: str = "ITEM"):
+        '''Returns flat list, listing items containing one of multiple items.
+
+        items: Items to return containing containers of.
+        cat: If included, only returns parents of this category.
+        result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
+        '''
+        selector = {'child': {'$in': items}}
+        fields = ['_id', 'container']
+        sort = [{'child': 'asc'}, {'container': 'asc'}]
+        query = self.containers_query(selector=selector, fields=fields, sort=sort)
+        if result == "CON":
+            parents = [row['_id'] for row in query if cat == None or self.id_cat(row['container']) == cat]
+            parents = list(dict.fromkeys(parents))
+        elif result == "ITEM" or result == "DOC":
+            parents = [row['container'] for row in query if cat == None or self.id_cat(row['container']) == cat]
+            parents = list(dict.fromkeys(parents))
+            if result == "DOC":
+                parents = self.db.documents_get(dbname="items", ids=parents)
+        else:
+            raise ValueError("result should be one of ITEM, CON or DOC")
+        return parents
+
+
+    def items_parents_all(self, items: str, cat: str = None, result: str = "ITEM"):
+        '''Returns flat list, listing all items containing one of multiple items, recursively.
+        
+        items: Items to return containing containers of.
+        cat: If included, only returns parents of this category.
+        result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
+        '''
+        parents = []
+        current_containers = items
+        while True:
+            ids = self.items_parents(items=current_containers, result="ITEM")
+            if len(ids) > 0:
+                parents += self.items_parents(items=current_containers, result=result, cat=cat)
+                current_containers = ids
+            else:
+                break
+        return parents
+
+
+    def items_parents_all_dict(self, items: str, cat: str = None):
+        '''Returns nested dictionary, listing all items containing one of multiple items, recursively.
+        
+        items: Items to return containing containers of.
+        cat: If included, only returns parents of this category.
+        '''
+        results = self.items_parents_dict(items=items)
+        for item in items:
+            result = results[item]
+            if len(result) > 0:
+                result = self.items_parents_all_dict(items=result, cat=cat)
+            results[item] = result
+        if cat != None:
+            results_c = results.copy()
+            for result in results_c:
+                if len(results[result]) == 0 and self.id_cat(result) != cat:
+                    del results[result]
+        return results
+
+
+    def items_parents_dict(self, items: list, cat: str = None):
+        '''Returns nested dictionary, listing items containing one of multiple items.
+
+        items: Items to return containing containers of.
+        cat: If included, only returns parents of this category.
+        '''
+        selector = {'child': {'$in': items}}
+        fields = ['_id', 'container', 'child']
+        sort = [{'child': 'asc'}, {'container': 'asc'}]
+        query = self.containers_query(selector=selector, fields=fields, sort=sort)
+        parents = {item: [] for item in items}
+        for row in query:
+            parent = row['container']
+            if cat == None or self.id_cat(parent) == cat:
+                parents[row['child']].append(parent)
+        return parents
 
 
     def items_query(self, cat: str = None, selector: dict = {}, fields: list = None, sort: list = None):
