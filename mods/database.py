@@ -7,6 +7,9 @@ import random
 from ibmcloudant import CouchDbSessionAuthenticator
 from ibmcloudant.cloudant_v1 import CloudantV1, BulkDocs, Document, IndexDefinition, IndexField
 
+import mods.log as ml
+
+
 # ----------------------------------------------------------------------------
 
 class Database:
@@ -17,23 +20,22 @@ class Database:
     class down below.
     
     client: The Cloudant-CouchDB client object.
-    loud: If true, database transactions will be logged to console.
+    logger: The logger object used for logging.
     '''
 
-    def __init__(self, config: str, loud: bool = False):
+    def __init__(self, config: str, level: str = "NOTSET"):
         '''Constructs a Database object.
         
         config: Path to .json file containing database server credentials.
-        loud: If true, database transactions will be logged to console.
+        level = Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         '''
         with open(config, "r") as f:
             data = json.loads(f.read())
-        auth = CouchDbSessionAuthenticator(username=data['user'], 
-        password=data['pass'])
+        auth = CouchDbSessionAuthenticator(username=data['user'], password=data['pass'])
         self.client = CloudantV1(authenticator=auth)
         self.client.set_service_url(data['url'])
-        self.loud = loud
-        self._log("start")
+        self.logger = ml.get("Database", level=level)
+        self.logger.debug("Database object instantiated")
 
 
     def database_create(self, dbname: str):
@@ -42,7 +44,7 @@ class Database:
         dbname: Name of the database to create.
         '''
         self.client.put_database(db=dbname)
-        self._log(f"new db {dbname}")
+        self.logger.info(f"Created database {dbname}")
 
 
     def database_delete(self, dbname: str):
@@ -51,7 +53,7 @@ class Database:
         dbname: Name of the database to delete.
         '''
         self.client.delete_database(db=dbname)
-        self._log(f"del db {dbname}")
+        self.logger.info(f"Deleted database {dbname}")
 
 
     def database_exists(self, dbname: str):
@@ -62,20 +64,19 @@ class Database:
         try:
             response = self.client.get_database_information(db=dbname).get_status_code()
             if response == 200:
-                self._log(f"db {dbname} exists")
+                self.logger.debug(f"Database {dbname} exists")
                 return True
-            else:
-                self._log(f"db {dbname} does not exist")
-                return False
         except:
-            self._log(f"db {dbname} does not exist")
-            return False
+            pass
+        self.logger.debug(f"Database {dbname} does not exist")
+        return False
 
 
     def database_list(self):
         '''Returns a list of active databases.'''
-        self._log(f"list db")
-        return self.client.get_all_dbs().get_result()
+        res = self.client.get_all_dbs().get_result()
+        self.logger.debug(f"Databases listed")
+        return res
 
 
     def document_create(self, dbname: str, doc: dict, id: str = None):
@@ -88,7 +89,7 @@ class Database:
         doc = Document(id=self.id_get()[0], **doc) if id == None else Document(id=id, **doc)
         res = self.client.post_document(db=dbname, document=doc).get_result()
         id = res['id']
-        self._log(f"new doc {dbname} {id}")
+        self.logger.info(f"Created document {dbname} {id}")
         return id
 
 
@@ -102,9 +103,9 @@ class Database:
         if lazy == False or self.document_exists(dbname=dbname, id=id) == True:
             doc = self.client.get_document(db=dbname, doc_id=id).get_result()
             self.client.delete_document(db=dbname, doc_id=id, rev=doc["_rev"])
-            self._log(f"del doc {dbname} {id}")
+            self.logger.info(f"Deleted document {dbname} {id}")
         else:
-            self._log(f"del doc {dbname} {id} failed")
+            self.logger.debug(f"Could not lazy delete document {dbname} {id}")
 
 
     def document_edit(self, dbname: str, doc: dict, id: str, lazy: bool = False):
@@ -119,9 +120,9 @@ class Database:
             remote_doc = self.client.get_document(db=dbname, doc_id=id).get_result()
             remote_doc.update(doc)
             self.client.post_document(db=dbname, document=remote_doc)
-            self._log(f"Edit doc {dbname} {id}")
+            self.logger.info(f"Edited document {dbname} {id}")
         else:
-            self._log(f"Edit doc {dbname} {id} failed")
+            self.logger.debug(f"Could not lazy edit document {dbname} {id}")
 
 
     def document_exists(self, dbname: str, id: str):
@@ -133,13 +134,12 @@ class Database:
         try:
             response = self.client.head_document(db=dbname, doc_id=id).get_status_code()
             if response == 200:
-                self._log(f"doc {dbname} {id} exists")
+                self.logger.debug(f"Document {dbname} {id} exists")
                 return True
-            self._log(f"doc {dbname} {id} does not exist")
-            return False
         except:
-            self._log(f"doc {dbname} {id} does not exist")
-            return False
+            pass
+        self.logger.debug(f"Document {dbname} {id} does not exist")
+        return False
 
 
     def document_get(self, dbname: str, id: str, lazy: bool = False):
@@ -151,10 +151,10 @@ class Database:
         '''
         if lazy == False or self.document_exists(dbname="items", id=id) == True:
             remote_doc = self.client.get_document(db=dbname, doc_id=id).get_result()
-            self._log(f"get doc {dbname} {id}")
+            self.logger.debug(f"Fetched document {dbname} {id}")
         else:
             remote_doc = {}
-            self._log(f"get doc {dbname} {id} failed")
+            self.logger.debug(f"Could not fetch document {dbname} {id}")
         return remote_doc
 
 
@@ -180,7 +180,7 @@ class Database:
         ids = []
         for re in res:
             id = re['id']
-            self._log(f"bulk new doc {dbname} {id}")
+            self.logger.info(f"Bulk created document {dbname} {id}")
             ids.append(id)
         return ids
 
@@ -198,9 +198,9 @@ class Database:
             if lazy == False or self.document_exists(dbname=dbname, id=id) == True:
                 rev = remote_doc["value"]["rev"]
                 self.client.delete_document(db=dbname, doc_id=id, rev=rev)
-                self._log(f"bulk del doc {dbname} {id}")
+                self.logger.info(f"Bulk deleted document {dbname} {id}")
             else:
-                self._log(f"bulk del doc {dbname} {id} failed")
+                self.logger.debug(f"Could not bulk lazy delete document {dbname} {id}")
 
 
     def documents_edit(self, dbname: str, docs: list, ids: list, lazy: bool = False):
@@ -222,12 +222,12 @@ class Database:
                 remote_doc = Document(id=id, rev=rev, **remote_doc)
                 doc_list.append(remote_doc)
             else:
-                self._log(f"bulk edit doc {dbname} {id} failed")
+                self.logger.debug(f"Could not bulk lazy edit document {dbname} {id}")
 
         doc_list = BulkDocs(docs=doc_list)
         res = self.client.post_bulk_docs(db=dbname, bulk_docs=doc_list).get_result()
         for re in res:
-            self._log(f"bulk edit doc {dbname} {re['id']}")
+            self.logger.info(f"Bulk edited document {dbname} {re['id']}")
 
 
     def documents_get(self, dbname: str, ids: str, lazy: bool = False):
@@ -242,10 +242,10 @@ class Database:
         for doc in remote_docs:
             id = doc["key"]
             if lazy == False or self.document_exists(dbname=dbname, id=id) == True:
-                self._log(f"bulk get doc {dbname} {id}")
+                self.logger.debug(f"Bulk fetched document {dbname} {id}")
                 doc_list.append(doc['doc'])
             else:
-                self._log(f"bulk get doc {dbname} {id} failed")
+                self.logger.debug(f"Could not bulk lazy fetch {dbname} {id}")
         return doc_list
 
 
@@ -261,7 +261,7 @@ class Database:
         docs = []
         for remote_doc in remote_docs['rows']:
             docs.append(remote_doc['doc'])
-        self._log(f"list doc {dbname} {startkey if startkey != None else 'START'} to {endkey if endkey != None else 'END'}")
+        self.logger.debug(f"Documents listed from database {dbname}, {startkey if startkey != None else 'START'} to {endkey if endkey != None else 'END'}")
         return docs
 
 
@@ -277,6 +277,7 @@ class Database:
             hexstr = hex(random.randint(0, 16 ** length))[2:]
             id = prefix + "0" * (length - len(hexstr)) + hexstr
             ids.append(id)
+        self.logger.debug(f"{n} UUIDs generated by Python")
         return ids
 
 
@@ -288,6 +289,7 @@ class Database:
         response = self.client.get_uuids(count=n).get_result()['uuids']
         for index, id in enumerate(response):
             response[index] = prefix+id
+        self.logger.debug(f"{n} UUIDs fetched from CouchDB")
         return response
 
 
@@ -304,7 +306,7 @@ class Database:
         index_definition = IndexDefinition(fields=index_field_list)
         res = self.client.post_index(db=dbname, index=index_definition, ddoc=name, name=name, type="json").get_result()
         id = res['id'][8:]
-        self._log(f"new idx {dbname} {id}")
+        self.logger.info(f"Created index {dbname} {name}")
         return id
 
 
@@ -315,7 +317,7 @@ class Database:
         name = Name of the index to be deleted.
         '''
         self.client.delete_index(db=dbname, ddoc=name, type="json", index=name)
-        self._log(f"del idx {dbname} {name}")
+        self.logger.info(f"Deleted index {dbname} {name}")
 
 
     def index_exists(self, dbname: str, name: str):
@@ -327,13 +329,12 @@ class Database:
         try:
             response = self.client.head_design_document(db=dbname, ddoc=name).get_status_code()
             if response == 200:
-                self._log(f"idx {dbname} {name} exists")
+                self.logger.debug(f"Index {dbname} {name} exists")
                 return True
-            self._log(f"idx {dbname} {name} does not exist")
-            return False
         except:
-            self._log(f"idx {dbname} {name} does not exist")
-            return False
+            pass
+        self.logger.debug(f"Index {dbname} {name} does not exist")
+        return False
 
 
     def query(self, dbname: str, selector: dict = {}, fields: list = None, sort: list = None, limit: int = 25):
@@ -349,7 +350,7 @@ class Database:
         limit = Number of docs to retrieve. Set arbitrary large to fetch all.
         '''
         res = self.client.post_find(db=dbname, selector=selector, fields=fields, sort=sort, limit=limit).get_result()
-        self._log(f"query {dbname} where {selector} for {fields} sort {sort}")
+        self.logger.debug(f"Queried database {dbname} where {selector} for {fields} sorted {sort}")
         return res['docs']
 
 
@@ -364,20 +365,9 @@ class Database:
             return False
 
 
-    def _log(self, msg: str):
-        '''Logs a timestamped message to the console.
-        
-        msg: Message to log.
-        '''
-        if self.loud == True:
-            ts = datetime.datetime.now(datetime.timezone.utc)
-            ts = f"{ts.year}-{ts.month:02d}-{ts.day:02d} {ts.hour:02d}:{ts.minute:02d}:{ts.second:02d}"
-            if self.loud == True:
-                print(f"{ts} | {msg}")
-
-
     def __del__(self):
-        self._log("end")
+        '''Runs when Database object is deleted.'''
+        self.logger.debug("Database object destroyed")
 
 
 # ----------------------------------------------------------------------------
@@ -392,23 +382,26 @@ class DEHCDatabase:
     db_list: List of DEHC database names.
     id_len: Length of hex part of document UUIDs used in the database.
     limit: Max number of documents to return from _list and _query methods.
+    logger: The logger object used for logging.
     schema: Dictionary describing objects and fields in the database.
     '''
 
-    def __init__(self, *, config: str, loud: bool = False, quickstart: bool = False):
+    def __init__(self, *, config: str, level: str = "NOTSET", quickstart: bool = False):
         '''Constructs a DEHCDatabase object.
 
         config: Path to .json file containing database server credentials.
-        loud: If true, database transactions will be logged to console.
+        level = Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         quickstart: Creates databases and loads schema automatically.
         '''
-        self.db = Database(config=config, loud=loud)
+        self.db = Database(config=config, level=level)
+        self.logger = ml.get(name="DEHCDatabase", level=level)
 
         self.db_list = ["items", "containers"]
         self.id_len = 12
         self.limit = 1000000
 
         self.schema = {}
+        self.logger.debug("DEHCDatabase object instantiated")
         if quickstart == True:
             self.databases_create(lazy=True)
             self.schema_load(schema="db_schema.json")
@@ -461,11 +454,11 @@ class DEHCDatabase:
         return ids_list
 
 
-    def container_children(self, container: str, cat: str = None, result: str = "ITEM"):
+    def container_children(self, container: str, cat: list = None, result: str = "ITEM"):
         '''Returns flat list, listing items contained by a container.
 
         container: Container to return containing items of.
-        cat: If included, only returns children of this category.
+        cat: If included, only returns children of these categories.
         result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
         '''
         selector = {'container': {'$eq': container}}
@@ -473,9 +466,9 @@ class DEHCDatabase:
         sort = [{'container': 'asc'}, {'child': 'asc'}]
         query = self.containers_query(selector=selector, fields=fields, sort=sort)
         if result == "CON":
-            children = [row['_id'] for row in query if cat == None or self.id_cat(row['child']) == cat]
+            children = [row['_id'] for row in query if cat == None or self.id_cat(row['child']) in cat]
         elif result == "ITEM" or result == "DOC":
-            children = [row['child'] for row in query if cat == None or self.id_cat(row['child']) == cat]
+            children = [row['child'] for row in query if cat == None or self.id_cat(row['child']) in cat]
             if result == "DOC":
                 children = self.db.documents_get(dbname="items", ids=children)
         else:
@@ -483,30 +476,32 @@ class DEHCDatabase:
         return children
 
 
-    def container_children_all(self, container: str, cat: str = None, result: str = "ITEM"):
+    def container_children_all(self, container: str, cat: list = None, result: str = "ITEM"):
         '''Returns flat list, listing items contained by a container and its sub-containers, recursively.
 
         container: Container to return containing items of.
-        cat: If included, only returns children of this category.
+        cat: If included, only returns children of these categories.
         result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
         '''
-        return self.containers_children_all(containers=[container], cat=cat, result=result)
+        children = self.containers_children_all(containers=[container], cat=cat, result=result)
+        return children
 
 
-    def container_children_all_dict(self, container: str, cat: str = None):
+    def container_children_all_dict(self, container: str, cat: list = None):
         '''Returns nested dictionary, listing items contained by a container and all sub-containers, recursively.
     
         container: Container to return containing items of.
-        cat: If included, only returns children of this category.
+        cat: If included, only returns children of these categories.
         '''
-        return self.containers_children_all_dict(containers=[container], cat=cat)
+        children = self.containers_children_all_dict(containers=[container], cat=cat)
+        return children
 
 
-    def container_children_dict(self, container: str, cat: str = None):
+    def container_children_dict(self, container: str, cat: list = None):
         '''Returns dictionary, listing items contained by a container.
 
         container: Container to return containing items of.
-        cat: If included, only returns children of this category.
+        cat: If included, only returns children of these categories.
         '''
         children = {container: self.container_children(container=container, cat=cat)}
         return children
@@ -519,7 +514,8 @@ class DEHCDatabase:
         item: The UUID of item to check.
         '''
         idc = container+"/"+item
-        return self.db.document_exists(dbname="containers", id=idc)
+        result = self.db.document_exists(dbname="containers", id=idc)
+        return result
 
 
     def container_flag(self, container: str, flag: str, value: int, lazy: bool = False):
@@ -591,11 +587,11 @@ class DEHCDatabase:
         self.db.documents_delete(dbname="containers", ids=ids, lazy=lazy)
 
 
-    def containers_children(self, containers: list, cat: str = None, result: str = "ITEM"):
+    def containers_children(self, containers: list, cat: list = None, result: str = "ITEM"):
         '''Returns flat list, listing items contained by multiple containers.
 
         containers: Containers to return containing items of.
-        cat: If included, only returns children of this category.
+        cat: If included, only returns children of these categories.
         result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
         '''
         selector = {'container': {'$in': containers}}
@@ -603,10 +599,10 @@ class DEHCDatabase:
         sort = [{'container': 'asc'}, {'child': 'asc'}]
         query = self.containers_query(selector=selector, fields=fields, sort=sort)
         if result == "CON":
-            children = [row['_id'] for row in query if cat == None or self.id_cat(row['child']) == cat]
+            children = [row['_id'] for row in query if cat == None or self.id_cat(row['child']) in cat]
             children = list(dict.fromkeys(children))
         elif result == "ITEM" or result == "DOC":
-            children = [row['child'] for row in query if cat == None or self.id_cat(row['child']) == cat]
+            children = [row['child'] for row in query if cat == None or self.id_cat(row['child']) in cat]
             children = list(dict.fromkeys(children))
             if result == "DOC":
                 children = self.db.documents_get(dbname="items", ids=children)
@@ -615,11 +611,11 @@ class DEHCDatabase:
         return children
 
 
-    def containers_children_all(self, containers: str, cat: str = None, result: str = "ITEM"):
+    def containers_children_all(self, containers: str, cat: list = None, result: str = "ITEM"):
         '''Returns flat list, listing items contained by some containers and all sub-containers, recursively.
 
         containers: Containers to return containing items of.
-        cat: If included, only returns children of this category.
+        cat: If included, only returns children of these categories.
         result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
         '''
         children = []
@@ -634,11 +630,11 @@ class DEHCDatabase:
         return children
 
 
-    def containers_children_all_dict(self, containers: list, cat: str = None):
+    def containers_children_all_dict(self, containers: list, cat: list = None):
         '''Returns nested dictionary, listing items contained by multiple containers and all sub-containers, recursively.
     
         containers: Containers to return containing items of.
-        cat: If included, only returns children of this category.
+        cat: If included, only returns children of these categories.
         '''
         results = self.containers_children_dict(containers=containers)
         for container in containers:
@@ -649,16 +645,16 @@ class DEHCDatabase:
         if cat != None:
             results_c = results.copy()
             for result in results_c:
-                if len(results[result]) == 0 and self.id_cat(result) != cat:
+                if len(results[result]) == 0 and self.id_cat(result) not in cat:
                     del results[result]
         return results
 
 
-    def containers_children_dict(self, containers: list, cat: str = None):
+    def containers_children_dict(self, containers: list, cat: list = None):
         '''Returns dictionary of lists, listing items contained by multiple containers.
 
         containers: Containers to return containing items of.
-        cat: If included, only returns children of this category.
+        cat: If included, only returns children of these categories.
         '''
         selector = {'container': {'$in': containers}}
         fields = ['_id', 'container', 'child']
@@ -667,7 +663,7 @@ class DEHCDatabase:
         children = {container: [] for container in containers} 
         for row in query:
             child = row['child']
-            if cat == None or self.id_cat(child) == cat:
+            if cat == None or self.id_cat(child) in cat:
                 children[row['container']].append(child)
         return children
 
@@ -697,7 +693,8 @@ class DEHCDatabase:
 
     def containers_list(self):
         '''Retrieves every doc from container database. Intensive!'''
-        return self.db.documents_list(dbname="containers", limit=self.limit)
+        docs = self.db.documents_list(dbname="containers", limit=self.limit)
+        return docs
 
 
     def containers_query(self, selector: dict = {}, fields: list = None, sort: list = None):
@@ -795,7 +792,8 @@ class DEHCDatabase:
         
         id: The UUID of item to check.
         '''
-        return self.db.document_exists(dbname="items", id=id)
+        result = self.db.document_exists(dbname="items", id=id)
+        return result
 
 
     def item_flag(self, item: str, flag: str, value: int, lazy: bool = False):
@@ -822,11 +820,11 @@ class DEHCDatabase:
         return doc
 
 
-    def item_parents(self, item: str, cat: str = None, result: str = "ITEM"):
+    def item_parents(self, item: str, cat: list = None, result: str = "ITEM"):
         '''Returns flat list, listing items containing an item.
 
         item: Item to return containing containers of.
-        cat: If included, only returns parents of this category.
+        cat: If included, only returns parents of these categories.
         result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
         '''
         selector = {'child': {'$eq': item}}
@@ -834,9 +832,9 @@ class DEHCDatabase:
         sort = [{'child': 'asc'}, {'container': 'asc'}]
         query = self.containers_query(selector=selector, fields=fields, sort=sort)
         if result == "CON":
-            parents = [row['_id'] for row in query if cat == None or self.id_cat(row['container']) == cat]
+            parents = [row['_id'] for row in query if cat == None or self.id_cat(row['container']) in cat]
         elif result == "ITEM" or result == "DOC":
-            parents = [row['container'] for row in query if cat == None or self.id_cat(row['container']) == cat]
+            parents = [row['container'] for row in query if cat == None or self.id_cat(row['container']) in cat]
             if result == "DOC":
                 parents = self.db.documents_get(dbname="items", ids=parents)
         else:
@@ -844,30 +842,32 @@ class DEHCDatabase:
         return parents
 
 
-    def item_parents_all(self, item: str, cat: str = None, result: str = "ITEM"):
+    def item_parents_all(self, item: str, cat: list = None, result: str = "ITEM"):
         '''Returns flat list, listing all items containing an item, recursively.
 
         item: Item to return containing containers of.
-        cat: If included, only returns parents of this category.
+        cat: If included, only returns parents of these categories.
         result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
         '''
-        return self.items_parents_all(items=[item], cat=cat, result=result)
+        parents = self.items_parents_all(items=[item], cat=cat, result=result)
+        return parents
 
 
-    def item_parents_all_dict(self, item: str, cat: str = None):
+    def item_parents_all_dict(self, item: str, cat: list = None):
         '''Returns nested dictionary, listing all items containing an item, recursively.
         
         item: Item to return containing containers of.
-        cat: If included, only returns parents of this category.
+        cat: If included, only returns parents of these categories.
         '''
-        return self.items_parents_all_dict(items=[item], cat=cat)
+        parents = self.items_parents_all_dict(items=[item], cat=cat)
+        return parents
 
 
-    def item_parents_dict(self, item: str, cat: str = None):
+    def item_parents_dict(self, item: str, cat: list = None):
         '''Returns dictionary, listing items containing an item.
 
         item: Item to return containing containers of.
-        cat: If included, only returns parents of this category.
+        cat: If included, only returns parents of these categories.
         '''
         parents = {item: self.item_parents(item=item, cat=cat)}
         return parents
@@ -967,11 +967,11 @@ class DEHCDatabase:
             return docs
 
 
-    def items_parents(self, items: list, cat: str = None, result: str = "ITEM"):
+    def items_parents(self, items: list, cat: list = None, result: str = "ITEM"):
         '''Returns flat list, listing items containing one of multiple items.
 
         items: Items to return containing containers of.
-        cat: If included, only returns parents of this category.
+        cat: If included, only returns parents of these categories.
         result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
         '''
         selector = {'child': {'$in': items}}
@@ -979,10 +979,10 @@ class DEHCDatabase:
         sort = [{'child': 'asc'}, {'container': 'asc'}]
         query = self.containers_query(selector=selector, fields=fields, sort=sort)
         if result == "CON":
-            parents = [row['_id'] for row in query if cat == None or self.id_cat(row['container']) == cat]
+            parents = [row['_id'] for row in query if cat == None or self.id_cat(row['container']) in cat]
             parents = list(dict.fromkeys(parents))
         elif result == "ITEM" or result == "DOC":
-            parents = [row['container'] for row in query if cat == None or self.id_cat(row['container']) == cat]
+            parents = [row['container'] for row in query if cat == None or self.id_cat(row['container']) in cat]
             parents = list(dict.fromkeys(parents))
             if result == "DOC":
                 parents = self.db.documents_get(dbname="items", ids=parents)
@@ -991,11 +991,11 @@ class DEHCDatabase:
         return parents
 
 
-    def items_parents_all(self, items: str, cat: str = None, result: str = "ITEM"):
+    def items_parents_all(self, items: str, cat: list = None, result: str = "ITEM"):
         '''Returns flat list, listing all items containing one of multiple items, recursively.
         
         items: Items to return containing containers of.
-        cat: If included, only returns parents of this category.
+        cat: If included, only returns parents of these categories.
         result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
         '''
         parents = []
@@ -1010,11 +1010,11 @@ class DEHCDatabase:
         return parents
 
 
-    def items_parents_all_dict(self, items: str, cat: str = None):
+    def items_parents_all_dict(self, items: str, cat: list = None):
         '''Returns nested dictionary, listing all items containing one of multiple items, recursively.
         
         items: Items to return containing containers of.
-        cat: If included, only returns parents of this category.
+        cat: If included, only returns parents of these categories.
         '''
         results = self.items_parents_dict(items=items)
         for item in items:
@@ -1025,16 +1025,16 @@ class DEHCDatabase:
         if cat != None:
             results_c = results.copy()
             for result in results_c:
-                if len(results[result]) == 0 and self.id_cat(result) != cat:
+                if len(results[result]) == 0 and self.id_cat(result) not in cat:
                     del results[result]
         return results
 
 
-    def items_parents_dict(self, items: list, cat: str = None):
+    def items_parents_dict(self, items: list, cat: list = None):
         '''Returns nested dictionary, listing items containing one of multiple items.
 
         items: Items to return containing containers of.
-        cat: If included, only returns parents of this category.
+        cat: If included, only returns parents of these categories.
         '''
         selector = {'child': {'$in': items}}
         fields = ['_id', 'container', 'child']
@@ -1043,7 +1043,7 @@ class DEHCDatabase:
         parents = {item: [] for item in items}
         for row in query:
             parent = row['container']
-            if cat == None or self.id_cat(parent) == cat:
+            if cat == None or self.id_cat(parent) in cat:
                 parents[row['child']].append(parent)
         return parents
 
@@ -1083,7 +1083,8 @@ class DEHCDatabase:
         '''
         if cat == None:
             cat = self.id_cat(id=id)
-        return self.schema[cat]["fields"]
+        fields = self.schema[cat]["fields"]
+        return fields
 
 
     def schema_keys(self, *, cat: str = None, id: str = None):
@@ -1096,7 +1097,8 @@ class DEHCDatabase:
         '''
         if cat == None:
             cat = self.id_cat(id=id)
-        return self.schema[cat]["keys"]
+        keys = self.schema[cat]["keys"]
+        return keys
 
 
     def schema_load(self, schema: str = None, forcelocal: bool = False):
@@ -1139,7 +1141,8 @@ class DEHCDatabase:
             keys = self.schema_keys(cat=cat)
         else:
             keys = self.schema_keys(id=id)
-        return [doc[key] for key in keys]
+        name = [doc[key] for key in keys]
+        return name
 
 
     def schema_save(self):
@@ -1148,6 +1151,11 @@ class DEHCDatabase:
             self.db.document_edit(dbname="items", doc=self.schema, id="schema")
         else:
             self.db.document_create(dbname="items", doc=self.schema, id="schema")
+
+
+    def __del__(self):
+        '''Runs when DEHCDatabase object is deleted.'''
+        self.logger.debug("DEHCDatabase object destroyed")
 
 
 # ----------------------------------------------------------------------------

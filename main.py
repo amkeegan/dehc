@@ -1,13 +1,21 @@
 '''The script that starts the main DEHC application.'''
 
 import sys
-from mods.database import DEHCDatabase
+
+import mods.database as md
+import mods.log as ml
 
 # ----------------------------------------------------------------------------
 
-# Initialization
+# Prepares logging
 
-db = DEHCDatabase(config="db_auth.json", loud=False, quickstart=True)
+level = "WARNING"
+logger = ml.get(name="main", level=level)
+logger.debug("Application started.")
+
+# Prepares database
+
+db = md.DEHCDatabase(config="db_auth.json", level=level, quickstart=True)
 
 pa = {"Family Name": "Smith", "Given Name(s)": "Alice", "Sex": "F", "Weight": "95", "Notes": "Likes walks on the beach."}
 pb = {"Family Name": "Jones", "Given Name(s)": "Bob", "Sex": "M", "Weight": "100"}
@@ -33,8 +41,8 @@ db.container_adds(container=fc, items=[pd, pe])
 db.container_add(container=sa, item=fa)
 db.container_adds(container=sb, items=[fb, fc, ph])
 
-input("Break. Press enter.")
-
 db.databases_delete()
 del db
+
+logger.debug("Application finished.")
 sys.exit(0)
