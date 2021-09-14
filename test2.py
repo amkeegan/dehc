@@ -84,11 +84,6 @@ for i in range(q):
     dehc.items_query(cat="person", selector={'IDS':{"$all": [docs[i]['IDS'][0]]}}, fields=["_id", "IDS"], sort=[{"Name": "asc"}])
 tb = time.time()
 
-# POSTAMBLE
-
-dehc.databases_delete()
-tc = time.time()
-
 # RESULTS
 
 places = 3  # Decimal places
@@ -102,6 +97,10 @@ print(f"Querying ID (indexed by ID) in {n} documents {q} times: {round(t8-t7, pl
 print(f"Querying ID (indexed by Name) in {n} documents {q} times: {round(t9-t8, places)} seconds")
 print(f"Querying list of IDs (indexed by IDS) in {n} documents {q} times: {round(ta-t9, places)} seconds")
 print(f"Querying list of IDs (indexed by Name) in {n} documents {q} times: {round(tb-ta, places)} seconds")
-print(f"Postamble: {round(tc-tb, places)} seconds")
 
+input("Breakpoint. Press enter to delete database and finish.")
+
+# POSTAMBLE
+
+dehc.databases_delete()
 sys.exit(0)
