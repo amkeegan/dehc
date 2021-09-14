@@ -1,8 +1,8 @@
 '''The module containing objects that manage the CouchDB database.'''
 
-import datetime
 import json
 import random
+import time
 
 from ibmcloudant import CouchDbSessionAuthenticator
 from ibmcloudant.cloudant_v1 import CloudantV1, BulkDocs, Document, IndexDefinition, IndexField
@@ -23,19 +23,19 @@ class Database:
     logger: The logger object used for logging.
     '''
 
-    def __init__(self, config: str, level: str = "NOTSET"):
+    def __init__(self, *, config: str, level: str = "NOTSET"):
         '''Constructs a Database object.
         
         config: Path to .json file containing database server credentials.
-        level = Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
+        level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         '''
+        self.logger = ml.get("Database", level=level)
+        self.logger.debug("Database object instantiated")
         with open(config, "r") as f:
             data = json.loads(f.read())
         auth = CouchDbSessionAuthenticator(username=data['user'], password=data['pass'])
         self.client = CloudantV1(authenticator=auth)
         self.client.set_service_url(data['url'])
-        self.logger = ml.get("Database", level=level)
-        self.logger.debug("Database object instantiated")
 
 
     def database_create(self, dbname: str):
@@ -296,9 +296,9 @@ class Database:
     def index_create(self, dbname: str, name: str, fields: list):
         '''Creates a new MongoDB-style index and returns its id (name).
         
-        dbname = Name of database to index.
-        name = Name of the index. Also used as design doc's name.
-        fields = List of dictionaries of form {"FIELDNAME" : "asc" | "desc"}, defining the index.
+        dbname: Name of database to index.
+        name: Name of the index. Also used as design doc's name.
+        fields: List of dictionaries of form {"FIELDNAME" : "asc" | "desc"}, defining the index.
         '''
         index_field_list = []
         for field in fields:
@@ -313,8 +313,8 @@ class Database:
     def index_delete(self, dbname: str, name: str):
         '''Deletes an existing MongoDB-style index.
 
-        dbname = Name of database index is stored in.
-        name = Name of the index to be deleted.
+        dbname: Name of database index is stored in.
+        name: Name of the index to be deleted.
         '''
         self.client.delete_index(db=dbname, ddoc=name, type="json", index=name)
         self.logger.info(f"Deleted index {dbname} {name}")
@@ -323,8 +323,8 @@ class Database:
     def index_exists(self, dbname: str, name: str):
         '''Returns whether or not a MongoDB-style index exists.
         
-        dbname = Name of database index is stored in.
-        name = Name of the index to be checked.
+        dbname: Name of database index is stored in.
+        name: Name of the index to be checked.
         '''
         try:
             response = self.client.head_design_document(db=dbname, ddoc=name).get_status_code()
@@ -341,13 +341,13 @@ class Database:
         '''Queries a database using MongoDB-style selectors & indexes.
         
         An index involving the 'sort' fields must exist, otherwise the query will fail.
-        For selector operators, see: https://docs.mongodb.com/manual/reference/operator/query/
+        For selector operators, see https://docs.mongodb.com/manual/reference/operator/query/
 
-        db = Name of database being queried.
-        selector = A MongoDB style selector: {"FIELDNAME" : {"OPERATOR": "VALUE"}, ... }. If omitted, returns no documents.
-        fields = List of fields to return: ["FIELD1", "FIELD2", ...]. If omitted, returns all fields.
-        sort = List defining sort order: [{"FIELD1": "ASC"}, {"FIELD2": "DESC"}, ...]. If omitted, returns in ascending UUID order.
-        limit = Number of docs to retrieve. Set arbitrary large to fetch all.
+        dbname: Name of database being queried.
+        selector: A MongoDB style selector: {"FIELDNAME" : {"OPERATOR": "VALUE"}, ... }. If omitted, returns no documents.
+        fields: List of fields to return: ["FIELD1", "FIELD2", ...]. If omitted, returns all fields.
+        sort: List defining sort order: [{"FIELD1": "ASC"}, {"FIELD2": "DESC"}, ...]. If omitted, returns in ascending UUID order.
+        limit: Number of docs to retrieve. Set arbitrary large to fetch all.
         '''
         res = self.client.post_find(db=dbname, selector=selector, fields=fields, sort=sort, limit=limit).get_result()
         self.logger.debug(f"Queried database {dbname} where {selector} for {fields} sorted {sort}")
@@ -390,18 +390,18 @@ class DEHCDatabase:
         '''Constructs a DEHCDatabase object.
 
         config: Path to .json file containing database server credentials.
-        level = Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
+        level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         quickstart: Creates databases and loads schema automatically.
         '''
-        self.db = Database(config=config, level=level)
         self.logger = ml.get(name="DEHCDatabase", level=level)
+        self.logger.debug("DEHCDatabase object instantiated")
+        self.db = Database(config=config, level=level)
 
-        self.db_list = ["items", "containers"]
+        self.db_list = ["items", "containers", "config"]
         self.id_len = 12
         self.limit = 1000000
 
         self.schema = {}
-        self.logger.debug("DEHCDatabase object instantiated")
         if quickstart == True:
             self.databases_create(lazy=True)
             self.schema_load(schema="db_schema.json")
@@ -700,7 +700,7 @@ class DEHCDatabase:
     def containers_query(self, selector: dict = {}, fields: list = None, sort: list = None):
         '''Queries the container database and returns the results.
 
-        For selector operators, see: https://docs.mongodb.com/manual/reference/operator/query/
+        For selector operators, see https://docs.mongodb.com/manual/reference/operator/query/
 
         selector = A MongoDB style selector: {"FIELDNAME" : {"OPERATOR": "VALUE"}, ... }. If omitted, returns all items.
         fields = List of fields to return: ["FIELD1", "FIELD2", ...]. If omitted, returns all fields.
@@ -1109,8 +1109,8 @@ class DEHCDatabase:
         schema: Path to local .json file containing database schema.
         forcelocal: If true, uses local schema over one stored in the database.
         '''
-        if forcelocal == False and self.db.document_exists(dbname="items", id="schema") == True:
-            loaded_schema = self.db.document_get(dbname="items", id="schema")
+        if forcelocal == False and self.db.document_exists(dbname="config", id="schema") == True:
+            loaded_schema = self.db.document_get(dbname="config", id="schema")
         else:
             with open(schema, "r") as f:
                 loaded_schema = json.loads(f.read())
@@ -1147,10 +1147,10 @@ class DEHCDatabase:
 
     def schema_save(self):
         '''Saves database schema to the database.'''
-        if self.db.document_exists(dbname="items", id="schema"):
-            self.db.document_edit(dbname="items", doc=self.schema, id="schema")
+        if self.db.document_exists(dbname="config", id="schema"):
+            self.db.document_edit(dbname="config", doc=self.schema, id="schema")
         else:
-            self.db.document_create(dbname="items", doc=self.schema, id="schema")
+            self.db.document_create(dbname="config", doc=self.schema, id="schema")
 
 
     def __del__(self):
