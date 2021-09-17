@@ -43,4 +43,10 @@ def get(name: str, level: str = "NOTSET"):
     return logger
 
 
+def check(name: str):
+    '''Returns whether or not a logger of a particular name already exists.'''
+    result = name in logging.Logger.manager.loggerDict
+    return result
+
+
 # ----------------------------------------------------------------------------

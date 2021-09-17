@@ -1,17 +1,58 @@
 {
     "person":
     {
-        "fields": ["Name", "ID"],
-        "keys": ["Name"]
+        "fields":
+        {
+            "Display Name":                      {"index": 0,  "type": "text",   "regex": ".*",                 "list": false, "required": true},
+            "Family Name":                       {"index": 1,  "type": "text",   "regex": ".*",                 "list": false, "required": false},
+            "Given Name(s)":                     {"index": 2,  "type": "text",   "regex": ".*",                 "list": false, "required": false},
+            "Sex":                               {"index": 3,  "type": "option", "options":["", "M", "F", "X"], "list": false, "required": false},
+            "Date Of Birth":                     {"index": 4,  "type": "text",   "regex": ".*",                 "list": false, "required": false},
+            "Passport Number":                   {"index": 5,  "type": "text",   "regex": ".*",                 "list": false, "required": false},
+            "Nationality":                       {"index": 6,  "type": "text",   "regex": ".*",                 "list": false, "required": false},
+            "Home Address":                      {"index": 7,  "type": "text",   "regex": ".*",                 "list": false, "required": false},
+            "Destination Address":               {"index": 8,  "type": "text",   "regex": ".*",                 "list": false, "required": false},
+            "Home Contact Number":               {"index": 9,  "type": "text",   "regex": ".*",                 "list": false, "required": false},
+            "Destination Contact Number":        {"index": 10, "type": "text",   "regex": ".*",                 "list": false, "required": false},
+            "Family":                            {"index": 11, "type": "id",                                    "list": true,  "required": false},
+            "Baggage":                           {"index": 12, "type": "id",                                    "list": true,  "required": false},
+            "Requires Medical Attention?":       {"index": 13, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
+            "Authority To Release Information?": {"index": 14, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
+            "Evacuee Searched?":                 {"index": 15, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
+            "Baggage Searched?":                 {"index": 16, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
+            "Documentation Completed?":          {"index": 17, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
+            "Medical Completed?":                {"index": 18, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
+            "Screening Completed?":              {"index": 19, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
+            "Accommodation":                     {"index": 20, "type": "text",   "regex": ".*",                 "list": false, "required": false},
+            "Notes":                             {"index": 21, "type": "text",   "regex": ".*",                 "list": false, "required": false}
+        },
+        "keys": ["Display Name"]
     },
     "family":
     {
-        "fields": ["Name", "Notes"],
-        "keys": ["Name"]
+        "fields":
+        {
+            "Display Name":                      {"index": 0, "type": "text", "regex": ".*", "list": false, "required": true},
+            "Notes":                             {"index": 1, "type": "text", "regex": ".*", "list": false, "required": false}
+        },
+        "keys": ["Display Name"]
     },
     "station":
     {
-        "fields": ["Name", "Index", "Notes"],
-        "keys": ["Index", "Name"]
+        "fields":
+        {
+            "Display Name":                      {"index": 0, "type": "text", "regex": ".*", "list": false, "required": true},
+            "Index":                             {"index": 1, "type": "text", "regex": ".*", "list": false, "required": false},
+            "Notes":                             {"index": 2, "type": "text", "regex": ".*", "list": false, "required": false}
+        },
+        "keys": ["Display Name"]
+    },
+    "evacuation":
+    {
+        "fields":
+        {
+            "Display Name":                      {"index": 0, "type": "text", "regex": ".*", "list": false, "required": true}
+        },
+        "keys": ["Display Name"]
     }
 }

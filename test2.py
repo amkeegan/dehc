@@ -1,3 +1,5 @@
+'''Another performance testing script.'''
+
 import random
 import sys
 import time
@@ -6,9 +8,9 @@ import mods.database as md
 # ----------------------------------------------------------------------
 
 level = "WARNING" # Logging level
-n = 5000          # Number of documents to insert
-f = 20            # Number of fetches to make
-q = 20            # Number of queries to make
+n = 2000          # Number of documents to insert
+f = 12            # Number of fetches to make
+q = 12            # Number of queries to make
 
 # ----------------------------------------------------------------------
 

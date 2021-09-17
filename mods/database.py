@@ -2,7 +2,6 @@
 
 import json
 import random
-import time
 
 from ibmcloudant import CouchDbSessionAuthenticator
 from ibmcloudant.cloudant_v1 import CloudantV1, BulkDocs, Document, IndexDefinition, IndexField
@@ -397,14 +396,15 @@ class DEHCDatabase:
         self.logger.debug("DEHCDatabase object instantiated")
         self.db = Database(config=config, level=level)
 
-        self.db_list = ["items", "containers", "config"]
+        self.db_list = ["items", "containers", "config", "log"]
         self.id_len = 12
         self.limit = 1000000
 
         self.schema = {}
         if quickstart == True:
+            self.databases_delete(lazy=True)
             self.databases_create(lazy=True)
-            self.schema_load(schema="db_schema.json")
+            self.schema_load(schema="db_schema.json", forcelocal=True)
             self.schema_save()
 
 
@@ -1068,9 +1068,15 @@ class DEHCDatabase:
                 key = next(iter(field.keys()))
                 index_name += f"-{key}"
             if self.db.index_exists(dbname="items", name=index_name) == False:
-                self.db.index_create(dbname="items", name=index_name, fields=sort)
+                self.db.index_create(dbname="items", name=index_name, fields=[{"category": "asc"}]+sort)
         res = self.db.query(dbname="items", selector=selector, fields=fields, sort=sort, limit=self.limit)
         return res
+
+
+    def schema_cats(self):
+        '''Returns the list of categories present in the schema.'''
+        cats = list(self.schema.keys())
+        return cats
 
 
     def schema_fields(self, *, cat: str = None, id: str = None):
@@ -1083,7 +1089,7 @@ class DEHCDatabase:
         '''
         if cat == None:
             cat = self.id_cat(id=id)
-        fields = self.schema[cat]["fields"]
+        fields = list(self.schema[cat]["fields"].keys())
         return fields
 
 
@@ -1124,25 +1130,16 @@ class DEHCDatabase:
         self.schema = loaded_schema
 
 
-    def schema_name(self, doc: dict, *, cat: str = None, id: str = None):
-        '''Takes doc, returns simple list of key field values.
-
-        Priority for determining category: doc, then cat, then id.
+    def schema_name(self, *, cat: str = None, id: str = None):
+        '''Returns the first field of a particular kind of item.
         
-        doc: The doc to get key values of.
-        cat: Category name, if not in doc itself.
-        id: Doc's UUID, if not in doc itself.
+        Only cat OR id needs to be provided. If both, cat is used.
+
+        cat: Category of item to recieve fields of.
+        id: ID of item to recieve fields of.
         '''
-        if "category" in doc:
-            keys = self.schema_keys(cat=doc["category"])
-        elif "_id" in doc:
-            keys = self.schema_keys(id=doc["_id"])
-        elif cat != None:
-            keys = self.schema_keys(cat=cat)
-        else:
-            keys = self.schema_keys(id=id)
-        name = [doc[key] for key in keys]
-        return name
+        field, *_ = self.schema_fields(cat=cat, id=id)
+        return field
 
 
     def schema_save(self):
@@ -1151,6 +1148,20 @@ class DEHCDatabase:
             self.db.document_edit(dbname="config", doc=self.schema, id="schema")
         else:
             self.db.document_create(dbname="config", doc=self.schema, id="schema")
+
+
+    def schema_schema(self, *, cat: str = None, id: str = None):
+        '''Returns the schema of a particular kind of item.
+        
+        Only cat OR id needs to be provided. If both, cat is used.
+
+        cat: Category of item to recieve fields of.
+        id: ID of item to recieve fields of.
+        '''
+        if cat == None:
+            cat = self.id_cat(id=id)
+        schema = self.schema[cat]["fields"]
+        return schema
 
 
     def __del__(self):
