@@ -34,7 +34,7 @@ class EMS():
 
         self.root = tk.Tk()
         self.root.title("EMS Prototype")
-        self.root.resizable(width=False, height=False)
+        self.root.state('zoomed')
         self.root.bind("<Escape>", lambda *_: self.root.destroy())
 
         if autorun == True:
@@ -45,24 +45,23 @@ class EMS():
 
     def prepare(self):
         '''Constructs the frames and widgets of the EMS.'''
-        self.f_left = ttk.Frame(master=self.root)
-        self.f_right = ttk.Frame(master=self.root)
-        self.f_base = ttk.Frame(master=self.root)
         topbase, = self.db.items_query(cat="station", selector={"Display Name":{"$eq":"Ingest"}}, fields=["_id", "Display Name"])
         botbase, = self.db.items_query(cat="station", selector={"Display Name":{"$eq":"Clean Hold"}}, fields=["_id", "Display Name"])
-        self.cm = mw.ContainerManager(master=self.f_left, db=self.db, topbase=topbase, botbase=botbase, cats=self.cats, level=self.level, prepare=True, select=self.item_select, width=100)
-        self.de = mw.DataEntry(master=self.f_right, db=self.db, cats=self.cats, level=self.level, prepare=True, height=266, width=100)
-        self.sb = mw.StatusBar(master=self.f_base, db=self.db, level=self.level, prepare=True, width=200)
+        self.cm = mw.ContainerManager(master=self.root, db=self.db, topbase=topbase, botbase=botbase, cats=self.cats, level=self.level, prepare=True, select=self.item_select)
+        self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, level=self.level, prepare=True)
+        self.sb = mw.StatusBar(master=self.root, db=self.db, level=self.level, prepare=True)
+
+        self.root.rowconfigure(0, weight=1000)
+        self.root.rowconfigure(1, weight=1, minsize=16)
+        self.root.columnconfigure(0, weight=1000)
+        self.root.columnconfigure(1, weight=1000)
 
 
     def pack(self):
         '''Packs & grids children frames and widgets of the EMS.'''
-        self.f_left.grid(column=0, row=0, sticky="nsew")
-        self.f_right.grid(column=1, row=0, sticky="nsew")
-        self.f_base.grid(column=0, row=1, columnspan=2)
-        self.de.pack(fill=tk.BOTH, expand=True)
-        self.cm.pack(fill=tk.BOTH, expand=True)
-        self.sb.pack(fill=tk.BOTH, expand=True)
+        self.de.grid(column=1, row=0, sticky="nsew", padx=2, pady=2)
+        self.cm.grid(column=0, row=0, sticky="nsew", padx=2, pady=2)
+        self.sb.grid(column=0, row=1, columnspan=2, sticky="nsew", padx=2)
 
 
     def run(self):

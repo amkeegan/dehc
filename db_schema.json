@@ -18,13 +18,14 @@
             "Baggage":                           {"index": 12, "type": "id",                                    "list": true,  "required": false},
             "Requires Medical Attention?":       {"index": 13, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
             "Authority To Release Information?": {"index": 14, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
-            "Evacuee Searched?":                 {"index": 15, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
-            "Baggage Searched?":                 {"index": 16, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
-            "Documentation Completed?":          {"index": 17, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
-            "Medical Completed?":                {"index": 18, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
-            "Screening Completed?":              {"index": 19, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
-            "Accommodation":                     {"index": 20, "type": "text",   "regex": ".*",                 "list": false, "required": false},
-            "Notes":                             {"index": 21, "type": "text",   "regex": ".*",                 "list": false, "required": false}
+            "Weight (KG)":                       {"index": 15, "type": "text",   "regex"  : ".*",               "list": false, "required": false},
+            "Evacuee Searched?":                 {"index": 16, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
+            "Baggage Searched?":                 {"index": 17, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
+            "Documentation Completed?":          {"index": 18, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
+            "Medical Completed?":                {"index": 19, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
+            "Screening Completed?":              {"index": 20, "type": "option", "options":["", "Y", "N"],      "list": false, "required": false},
+            "Accommodation":                     {"index": 21, "type": "text",   "regex": ".*",                 "list": false, "required": false},
+            "Notes":                             {"index": 22, "type": "text",   "regex": ".*",                 "list": false, "required": false}
         },
         "keys": ["Display Name"]
     },
