@@ -765,6 +765,7 @@ class DEHCDatabase:
         
         id: The UUID of item to delete.
         all: If true, also deletes item's container and file docs.
+        recur: If true, also deletes all children the item contains.
         lazy: If true, won't error if document doesn't exist.
         '''
         self.db.document_delete(dbname="items", id=id, lazy=lazy)
