@@ -1,5 +1,8 @@
 '''The script that starts the main DEHC application.'''
 
+import pprint
+import random
+import time
 import sys
 
 import apps.ems as ae
@@ -8,7 +11,7 @@ import mods.log as ml
 
 # ----------------------------------------------------------------------------
 
-level = "ERROR"
+level = "INFO"
 logger = ml.get(name="Main", level=level)
 logger.debug("Application has started.")
 
@@ -38,16 +41,87 @@ pids = db.items_create(cat="person", docs = [
     {"Display Name":"Isaac Clark", "Family Name":"Clark", "Given Name(s)":"Isaac", "Sex":"M", "Date Of Birth":"1989-02-26", "Passport Number":"M61132249", "Nationality":"NZL", "FlagB":1}
 ])
 
-db.container_adds(container=fids[0], items=pids[:3])
-db.container_adds(container=fids[1], items=pids[3:6])
-db.container_adds(container=fids[2], items=pids[6:8])
-db.container_adds(container=sids[0], items=fids[:2]+pids[8:])
-db.container_adds(container=sids[1], items=fids[2:])
-db.container_adds(container=eid, items=sids)
+def fakename():
+    name = ""
+    for _ in range(12):
+        c = random.choice("abcdefghijklmnopqrstuvwxyz")
+        name += c
+    return name
+
+docs = []
+for _ in range(10000):
+    doc = {
+        "Display Name": fakename(),
+        "Family Name": fakename(),
+        "Given Name(s)": fakename(),
+        "Sex": fakename(),
+        "Date Of Birth": fakename(),
+        "Passport Number": fakename(),
+        "Nationality": fakename(),
+        "Home Address": fakename(),
+        "Destination Address": fakename(),
+        "Home Contact Number": fakename(),
+        "Destination Contact Number": fakename(),
+        "Guardian(s)": fakename(),
+        "Requires Medical Attention?": fakename(),
+        "Authority To Release Information?": fakename(),
+        "Weight (KG)": fakename(),
+        "Evacuee Searched?": fakename(),
+        "Baggage Searched?": fakename(),
+        "Documentation Completed?": fakename(),
+        "Medical Completed?": fakename(),
+        "Screening Completed?": fakename(),
+        "Accommodation": fakename(),
+        "Notes": fakename()
+    }
+    docs.append(doc)
+db.items_create(cat="person", docs=docs)
+q = docs[1000]["Display Name"]
+
+#db.container_adds(container=fids[0], items=pids[:3])
+#db.container_adds(container=fids[1], items=pids[3:6])
+#db.container_adds(container=fids[2], items=pids[6:8])
+#db.container_adds(container=sids[0], items=fids[:2]+pids[8:])
+#db.container_adds(container=sids[1], items=fids[2:])
+#db.container_adds(container=eid, items=sids)
 
 # ----------------------------------------------------------------------------
 
-app = ae.EMS(db=db, level=level, autorun=True)
+#app = ae.EMS(db=db, level=level, autorun=True)
+cat="person"
+selector={"Display Name":{"$eq": q}}
+
+input("Break")
+t1 = time.time()
+db.items_query(cat=cat, selector=selector)
+t2 = time.time()
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+y = db.items_query(cat=cat, selector=selector)
+t3 = time.time()
+
+pprint.pprint(y)
+print(t2-t1)
+print(t3-t2)
 
 # ----------------------------------------------------------------------------
 
