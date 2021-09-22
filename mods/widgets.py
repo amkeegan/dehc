@@ -474,11 +474,12 @@ class DataEntry(SuperWidget):
 
                 elif w_type == "sum":
                     entry = ttk.Entry(master=self.w_fr_data)
-                    children = self.db.container_children_all(container=self.last_doc["_id"], cat=info['cat'], result="DOC")
-                    target = info['target']
-                    items = [float(child.get(target, "")) for child in children if child.get(target,"") != ""]
-                    itemsum = str(sum(items)) if len(items) > 0 else ""
-                    entry.insert(0, itemsum)
+                    if self.last_doc.get('_id','') != "":
+                        children = self.db.container_children_all(container=self.last_doc["_id"], cat=info['cat'], result="DOC")
+                        target = info['target']
+                        items = [float(child.get(target, "")) for child in children if child.get(target,"") != ""]
+                        itemsum = str(sum(items)) if len(items) > 0 else ""
+                        entry.insert(0, itemsum)
                     entry.config(state="disabled")
                     buttona = None
                     buttonb = None
