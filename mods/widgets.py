@@ -1,11 +1,14 @@
 '''The module containing objects that create and manage groups of tkinter widgets.'''
 
+from logging import exception
 import tkinter as tk
 from tkinter import ttk
 from typing import Callable
 
 import mods.database as md
 import mods.log as ml
+
+import serial
 
 
 # ----------------------------------------------------------------------------
@@ -85,6 +88,9 @@ class DataEntry(SuperWidget):
     _save: If present, a callback function that triggers when an item is saved.
     '''
 
+    scales = None
+    last_weight = 0.0
+
     def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, flags: list = [], level: str = "NOTSET", prepare: bool = True, save: Callable = None):
         '''Constructs a DataEntry object.
         
@@ -102,10 +108,28 @@ class DataEntry(SuperWidget):
         self.last_doc = {}
         self._delete = delete
         self._save = save
-
+        try:
+            self.scales = serial.Serial('COM8', 19200, timeout=1)
+        except Exception as err:
+            print('No scales...')
+            print(f'Error: {err}')
         if prepare == True:
             self.prepare()
 
+    def read_scales(self):
+        if self.scales is not None:
+            if self.scales.in_waiting > 0:
+                line = self.scales.readline()
+                self.last_weight = float(line.decode().strip('\r\n').strip('KG'))
+        else:
+            #TODO: Remove random weight generation
+            import random
+            self.last_weight = round(90+random.random()*5, 2)
+    
+    def close_scales(self):
+        if self.scales is not None:
+            self.scales.close()
+            self.scales = None
 
     def prepare(self):
         '''Constructs the frames and widgets of the DataEntry.'''
@@ -275,9 +299,11 @@ class DataEntry(SuperWidget):
 
             def read_weight(*args):
                 '''Reads the current weight from another device.'''
-                reading = round(90+random.random()*5, 2)
+                #reading = round(90+random.random()*5, 2)
+                self.read_scales()
+                reading = self.last_weight
                 msg.config(text=str(reading))
-                window.after(500, read_weight)
+                window.after(50, read_weight)
 
             def commit_weight(*args):
                 '''Inserts current weight into data pane.'''
