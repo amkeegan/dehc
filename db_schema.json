@@ -3,38 +3,40 @@
     {
         "fields":
         {
-            "Display Name":                      {"index": 0,  "type": "text",   "regex": ".*",                 "required": true},
-            "Family Name":                       {"index": 1,  "type": "text",   "regex": ".*",                 "required": false},
-            "Given Name(s)":                     {"index": 2,  "type": "text",   "regex": ".*",                 "required": false},
-            "Sex":                               {"index": 3,  "type": "option", "options":["", "M", "F", "X"], "required": false},
-            "Date Of Birth":                     {"index": 4,  "type": "text",   "regex": ".*",                 "required": false},
-            "Passport Number":                   {"index": 5,  "type": "text",   "regex": ".*",                 "required": false},
-            "Nationality":                       {"index": 6,  "type": "text",   "regex": ".*",                 "required": false},
-            "Home Address":                      {"index": 7,  "type": "text",   "regex": ".*",                 "required": false},
-            "Destination Address":               {"index": 8,  "type": "text",   "regex": ".*",                 "required": false},
-            "Home Contact Number":               {"index": 9,  "type": "text",   "regex": ".*",                 "required": false},
-            "Destination Contact Number":        {"index": 10, "type": "text",   "regex": ".*",                 "required": false},
-            "Guardian(s)":                       {"index": 11, "type": "list",   "source" : "IDS",              "required": false},
-            "Requires Medical Attention?":       {"index": 12, "type": "option", "options":["", "Y", "N"],      "required": false},
-            "Authority To Release Information?": {"index": 13, "type": "option", "options":["", "Y", "N"],      "required": false},
-            "Weight (KG)":                       {"index": 14, "type": "read",   "source" : "WEIGHT",           "required": false},
-            "Evacuee Searched?":                 {"index": 15, "type": "option", "options":["", "Y", "N"],      "required": false},
-            "Baggage Searched?":                 {"index": 16, "type": "option", "options":["", "Y", "N"],      "required": false},
-            "Documentation Completed?":          {"index": 17, "type": "option", "options":["", "Y", "N"],      "required": false},
-            "Medical Completed?":                {"index": 18, "type": "option", "options":["", "Y", "N"],      "required": false},
-            "Screening Completed?":              {"index": 19, "type": "option", "options":["", "Y", "N"],      "required": false},
-            "Accommodation":                     {"index": 20, "type": "text",   "regex": ".*",                 "required": false},
-            "Notes":                             {"index": 21, "type": "text",   "regex": ".*",                 "required": false}
+            "Display Name":                      {"index": 0,  "type": "text",   "regex": ".*",                      "required": true},
+            "Family Name":                       {"index": 1,  "type": "text",   "regex": ".*",                      "required": false},
+            "Given Name(s)":                     {"index": 2,  "type": "text",   "regex": ".*",                      "required": false},
+            "Sex":                               {"index": 3,  "type": "option", "options":["", "M", "F", "X"],      "required": false},
+            "Date Of Birth":                     {"index": 4,  "type": "text",   "regex": ".*",                      "required": false},
+            "Passport Number":                   {"index": 5,  "type": "text",   "regex": ".*",                      "required": false},
+            "Nationality":                       {"index": 6,  "type": "text",   "regex": ".*",                      "required": false},
+            "Home Address":                      {"index": 7,  "type": "text",   "regex": ".*",                      "required": false},
+            "Destination Address":               {"index": 8,  "type": "text",   "regex": ".*",                      "required": false},
+            "Home Contact Number":               {"index": 9,  "type": "text",   "regex": ".*",                      "required": false},
+            "Destination Contact Number":        {"index": 10, "type": "text",   "regex": ".*",                      "required": false},
+            "Guardian(s)":                       {"index": 11, "type": "list",   "source" : "IDS",                   "required": false},
+            "Requires Medical Attention?":       {"index": 12, "type": "option", "options":["", "Y", "N"],           "required": false},
+            "Authority To Release Information?": {"index": 13, "type": "option", "options":["", "Y", "N"],           "required": false},
+            "Weight (KG)":                       {"index": 14, "type": "read",   "source" : "WEIGHT", "default": 82, "required": false},
+            "Evacuee Searched?":                 {"index": 15, "type": "option", "options":["", "Y", "N"],           "required": false},
+            "Baggage Searched?":                 {"index": 16, "type": "option", "options":["", "Y", "N"],           "required": false},
+            "Documentation Completed?":          {"index": 17, "type": "option", "options":["", "Y", "N"],           "required": false},
+            "Medical Completed?":                {"index": 18, "type": "option", "options":["", "Y", "N"],           "required": false},
+            "Screening Completed?":              {"index": 19, "type": "option", "options":["", "Y", "N"],           "required": false},
+            "Accommodation":                     {"index": 20, "type": "text",   "regex": ".*",                      "required": false},
+            "Notes":                             {"index": 21, "type": "text",   "regex": ".*",                      "required": false}
         },
+        "flags": ["Aflag", "Bflag", "Cflag", "Dflag"],
         "keys": ["Display Name"]
     },
     "family":
     {
         "fields":
         {
-            "Display Name":                      {"index": 0, "type": "text", "regex": ".*", "list": false, "required": true},
-            "Weight (KG)":                       {"index": 1, "type": "sum",  "cat": ["person"], "target": "Weight (KG)", "list": false, "required": false},
-            "Notes":                             {"index": 2, "type": "text", "regex": ".*", "list": false, "required": false}
+            "Display Name":                      {"index": 0, "type": "text", "regex": ".*", "required": true},
+            "Weight (KG)":                       {"index": 1, "type": "sum",  "cat": ["person"], "target": "Weight (KG)", "default": 82, "required": false},
+            "Souls":                             {"index": 2, "type": "count", "cat": ["person"], "required": false},
+            "Notes":                             {"index": 3, "type": "text", "regex": ".*", "required": false}
         },
         "keys": ["Display Name"]
     },
@@ -42,9 +44,9 @@
     {
         "fields":
         {
-            "Display Name":                      {"index": 0, "type": "text", "regex": ".*", "list": false, "required": true},
-            "Index":                             {"index": 1, "type": "text", "regex": ".*", "list": false, "required": false},
-            "Notes":                             {"index": 2, "type": "text", "regex": ".*", "list": false, "required": false}
+            "Display Name":                      {"index": 0, "type": "text", "regex": ".*", "required": true},
+            "Index":                             {"index": 1, "type": "text", "regex": ".*", "required": false},
+            "Notes":                             {"index": 2, "type": "text", "regex": ".*", "required": false}
         },
         "keys": ["Display Name"]
     },
@@ -52,7 +54,7 @@
     {
         "fields":
         {
-            "Display Name":                      {"index": 0, "type": "text", "regex": ".*", "list": false, "required": true}
+            "Display Name":                      {"index": 0, "type": "text", "regex": ".*", "required": true}
         },
         "keys": ["Display Name"]
     }

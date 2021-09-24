@@ -32,7 +32,6 @@ class EMS():
 
         self.db = db
         self.cats = self.db.schema_cats()
-        self.flags = ["FlagA", "FlagB", "FlagC", "FlagD"]
 
         self.root = tk.Tk()
         self.root.title("EMS Prototype")
@@ -50,9 +49,8 @@ class EMS():
         topbase, = self.db.items_query(cat="station", selector={"Display Name":{"$eq":"Ingest"}}, fields=["_id", "Display Name"])
         botbase, = self.db.items_query(cat="station", selector={"Display Name":{"$eq":"Clean Hold"}}, fields=["_id", "Display Name"])
         self.cm = mw.ContainerManager(master=self.root, db=self.db, topbase=topbase, botbase=botbase, cats=self.cats, level=self.level, prepare=True, select=self.item_select)
-        self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, delete=self.delete, flags=self.flags, level=self.level, prepare=True, save=self.save)
+        self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, delete=self.delete, level=self.level, prepare=True, save=self.save, show=self.show)
         self.sb = mw.StatusBar(master=self.root, db=self.db, level=self.level, prepare=True)
-
         self.root.rowconfigure(0, weight=1000)
         self.root.rowconfigure(1, weight=1, minsize=16)
         self.root.columnconfigure(0, weight=1000)
@@ -99,6 +97,15 @@ class EMS():
             self.db.container_add(container=container, item=id)
         self.cm.refresh()
         if id != None:
+            self.cm.highlight(item=container)
+            self.cm.open()
+
+
+    def show(self, *args):
+        '''Callback for when the show button is pressed in the data pane.'''
+        id, *_ = args
+        if id != None:
+            self.cm.refresh()
             self.cm.highlight(item=id)
 
 

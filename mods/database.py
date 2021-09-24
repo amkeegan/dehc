@@ -530,17 +530,6 @@ class DEHCDatabase:
         self.items_flag(items=items, flag=flag, value=value, lazy=lazy)
 
 
-    def container_flag_get(self, container: str, flag: str, lazy: bool = False):
-        '''Retrieves the highest value of a flag among an item and its children.
-        
-        container: Container to check for flag.
-        flag: Flag to check for.
-        lazy: If true, won't error if container or containing items don't exist.
-        '''
-        items = [container]+self.container_children_all(container=container, result="ITEM")
-        return self.flags_get(items=items, flag=flag, lazy=lazy)
-
-
     def container_move(self, from_con: str, to_con: str, item: str, lazy: bool = False):
         '''Moves an item from one container to another.
         
@@ -680,17 +669,6 @@ class DEHCDatabase:
         self.items_flag(items=items, flag=flag, value=value, lazy=lazy)
 
 
-    def containers_flag_get(self, containers: list, flag: str, lazy: bool = False):
-        '''Retrieves the highest value of a flag among multiple items and their children.
-        
-        containers: Containers to check for flag.
-        flag: Flag to check for.
-        lazy: If true, won't error if container or containing items don't exist.
-        '''
-        items = containers+self.containers_children_all(containers=containers, result="ITEM")
-        return self.flags_get(items=items, flag=flag, lazy=lazy)
-
-
     def containers_list(self):
         '''Retrieves every doc from container database. Intensive!'''
         docs = self.db.documents_list(dbname="containers", limit=self.limit)
@@ -717,28 +695,6 @@ class DEHCDatabase:
         return res
 
 
-    def flag_get(self, item: str, flag: str, lazy: bool = False):
-        '''Retrieves the value of a flag for a particular item.
-        
-        item: Item to check for flag.
-        flag: Flag to check for.
-        lazy: If true, won't error if item doesn't exist.
-        '''
-        doc = self.db.document_get(dbname="items", id=item, lazy=lazy)
-        return doc.get(flag, 0)
-
-
-    def flags_get(self, items: list, flag: str, lazy: bool = False):
-        '''Retrieves the highest value of a flag among multiple items.
-        
-        items: Items to check for flag.
-        flag: Flag to check for.
-        lazy: If true, won't error if item doesn't exist.
-        '''
-        docs = self.db.documents_get(dbname="items", ids=items, lazy=lazy)
-        return max([doc.get(flag, 0) for doc in docs])
-
-
     def id_cat(self, id: str):
         '''Takes an id and returns its category.
         
@@ -756,6 +712,8 @@ class DEHCDatabase:
         '''
         id, = self.db.id_create(length=self.id_len, prefix=cat+"/")
         doc['category'] = cat
+        if 'flags' not in doc:
+            doc['flags'] = []
         self.db.document_create(dbname="items", doc=doc, id=id)
         return id
 
@@ -885,6 +843,8 @@ class DEHCDatabase:
         for doc in docs:
             doc_c = doc.copy()
             doc_c['category'] = cat
+            if 'flags' not in doc:
+                doc['flags'] = []
             new_docs.append(doc_c)
         self.db.documents_create(dbname="items", docs=new_docs, ids=ids)
         return ids
@@ -1094,6 +1054,20 @@ class DEHCDatabase:
         return fields
 
 
+    def schema_flags(self, *, cat: str = None, id: str = None):
+        '''Returns the list of flags for a particular kind of item.
+
+        Only cat OR id needs to be provided. If both, cat is used.
+
+        cat: Category of item to recieve flags of.
+        id: ID of item to recieve flags of.
+        '''
+        if cat == None:
+            cat = self.id_cat(id=id)
+        flags = self.schema[cat].get("flags", [])
+        return flags
+
+
     def schema_keys(self, *, cat: str = None, id: str = None):
         '''Returns the list of key fields for a particular kind of item.
 
@@ -1163,6 +1137,16 @@ class DEHCDatabase:
             cat = self.id_cat(id=id)
         schema = self.schema[cat]["fields"]
         return schema
+
+
+    def schema_sums(self):
+        '''Returns all of the summable fields within the entire schema.'''
+        summables = []
+        for cat, schema in self.schema.items():
+            for field, info in schema['fields'].items():
+                if info['type'] == "sum" or info['type'] == "count":
+                    summables.append(field)
+        return list(dict.fromkeys(summables))
 
 
     def __del__(self):

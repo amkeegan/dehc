@@ -79,29 +79,31 @@ class DataEntry(SuperWidget):
     cats: The categories for which new items can be created using this DataEntry.
     db: The database object which the widget uses for database transactions.
     last_doc: The last doc that was shown in the data pane.
+    level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
     logger: The logger object used for logging.
     master: The widget that the DataEntry's component widgets will be instantiated under.
     _delete: If present, a callback function that triggers when an item is deleted.
     _save: If present, a callback function that triggers when an item is saved.
     '''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, flags: list = [], level: str = "NOTSET", prepare: bool = True, save: Callable = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, level: str = "NOTSET", prepare: bool = True, save: Callable = None, show: Callable = None):
         '''Constructs a DataEntry object.
         
         master: The widget that the DataEntry's component widgets will be instantiated under.
         cats: The categories of items that can be created using the New button.
-        flags: The flags that can be added to items using this DataEntry.
         level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         save: If present, a callback function that triggers when an item is saved.
+        show: If present, a callback function that triggers when 'show' is pressed in the data pane.
         prepare: If true, automatically prepares widgets for packing.
         '''
         super().__init__(master=master, db=db, level=level)
 
         self.cats = cats
-        self.flags = flags
         self.last_doc = {}
+        self.level = level
         self._delete = delete
         self._save = save
+        self._show = show
 
         if prepare == True:
             self.prepare()
@@ -116,7 +118,8 @@ class DataEntry(SuperWidget):
 
         self.w_fr.columnconfigure(index=0, weight=1000)
         self.w_fr.columnconfigure(index=1, weight=1000)
-        self.w_fr.columnconfigure(index=2, weight=1, minsize=16)
+        self.w_fr.columnconfigure(index=2, weight=1000)
+        self.w_fr.columnconfigure(index=3, weight=1, minsize=16)
         self.w_fr.rowconfigure(index=0, weight=1, minsize=25)
         self.w_fr.rowconfigure(index=1, weight=500)
         self.w_fr.rowconfigure(index=2, weight=1000)
@@ -148,10 +151,11 @@ class DataEntry(SuperWidget):
 
         # Widgets
         self.w_la_title = ttk.Label(master=self.w_fr, text="Title", font="Arial 12 bold")
+        self.w_bu_copyid = ttk.Button(master=self.w_fr, text="Copy ID", command=self.copyid)
         self.w_bu_photo = ttk.Button(master=self.w_fr, text="Photo", command=self.photo)
         self.w_la_flags = ttk.Label(master=self.w_fr_flags, text="Flags")
         self.w_li_flags = tk.Listbox(master=self.w_fr_flags, selectmode=tk.SINGLE, relief=tk.GROOVE, exportselection=False)
-        self.w_co_flags = ttk.Combobox(master=self.w_fr_flags, values=self.flags, textvariable=self.w_var_flags, state="readonly")
+        self.w_co_flags = ttk.Combobox(master=self.w_fr_flags, textvariable=self.w_var_flags, state="readonly")
         self.w_bu_add = ttk.Button(master=self.w_fr_flags, text="Add", command=self.add)
         self.w_bu_remove = ttk.Button(master=self.w_fr_flags, text="Remove", command=self.remove)
         self.w_la_data = []
@@ -162,7 +166,6 @@ class DataEntry(SuperWidget):
         self.w_bu_new = ttk.Button(master=self.w_fr_foot, text="New", command=self.new)
         self.w_bu_save = ttk.Button(master=self.w_fr_foot, text="Save", command=self.save)
         self.w_bu_delete = ttk.Button(master=self.w_fr_foot, text="Delete", command=self.delete)
-        self.w_co_flags.current(0)
         self.w_co_cat.current(0)
         self.show()
 
@@ -173,12 +176,13 @@ class DataEntry(SuperWidget):
 
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the DataEntry.'''
-        self.w_la_title.grid(column=0, row=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        self.w_la_title.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_bu_copyid.grid(column=2, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
         self.w_bu_photo.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
-        self.w_fr_flags.grid(column=1, row=1, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_fr_body.grid(column=0, row=2, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_fr_flags.grid(column=1, row=1, columnspan=3, sticky="nsew", padx=2, pady=2)
+        self.w_fr_body.grid(column=0, row=2, columnspan=3, sticky="nsew", padx=2, pady=2)
         self.w_fr_data.grid(column=0, row=0, sticky="nsew")
-        self.w_fr_foot.grid(column=0, row=3, columnspan=3, sticky="nsew", padx=2, pady=1)
+        self.w_fr_foot.grid(column=0, row=3, columnspan=4, sticky="nsew", padx=2, pady=1)
 
         self.w_la_flags.grid(column=0, row=0, columnspan=4, sticky="nsew", padx=1, pady=1)
         self.w_li_flags.grid(column=0, row=1, columnspan=3, sticky="nsew", padx=1, pady=1)
@@ -205,6 +209,13 @@ class DataEntry(SuperWidget):
     def cancel(self, *args):
         '''Callback for when the cancel button is pressed.'''
         self.show()
+
+
+    def copyid(self, *args):
+        '''Call back for when the copy id button is pressed.'''
+        root = self.w_fr.winfo_toplevel()
+        root.clipboard_clear()
+        root.clipboard_append(self.last_doc.get("_id", ""))
 
 
     def delete(self, *args):
@@ -237,6 +248,11 @@ class DataEntry(SuperWidget):
         self.w_bu_add.config(state="normal")
         self.w_bu_remove.config(state="normal")
         self.w_co_flags.config(state="normal")
+        if "category" in self.last_doc:
+            flags = self.db.schema_flags(cat=self.last_doc["category"])
+            if len(flags) > 0:
+                self.w_co_flags['values'] = flags
+                self.w_co_flags.current(0)
 
 
     def new(self, *args):
@@ -259,35 +275,37 @@ class DataEntry(SuperWidget):
         source: The source to read from.
         '''
         button = event.widget
-        row = self.w_buttona_data.index(button)
-        entry = self.w_input_data[row]
-        field = self.w_la_data[row]
-        for child in button.winfo_children():
-            child.destroy()
-        window = tk.Toplevel(master=button)
-        window.title(field.cget("text"))
+        state = str(button.cget("state"))
+        if state != "disabled":
+            row = self.w_buttona_data.index(button)
+            entry = self.w_input_data[row]
+            field = self.w_la_data[row]
+            for child in button.winfo_children():
+                child.destroy()
+            window = tk.Toplevel(master=button)
+            window.title(field.cget("text"))
 
-        if source == "WEIGHT":
-            import random
-            
-            msg = tk.Label(master=window, font="Arial 14 bold")
-            getbutton = tk.Button(master=window, text="Update", font="Arial 14 bold")
+            if source == "WEIGHT":
+                import random
+                
+                msg = tk.Label(master=window, font="Arial 14 bold")
+                getbutton = tk.Button(master=window, text="Update", font="Arial 14 bold")
 
-            def read_weight(*args):
-                '''Reads the current weight from another device.'''
-                reading = round(90+random.random()*5, 2)
-                msg.config(text=str(reading))
-                window.after(500, read_weight)
+                def read_weight(*args):
+                    '''Reads the current weight from another device.'''
+                    reading = round(90+random.random()*5, 2)
+                    msg.config(text=str(reading))
+                    window.after(500, read_weight)
 
-            def commit_weight(*args):
-                '''Inserts current weight into data pane.'''
-                entry.delete(0, "end")
-                entry.insert(0, msg.cget('text'))
+                def commit_weight(*args):
+                    '''Inserts current weight into data pane.'''
+                    entry.delete(0, "end")
+                    entry.insert(0, msg.cget('text'))
 
-            read_weight()
-            getbutton.config(command=commit_weight)
-            msg.grid(column=0, row=0, sticky="nsew", padx=10, pady=10)
-            getbutton.grid(column=0, row=1, sticky="nsew", padx=10, pady=10)
+                read_weight()
+                getbutton.config(command=commit_weight)
+                msg.grid(column=0, row=0, sticky="nsew", padx=10, pady=10)
+                getbutton.grid(column=0, row=1, sticky="nsew", padx=10, pady=10)
 
 
     def readlist(self, event: tk.Event, source: str):
@@ -297,60 +315,71 @@ class DataEntry(SuperWidget):
         source: The source to read from.
         '''
         button = event.widget
-        row = self.w_buttona_data.index(button)
-        entry = self.w_input_data[row]
-        field = self.w_la_data[row]
-        for child in button.winfo_children():
-            child.destroy()
-        window = tk.Toplevel(master=button)
-        window.title(field.cget("text"))
+        state = str(button.cget("state"))
+        if state != "disabled":
+            row = self.w_buttonb_data.index(button)
+            entry = self.w_input_data[row]
+            field = self.w_la_data[row]
+            for child in button.winfo_children():
+                child.destroy()
+            window = tk.Toplevel(master=button)
+            window.title(field.cget("text"))
 
-        if source == "IDS":
-            cur_id = self.last_doc.get("_id","")
-            parents = self.db.item_parents(item=cur_id)
-            children = self.db.container_children(container=cur_id)
-            parents_children = self.db.containers_children(containers=parents)
-            name_ids = list(dict.fromkeys(parents+children+parents_children))
-            if cur_id in name_ids:
-                name_ids.remove(cur_id)
-            db_result = self.db.items_get(ids=name_ids, fields=["_id", "Display Name"])
-            names = [item["Display Name"] for item in db_result]
-            ids = [item["_id"] for item in db_result]
-            active_ids = [] if self.w_hidden_data[row] == "" else self.w_hidden_data[row]
+            if source == "IDS":
+                cur_id = self.last_doc.get("_id","")
+                parents = self.db.item_parents(item=cur_id)
+                base = self.db.item_get(id=parents[0]) if len(parents) > 0 else self.db.items_query(cat="evacuation", selector={"Display Name":{"$eq":"DEHC Test"}}, fields=["_id", "Display Name"])[0]
 
-            namevar = tk.StringVar()
+                listids = [] if self.w_hidden_data[row] == "" else self.w_hidden_data[row]
 
-            def add(*args):
-                '''Adds name to the list.'''
-                name = namevar.get()
-                if name not in namelist.get(0, "end"):
+                def addname():
+                    '''Callback when tree -> list button is pressed.'''
+                    id, name = tree.tree_get()
+                    if name not in namelist.get(0, "end"):
+                        listids.append(id)
+                        namelist.insert("end", name)
+
+                def removename():
+                    '''Callback when tree <- list button is pressed.'''
+                    indexes = namelist.curselection()
+                    if len(indexes) > 0:
+                        index, *_ = indexes
+                        listids.pop(index)
+                        namelist.delete(index)
+
+                def submit(*args):
+                    '''Submits current list to the data pane.'''
+                    entry.config(values=namelist.get(0,"end"))
+                    entry.current(0)
+                    self.w_hidden_data[row] = listids
+
+                tree = SearchTree(master=window, db=self.db, base=base, cats=self.cats, level=self.level, prepare=True)
+                namelistlb = tk.Label(master=window, text="Included")
+                namelist = tk.Listbox(master=window, selectmode=tk.SINGLE)
+                for name in entry['values']:
                     namelist.insert("end", name)
-                    active_ids.append(ids[namecombo.current()])
-            
-            def remove(*args):
-                '''Removes name from the list.'''
-                index, = namelist.curselection()
-                namelist.delete(index)
-                active_ids.pop(index)
-            
-            def submit(*args):
-                '''Submits current list to the data pane.'''
-                entry.config(values=namelist.get(0,"end"))
-                entry.current(0)
-                self.w_hidden_data[row] = active_ids
+                addbut = ttk.Button(master=window, text="→", command=addname)
+                removebut = ttk.Button(master=window, text="←", command=removename)
+                scanbut = ttk.Button(master=window, text="Scan")
+                submitbut = ttk.Button(master=window, text="Update", command=submit)
 
-            namelist = tk.Listbox(master=window, font="Arial 12 bold", selectmode=tk.SINGLE)
-            for name in entry.cget("values"):
-                namelist.insert("end", name)
-            namecombo = ttk.Combobox(master=window, values=names, textvariable=namevar, font="Arial 12 bold", state="readonly")
-            addbutton = tk.Button(master=window, text="Add", command=add, font="Arial 12 bold")
-            removebutton = tk.Button(master=window, text="Remove", command=remove, font="Arial 12 bold")
-            submitbutton = tk.Button(master=window, text="Update", command=submit, font="Arial 12 bold")
-            namelist.grid(column=0, row=0, rowspan=3, sticky="nsew", padx=2, pady=2)
-            namecombo.grid(column=1, row=0, sticky="nsew", padx=2, pady=2)
-            addbutton.grid(column=1, row=1, sticky="nsew", padx=2, pady=2)
-            removebutton.grid(column=1, row=2, sticky="nsew", padx=2, pady=2)
-            submitbutton.grid(column=0, row=3, columnspan=2, sticky="nsew", padx=2, pady=2)
+                window.columnconfigure(0, weight=1000)
+                window.columnconfigure(1, weight=1000)
+                window.columnconfigure(2, weight=1000)
+                window.columnconfigure(3, weight=1000)
+                window.columnconfigure(4, weight=1000)
+                window.columnconfigure(5, weight=1000)
+                window.rowconfigure(0, weight=1, minsize=25)
+                window.rowconfigure(1, weight=1000)
+                window.rowconfigure(2, weight=1000)
+
+                tree.grid(column=0, row=0, rowspan=3, sticky="nsew", padx=2, pady=2)
+                addbut.grid(column=1, row=1, sticky="nsew", padx=2, pady=2)
+                removebut.grid(column=1, row=2, sticky="nsew", padx=2, pady=2)
+                namelistlb.grid(column=2, row=0, sticky="nsew", padx=2, pady=2)
+                namelist.grid(column=2, row=1, rowspan=2, sticky="nsew", padx=2, pady=2)
+                scanbut.grid(column=3, row=1, sticky="nsew", padx=2, pady=2)
+                submitbut.grid(column=3, row=2, sticky="nsew", padx=2, pady=2)
 
 
     def remove(self, *args):
@@ -371,14 +400,7 @@ class DataEntry(SuperWidget):
                 break
             doc[field] = value
         else:
-            old_flags = set([field for field in self.last_doc.keys() if field not in schema and field not in ["_id", "_rev", "category"]])
-            new_flags = set(self.w_li_flags.get(0, "end"))
-            flags = old_flags.union(new_flags)
-            for flag in flags:
-                if flag in new_flags:
-                    doc[flag] = 1
-                else:
-                    doc[flag] = 0
+            doc["flags"] = list(self.w_li_flags.get(0, "end"))
             if "_id" in doc:
                 self.db.item_edit(id=doc["_id"], data=doc)
                 id = None
@@ -403,6 +425,8 @@ class DataEntry(SuperWidget):
         for child in self.w_fr_data.winfo_children():
             child.destroy()
         self.w_li_flags.delete(0, "end")
+        self.w_co_flags.set("")
+        self.w_co_flags['values'] = []
 
         self.w_var_data = []
         self.w_la_data = []
@@ -465,11 +489,14 @@ class DataEntry(SuperWidget):
                     entry = ttk.Combobox(master=self.w_fr_data, values=names, state="readonly")
                     if value != "":
                         entry.current(0)
-                    buttona = ttk.Button(master=self.w_fr_data, text="Edit", state="disabled")
+                    buttonb = ttk.Button(master=self.w_fr_data, text="Edit", state="disabled")
                     source = info['source']
                     if source == "IDS":
-                        buttona.bind("<Button-1>", lambda e: self.readlist(event=e, source="IDS"))
-                    buttonb = None
+                        buttonb.bind("<Button-1>", lambda e: self.readlist(event=e, source="IDS"))
+                        buttona = ttk.Button(master=self.w_fr_data, text="Show", state="disabled")
+                        buttona.bind("<Button-1>", lambda e: self.showlist(event=e, source="IDS"))
+                    else:
+                        buttona = None
                     hidden = value
 
                 elif w_type == "sum":
@@ -477,9 +504,30 @@ class DataEntry(SuperWidget):
                     if self.last_doc.get('_id','') != "":
                         children = self.db.container_children_all(container=self.last_doc["_id"], cat=info['cat'], result="DOC")
                         target = info['target']
-                        items = [float(child.get(target, "")) for child in children if child.get(target,"") != ""]
-                        itemsum = str(sum(items)) if len(items) > 0 else ""
+                        default = info.get('default', 0)
+                        items = []
+                        defaulted = False
+                        for child in children:
+                            value = child.get(target, "")
+                            if value == "":
+                                value = default
+                                defaulted = True
+                            items.append(float(value))
+                        itemsum = f"{sum(items):.1f}" if len(items) > 0 else ""
+                        if defaulted == True:
+                            itemsum += "*"
                         entry.insert(0, itemsum)
+                    entry.config(state="disabled")
+                    buttona = None
+                    buttonb = None
+                    hidden = ""
+                
+                elif w_type == "count":
+                    entry = ttk.Entry(master=self.w_fr_data)
+                    if self.last_doc.get('_id','') != "":
+                        children = self.db.container_children_all(container=self.last_doc["_id"], cat=info['cat'], result="DOC")
+                        counts = len(children)
+                        entry.insert(0, counts)
                     entry.config(state="disabled")
                     buttona = None
                     buttonb = None
@@ -502,7 +550,11 @@ class DataEntry(SuperWidget):
                         entry.grid(column=1, row=index, columnspan=2, sticky="nsew", padx=1, pady=1)
                         buttona.grid(column=3, row=index, sticky="nsew", padx=1, pady=1)
                 else:
-                    entry.grid(column=1, row=index, columnspan=3, sticky="nsew", padx=1, pady=1)
+                    if buttonb != None:
+                        entry.grid(column=1, row=index, columnspan=2, sticky="nsew", padx=1, pady=1)
+                        buttonb.grid(column=3, row=index, sticky="nsew", padx=1, pady=1)
+                    else:
+                        entry.grid(column=1, row=index, columnspan=3, sticky="nsew", padx=1, pady=1)
 
                 self.w_var_data.append(var)
                 self.w_la_data.append(label)
@@ -511,14 +563,32 @@ class DataEntry(SuperWidget):
                 self.w_buttonb_data.append(buttonb)
                 self.w_hidden_data.append(hidden)
             
-            flags = [field for field in self.last_doc.keys() if field not in schema and field not in ["_id", "_rev", "category"]]
+            flags = self.last_doc.get("flags", [])
+            flags.sort()
             
             for index, flag in enumerate(flags):
-                if self.last_doc[flag] > 0:
-                    self.w_li_flags.insert(index, flag)
+                self.w_li_flags.insert(index, flag)
             
             if len(flags) > 0:
                 self.w_li_flags.selection_set(0)
+
+
+    def showlist(self, event: tk.Event, source: str):
+        '''Callback for when the 'show' button is pressed for a given list field.
+        
+        event: The tkinter event object associated with the callback.
+        source: The source to read from.
+        '''
+        button = event.widget
+        state = str(button.cget("state"))
+        if state != "disabled":
+            row = self.w_buttona_data.index(button)
+            entry = self.w_input_data[row]
+            hidden = self.w_hidden_data[row]
+            if source == "IDS":
+                if len(entry['values']) > 0:
+                    id = hidden[entry.current()]
+                    self._show(id)
 
 
     def __del__(self):
@@ -534,11 +604,14 @@ class SearchTree(SuperWidget):
     base: The id of the tree's root node.
     cats: The categories which may be searched using this SearchTree.
     db: The database object which the widget uses for database transactions.
+    headings: A mapping of column names -> column IDs in the search tree.
     logger: The logger object used for logging.
     master: The widget that the SearchTree's component widgets will be instantiated under.
     ops: The operations that can be used in searches.
     search_result: The contents of the last search result.
     selection: The last selected element of the tree.
+    summables: A list of summable fields defined in the database schema.
+    summation: Whether or not to sum summable fields in the tree.
     _select: If present, a callback function that triggers when a tree item is selected.
     '''
 
@@ -561,8 +634,11 @@ class SearchTree(SuperWidget):
         self._select = select
 
         self.base = base
+        self.headings = {}
         self.selection = None
         self.search_result = None
+        self.summables = self.db.schema_sums()
+        self.summation = False
 
         if prepare == True:
             self.prepare()
@@ -579,6 +655,7 @@ class SearchTree(SuperWidget):
         self.w_fr.columnconfigure(3, weight=1, minsize=16)
         self.w_fr.rowconfigure(0, weight=1, minsize=25)
         self.w_fr.rowconfigure(1, weight=1000)
+        self.w_fr.rowconfigure(2, weight=1, minsize=17)
 
         self.w_fr_search.columnconfigure(0, weight=1000)
         self.w_fr_search.columnconfigure(1, weight=1000)
@@ -593,6 +670,8 @@ class SearchTree(SuperWidget):
         self.w_var_field = tk.StringVar()
         self.w_var_op = tk.StringVar()
         self.w_var_value = tk.StringVar()
+        self.w_var_summation = tk.IntVar()
+        self.w_var_summation.trace("w", self.summation_toggle)
 
         # Widgets
         self.w_co_cat = ttk.Combobox(master=self.w_fr_search, values=self.cats, textvariable=self.w_var_cat, state="readonly")
@@ -601,7 +680,8 @@ class SearchTree(SuperWidget):
         self.w_en_value = ttk.Entry(master=self.w_fr_search, textvariable=self.w_var_value)
         self.w_bu_search = ttk.Button(master=self.w_fr_search, text="Search", command=self.search)
         self.w_li_search = tk.Listbox(master=self.w_fr, selectmode=tk.SINGLE, relief=tk.GROOVE, exportselection=False)
-        self.w_tr_tree = ttk.Treeview(master=self.w_fr, show="tree", selectmode="browse")
+        self.w_tr_tree = ttk.Treeview(master=self.w_fr, columns=list(range(1,len(self.summables)+2)), show="tree", selectmode="browse")
+        self.w_ch_summation = ttk.Checkbutton(master=self.w_fr, variable=self.w_var_summation, text="Show Sums?")
 
         self.w_li_search.bind("<<ListboxSelect>>", self.search_select)
         self.w_tr_tree.bind("<<TreeviewSelect>>", self.tree_select)
@@ -609,9 +689,18 @@ class SearchTree(SuperWidget):
         self.w_tr_tree.bind("<Button-3>", self.tree_rebase)
 
         self.w_co_cat.current(0)
-        self.w_co_field.current(0)
+        self.w_co_field.current(1)
         self.w_co_op.current(0)
-        self.w_tr_tree.column(column="#0")
+        self.w_tr_tree.column(column="#0", anchor=tk.E, stretch=False, width=300)
+        self.w_tr_tree.heading("#0", text="Item")
+        for index, field in enumerate(self.summables):
+            headname = field
+            headid = index+1
+            self.headings[headname] = index
+            self.w_tr_tree.column(column=headid, anchor=tk.E, stretch=False, width=120)
+            self.w_tr_tree.heading(headid, text=headname)
+        self.w_tr_tree.column(column=len(self.summables)+1, anchor=tk.E, stretch=False, width=120)
+        self.w_tr_tree.heading(len(self.summables)+1, text="Flags")
 
         # Scrollbars
         self.w_sc_tree = ttk.Scrollbar(master=self.w_fr, orient="vertical", command=self.w_tr_tree.yview)
@@ -636,10 +725,11 @@ class SearchTree(SuperWidget):
         self.w_co_op.grid(column=2, row=0, sticky="nsew", padx=1, pady=1)
         self.w_en_value.grid(column=3, row=0, sticky="nsew", padx=1, pady=1)
         self.w_bu_search.grid(column=4, row=0, sticky="nsew", padx=1, pady=1)
-        self.w_li_search.grid(column=0, row=1, sticky="nsew", padx=1, pady=1)
-        self.w_sc_search.grid(column=1, row=1, sticky="nse", padx=1, pady=1)
+        self.w_li_search.grid(column=0, row=1, rowspan=2, sticky="nsew", padx=1, pady=1)
+        self.w_sc_search.grid(column=1, row=1, rowspan=2, sticky="nse", padx=1, pady=1)
         self.w_tr_tree.grid(column=2, row=1, sticky="nsew", padx=1, pady=1)
         self.w_sc_tree.grid(column=3, row=1, sticky="nse", padx=1, pady=1)
+        self.w_ch_summation.grid(column=2, row=2, columnspan=2, sticky="nsew", padx=1, pady=1)
 
 
     def search(self, *args):
@@ -660,8 +750,8 @@ class SearchTree(SuperWidget):
 
     def search_cat(self, *args):
         '''Callback for when the search category is changed.'''
-        self.w_co_field['values'] = self.db.schema_fields(cat=self.w_var_cat.get())
-        self.w_co_field.current(0)
+        self.w_co_field['values'] = ['_id']+self.db.schema_fields(cat=self.w_var_cat.get())
+        self.w_co_field.current(1)
 
 
     def search_select(self, *args):
@@ -672,6 +762,18 @@ class SearchTree(SuperWidget):
             index, = selected
             id = self.search_result[index]["_id"]
             self.tree_focus(goal=id, rebase=True)
+
+
+    def summation_toggle(self, *args):
+        '''Callback for when the summation checkbox is toggled.'''
+        state = self.w_var_summation.get()
+        if state == 0:
+            self.summation = False
+            self.w_tr_tree.config(show="tree")
+        elif state == 1:
+            self.summation = True
+            self.w_tr_tree.config(show="tree headings")
+        self.tree_refresh()
 
 
     def tree_focus(self, goal: str, rebase: bool = False):
@@ -701,13 +803,22 @@ class SearchTree(SuperWidget):
             break
 
 
-    def tree_insert(self, parent: str, iid: str, text: str):
+    def tree_get(self):
+        '''Returns a tuple consisting of the currently selected node's id and name.'''
+        id, *_ = self.w_tr_tree.selection()
+        name = self.w_tr_tree.item(item=id)['text']
+        return (id, name)
+
+
+    def tree_insert(self, parent: str, iid: str, text: str, values: list = []):
         '''Inserts a node into the tree view.
         
         parent: The id of the parent node in the tree.
         iid: The id of the node being inserted.
-        text: The text of the node.'''
-        self.w_tr_tree.insert(parent=parent, index=1000000, iid=iid, text=text)
+        text: The text of the node.
+        values: The values to put in the nodes's columns.
+        '''
+        self.w_tr_tree.insert(parent=parent, index=1000000, iid=iid, text=text, values=values)
         if len(self.db.container_children(container=iid)) > 0:
             self.w_tr_tree.insert(parent=iid, index=1000000, iid=iid+"_stub")
 
@@ -733,6 +844,7 @@ class SearchTree(SuperWidget):
         if self.db.item_exists(id=base_id):
             base_name = self.base[self.db.schema_name(id=base_id)]
             self.tree_insert(parent="", iid=base_id, text=base_name)
+            self.tree_sum(node=base_id)
             if len(self.selection) == 1:
                 selection, = self.selection
                 self.tree_focus(goal=selection, rebase=True)
@@ -772,7 +884,63 @@ class SearchTree(SuperWidget):
             child_id = child["_id"]
             child_name = child[self.db.schema_name(id=child_id)]
             self.tree_insert(parent=id, iid=child_id, text=child_name)
+            self.tree_sum(node=child_id)
         self.w_tr_tree.item(item=id, open=True)
+
+
+    def tree_sum(self, node: str):
+        '''Sums and displays summable fields of a node.
+        
+        node: The node to display sums of.
+        '''
+        if self.summation == True:
+            schema = self.db.schema_schema(id=node)
+            values = [""]*(len(self.summables)+1)
+            doc = self.db.item_get(id=node)
+            all_children = self.db.container_children_all(container=node, result="DOC")
+            
+            for field, info in schema.items():
+                if field in self.summables:
+                    defaulted = False
+
+                    if info['type'] == "sum":
+                        children = [child for child in all_children if child['category'] in info['cat']]
+                        target = info['target']
+                        default = info.get('default', 0)
+                        items = []
+                        for child in children:
+                            value = child.get(target, "")
+                            if value == "":
+                                value = default
+                                defaulted = True
+                            items.append(float(value))
+                        itemsum = f"{sum(items):.1f}" if len(items) > 0 else ""
+                    elif info['type'] == "count":
+                        children = [child for child in all_children if child['category'] in info['cat']]
+                        itemsum = len(children)
+                    else:
+                        value = doc.get(field, "")
+                        if value == "":
+                            value = info.get('default', 0)
+                            defaulted = True
+                        itemsum = f"{float(value):.1f}"
+
+                    if defaulted == True:
+                        itemsum += "*"
+                    values[self.headings[field]] = itemsum
+
+            all_flags = []
+            for child in [doc]+all_children:
+                flags = child.get("flags",[])
+                all_flags.extend(flags)
+            all_flags = list(dict.fromkeys(all_flags))
+            minilist = ""
+            for flag in all_flags:
+                minilist += f"{flag[:2]}"
+            values[len(self.summables)] = minilist
+
+            self.w_tr_tree.item(item=node, values=values)
+
 
 
     def __del__(self):
