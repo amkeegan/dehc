@@ -293,7 +293,7 @@ class DataEntry(SuperWidget):
 
                 def read_weight(*args):
                     '''Reads the current weight from another device.'''
-                    reading = round(90+random.random()*5, 2)
+                    reading = round(80+random.random()*10, 2)
                     msg.config(text=str(reading))
                     window.after(500, read_weight)
 
@@ -328,7 +328,7 @@ class DataEntry(SuperWidget):
             if source == "IDS":
                 cur_id = self.last_doc.get("_id","")
                 parents = self.db.item_parents(item=cur_id)
-                base = self.db.item_get(id=parents[0]) if len(parents) > 0 else self.db.items_query(cat="evacuation", selector={"Display Name":{"$eq":"DEHC Test"}}, fields=["_id", "Display Name"])[0]
+                base = self.db.item_get(id=parents[0]) if len(parents) > 0 else self.db.items_query(cat="Evacuation", selector={"Display Name":{"$eq":"DEHC"}}, fields=["_id", "Display Name"])[0]
 
                 listids = [] if self.w_hidden_data[row] == "" else self.w_hidden_data[row]
 

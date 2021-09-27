@@ -402,7 +402,6 @@ class DEHCDatabase:
 
         self.schema = {}
         if quickstart == True:
-            self.databases_delete(lazy=True)
             self.databases_create(lazy=True)
             self.schema_load(schema="db_schema.json", forcelocal=True)
             self.schema_save()

@@ -46,9 +46,8 @@ class EMS():
 
     def prepare(self):
         '''Constructs the frames and widgets of the EMS.'''
-        topbase, = self.db.items_query(cat="station", selector={"Display Name":{"$eq":"Ingest"}}, fields=["_id", "Display Name"])
-        botbase, = self.db.items_query(cat="station", selector={"Display Name":{"$eq":"Clean Hold"}}, fields=["_id", "Display Name"])
-        self.cm = mw.ContainerManager(master=self.root, db=self.db, topbase=topbase, botbase=botbase, cats=self.cats, level=self.level, prepare=True, select=self.item_select)
+        base, = self.db.items_query(cat="Evacuation", fields=["_id", "Display Name"])
+        self.cm = mw.ContainerManager(master=self.root, db=self.db, topbase=base, botbase=base, cats=self.cats, level=self.level, prepare=True, select=self.item_select)
         self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, delete=self.delete, level=self.level, prepare=True, save=self.save, show=self.show)
         self.sb = mw.StatusBar(master=self.root, db=self.db, level=self.level, prepare=True)
         self.root.rowconfigure(0, weight=1000)
