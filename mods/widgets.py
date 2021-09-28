@@ -354,7 +354,7 @@ class DataEntry(SuperWidget):
                     self.w_hidden_data[row] = listids
 
                 tree = SearchTree(master=window, db=self.db, base=base, cats=self.cats, level=self.level, prepare=True)
-                namelistlb = tk.Label(master=window, text="Included")
+                namelistlb = tk.Label(master=window, text="Guardians")
                 namelist = tk.Listbox(master=window, selectmode=tk.SINGLE)
                 for name in entry['values']:
                     namelist.insert("end", name)
@@ -380,6 +380,56 @@ class DataEntry(SuperWidget):
                 namelist.grid(column=2, row=1, rowspan=2, sticky="nsew", padx=2, pady=2)
                 scanbut.grid(column=3, row=1, sticky="nsew", padx=2, pady=2)
                 submitbut.grid(column=3, row=2, sticky="nsew", padx=2, pady=2)
+            
+            elif source == "PHYSIDS":
+
+                def addid():
+                    '''Callback when add button is pressed.'''
+                    id = idvar.get()
+                    if id not in idlist.get(0, "end") and len(id) > 0:
+                        idlist.insert("end", id)
+                        identry.delete(0, "end")
+
+                def removeid():
+                    '''Callback when remove button is pressed.'''
+                    indexes = idlist.curselection()
+                    if len(indexes) > 0:
+                        index, *_ = indexes
+                        idlist.delete(index)
+
+                def submit():
+                    '''Callback when submit button is pressed.'''
+                    values = idlist.get(0,"end")
+                    entry.config(values=values)
+                    entry.current(0)
+                    self.w_hidden_data[row] = values
+
+                idvar = tk.StringVar()
+                idlistlb = ttk.Label(master=window, text="Physical IDs")
+                idlist = tk.Listbox(master=window, selectmode=tk.SINGLE)
+                for id in entry['values']:
+                    idlist.insert("end", id)
+                identry = ttk.Entry(master=window, textvariable=idvar)
+                addbut = ttk.Button(master=window, text="Add", command=addid)
+                removebut = ttk.Button(master=window, text="Remove", command=removeid)
+                scanbut = ttk.Button(master=window, text="Scan")
+                submitbut = ttk.Button(master=window, text="Update", command=submit)
+
+                window.columnconfigure(0, weight=1000)
+                window.columnconfigure(1, weight=1000)
+                window.columnconfigure(2, weight=1000)
+                window.rowconfigure(0, weight=1, minsize=17)
+                window.rowconfigure(1, weight=1, minsize=25)
+                window.rowconfigure(2, weight=1000)
+                window.rowconfigure(3, weight=1000)
+
+                idlistlb.grid(column=0, row=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+                idlist.grid(column=0, row=1, rowspan=3, sticky="nsew", padx=2, pady=2)
+                identry.grid(column=1, row=1, columnspan=2, sticky="nsew", padx=2, pady=2)
+                addbut.grid(column=1, row=2, sticky="nsew", padx=2, pady=2)
+                removebut.grid(column=1, row=3, sticky="nsew", padx=2, pady=2)
+                scanbut.grid(column=2, row=2, sticky="nsew", padx=2, pady=2)
+                submitbut.grid(column=2, row=3, sticky="nsew", padx=2, pady=2)
 
 
     def remove(self, *args):
@@ -390,12 +440,17 @@ class DataEntry(SuperWidget):
     def save(self, *args):
         '''Callback for when the save button is pressed.'''
         doc = self.last_doc
+        physid = None
         schema = self.db.schema_schema(cat=self.last_doc["category"])
         for index, (field, info) in enumerate(schema.items()):
             if self.w_hidden_data[index] == None:
                 value = self.w_var_data[index].get()
             else:
-                value = self.w_hidden_data[index]
+                if info.get('type','') == 'list' and info.get('source') == 'PHYSIDS':
+                    physid = self.w_hidden_data[index]
+                    value = ""
+                else:
+                    value = self.w_hidden_data[index]
             if info['required'] == True and value == "":
                 break
             doc[field] = value
@@ -405,7 +460,10 @@ class DataEntry(SuperWidget):
                 self.db.item_edit(id=doc["_id"], data=doc)
                 id = None
             else:
-                id = self.db.item_create(cat=doc["category"], doc=doc)
+                doc["_id"] = self.db.item_create(cat=doc["category"], doc=doc)
+                id = doc["_id"]
+            if physid != None:
+                self.db.ids_edit(item=doc["_id"], ids=physid)
             if self._save != None:
                 self._save(id)
             self.last_doc = doc
@@ -445,8 +503,10 @@ class DataEntry(SuperWidget):
 
         if len(self.last_doc) > 0:
             self.w_bu_edit.config(state="normal")
-            schema = self.db.schema_schema(cat=self.last_doc["category"])
-            self.w_la_title.config(text=self.last_doc.get(self.db.schema_name(cat=self.last_doc["category"]), ""))
+            cat = self.last_doc["category"]
+            schema = self.db.schema_schema(cat=cat)
+            title = f"{self.last_doc.get(self.db.schema_name(cat=cat), cat)} ({self.last_doc.get('_id','New')})"
+            self.w_la_title.config(text=title)
             self.w_fr_data.columnconfigure(index=0, weight=1000)
             self.w_fr_data.columnconfigure(index=1, weight=1000)
             self.w_fr_data.columnconfigure(index=2, weight=1000)
@@ -482,19 +542,28 @@ class DataEntry(SuperWidget):
                     hidden = None
 
                 elif w_type == "list":
+                    source = info['source']
                     if value != "":
                         names = [item["Display Name"] for item in self.db.items_get(ids=value, fields=["Display Name"])]
                     else:
-                        names = []
+                        last_id = self.last_doc.get("_id", "")
+                        if last_id != "" and source == "PHYSIDS":
+                            names = self.db.ids_get(item=self.last_doc["_id"])
+                            value = names
+                        else:
+                            names = []
+                    
                     entry = ttk.Combobox(master=self.w_fr_data, values=names, state="readonly")
-                    if value != "":
+                    if len(entry['values']) > 0:
                         entry.current(0)
+                    
                     buttonb = ttk.Button(master=self.w_fr_data, text="Edit", state="disabled")
-                    source = info['source']
                     if source == "IDS":
                         buttonb.bind("<Button-1>", lambda e: self.readlist(event=e, source="IDS"))
-                        buttona = ttk.Button(master=self.w_fr_data, text="Show", state="disabled")
+                        buttona = ttk.Button(master=self.w_fr_data, text="Show", state="normal")
                         buttona.bind("<Button-1>", lambda e: self.showlist(event=e, source="IDS"))
+                    elif source == "PHYSIDS":
+                        buttonb.bind("<Button-1>", lambda e: self.readlist(event=e, source="PHYSIDS"))
                     else:
                         buttona = None
                     hidden = value
@@ -827,6 +896,7 @@ class SearchTree(SuperWidget):
         '''Callback for when the tree is rebased using right-click.'''
         event, = args
         target = event.widget.identify_row(event.y)
+        self.w_tr_tree.selection_set(target)
         if self.w_tr_tree.parent(target) == "":
             parents = self.db.item_parents(item=target, result="DOC")
             if len(parents) > 0:
@@ -834,6 +904,7 @@ class SearchTree(SuperWidget):
         else:
             self.base = self.db.item_get(id=target)
         self.tree_refresh()
+        self.tree_open(target)
 
 
     def tree_refresh(self):

@@ -34,7 +34,7 @@ class EMS():
         self.cats = self.db.schema_cats()
 
         self.root = tk.Tk()
-        self.root.title("EMS Prototype")
+        self.root.title(f"EMS ({self.db.db.data['url']})")
         self.root.state('zoomed')
         self.root.bind("<Escape>", lambda *_: self.root.destroy())
 
