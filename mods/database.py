@@ -35,6 +35,7 @@ class Database:
         auth = CouchDbSessionAuthenticator(username=data['user'], password=data['pass'])
         self.client = CloudantV1(authenticator=auth)
         self.client.set_service_url(data['url'])
+        self.index_cache = {} #cache indexes we have seen, we presume these only add and aren't deleted
 
 
     def database_create(self, dbname: str):
@@ -299,6 +300,12 @@ class Database:
         name: Name of the index. Also used as design doc's name.
         fields: List of dictionaries of form {"FIELDNAME" : "asc" | "desc"}, defining the index.
         '''
+        if (dbname not in list(self.index_cache)): #new database to add indexes to the cache
+            self.index_cache[dbname] = []          #create a blank list in the dictionary
+                
+        if (name not in self.index_cache[dbname]): #new dictionary
+            self.index_cache[dbname].append(name)
+
         index_field_list = []
         for field in fields:
             index_field_list.append(IndexField(**field))
@@ -325,13 +332,22 @@ class Database:
         dbname: Name of database index is stored in.
         name: Name of the index to be checked.
         '''
+        if (dbname in list(self.index_cache)) and (name in self.index_cache[dbname]):
+            return True
         try:
             response = self.client.head_design_document(db=dbname, ddoc=name).get_status_code()
             if response == 200:
                 self.logger.debug(f"Index {dbname} {name} exists")
+
+                if (dbname not in list(self.index_cache)): #new database to add indexes to the cache
+                    self.index_cache[dbname] = []          #create a blank list in the dictionary
+                
+                if (name not in self.index_cache[dbname]): #new dictionary
+                    self.index_cache[dbname].append(name)
+
                 return True
         except:
-            pass
+            self.logger.exception("message")
         self.logger.debug(f"Index {dbname} {name} does not exist")
         return False
 
@@ -402,6 +418,7 @@ class DEHCDatabase:
 
         self.schema = {}
         if quickstart == True:
+            
             self.databases_create(lazy=True)
             self.schema_load(schema="db_schema.json", forcelocal=True)
             self.schema_save()
