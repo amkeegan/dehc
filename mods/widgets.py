@@ -6,7 +6,8 @@ from typing import Callable
 
 import mods.database as md
 import mods.log as ml
-
+import time
+from pprint import pprint
 
 # ----------------------------------------------------------------------------
 
@@ -937,6 +938,8 @@ class SearchTree(SuperWidget):
         
         node: The node to open. If omitted, opens currently selected node.
         '''
+        self.logger.info("Tree Open Pressed")
+        start_time = time.perf_counter()
         self.selection = self.w_tr_tree.selection()
         if node != None:
             id = node
@@ -949,7 +952,12 @@ class SearchTree(SuperWidget):
             raise RuntimeError("Unable to open tree nodes.")
 
         children = self.db.container_children(container=id, result="DOC")
+
+        self.logger.debug("Container Load finished at  %.5f" % (time.perf_counter() - start_time)  )
+
         children.sort(key=lambda doc: (doc["category"], doc[self.db.schema_name(cat=doc["category"])]))
+        self.logger.debug("Children sort finished at  %.5f" % (time.perf_counter() - start_time)  )
+        #pprint(children)
         self.w_tr_tree.delete(*self.w_tr_tree.get_children(item=id))
         for child in children:
             child_id = child["_id"]
@@ -957,6 +965,7 @@ class SearchTree(SuperWidget):
             self.tree_insert(parent=id, iid=child_id, text=child_name)
             self.tree_sum(node=child_id)
         self.w_tr_tree.item(item=id, open=True)
+        self.logger.info("Tree Open finished in %.5f" % (time.perf_counter() - start_time)  )
 
 
     def tree_sum(self, node: str):
