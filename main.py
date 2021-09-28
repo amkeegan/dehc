@@ -8,10 +8,8 @@ import mods.log as ml
 
 # ----------------------------------------------------------------------------
 
-#
-# level = "DEBUG"
 level = "INFO"
-#level = "WARNING"
+
 logger = ml.get(name="Main", level=level)
 logger.debug("Application has started.")
 

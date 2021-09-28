@@ -31,10 +31,10 @@ class Database:
         self.logger = ml.get("Database", level=level)
         self.logger.debug("Database object instantiated")
         with open(config, "r") as f:
-            data = json.loads(f.read())
-        auth = CouchDbSessionAuthenticator(username=data['user'], password=data['pass'])
+            self.data = json.loads(f.read())
+        auth = CouchDbSessionAuthenticator(username=self.data['user'], password=self.data['pass'])
         self.client = CloudantV1(authenticator=auth)
-        self.client.set_service_url(data['url'])
+        self.client.set_service_url(self.data['url'])
         self.index_cache = {} #cache indexes we have seen, we presume these only add and aren't deleted
 
 
@@ -412,7 +412,7 @@ class DEHCDatabase:
         self.logger.debug("DEHCDatabase object instantiated")
         self.db = Database(config=config, level=level)
 
-        self.db_list = ["items", "containers", "config", "log"]
+        self.db_list = ["items", "containers", "config", "ids", "files"]
         self.id_len = 12
         self.limit = 1000000
 
@@ -422,6 +422,7 @@ class DEHCDatabase:
             self.databases_create(lazy=True)
             self.schema_load(schema="db_schema.json", forcelocal=True)
             self.schema_save()
+            self.index_prepare()
 
 
     def databases_create(self, lazy: bool = False):
@@ -712,12 +713,48 @@ class DEHCDatabase:
 
 
     def id_cat(self, id: str):
-        '''Takes an id and returns its category.
+        '''Takes a database id and returns its category.
         
         id: The UUID to extract the category of.
         '''
         cat, *_ = id.split("/")
         return cat
+
+
+    def ids_edit(self, item: str, ids: list):
+        '''Edits what physical IDs are associated with an item.
+        
+        item: The item to edit the physical IDs of.
+        ids: A list of strings, consisting of all physical IDs associated with an item.
+        '''
+        old_ids = set(self.ids_get(item=item))
+        new_ids = set(ids)
+        ids_to_create = list(new_ids - old_ids)
+        ids_to_delete = list(old_ids - new_ids)
+
+        if len(ids_to_create) > 0:
+            docs_create = [{"item": item, "physid": physid} for physid in ids_to_create]
+            ids_create = [f"{item}/{physid}" for physid in ids_to_create]
+            self.db.documents_create(dbname="ids", docs=docs_create, ids=ids_create)
+
+        if len(ids_to_delete) > 0:
+            ids_delete = [f"{item}/{physid}" for physid in ids_to_delete]
+            self.db.documents_delete(dbname="ids", ids=ids_delete, lazy=True)
+
+
+    def ids_get(self, item: str):
+        '''Fetches all physical IDs associated with an item.
+        
+        item: The item to get the physical IDs of.
+        '''
+        res = self.db.query(dbname="ids", selector={'item': {'$eq': item}}, fields=['physid'], sort=[{'item': 'asc'}], limit=self.limit)
+        return [row['physid'] for row in res]
+
+
+    def index_prepare(self):
+        '''Prepares known indexes used by database queries.'''
+        if self.db.index_exists(dbname="ids", name="idx-item") == False:
+            self.db.index_create(dbname="ids", name="idx-item", fields=[{'item': 'asc'}])
 
 
     def item_create(self, cat: str, doc: dict):
