@@ -277,12 +277,18 @@ class DataEntry(SuperWidget):
         window.title("Photo")
         photomanager = mp.PhotoManager(level=self.level)
 
+        def clear():
+            '''Removes current photo from data pane.'''
+            self.current_photo = None
+            self.w_bu_photo.config(image="")
+            self.w_bu_photo.image = ""
+
         def fetch_photo():
             '''Updates the photoframe with a new photo.'''
             img = ImageTk.PhotoImage(photomanager.take_photo())
             photoframe.config(image=img)
             photoframe.image = img
-            window.after(500, fetch_photo)
+            window.after(250, fetch_photo)
         
         def on_close():
             '''Callback for when the window is closed.'''
@@ -297,14 +303,17 @@ class DataEntry(SuperWidget):
             self.w_bu_photo.image = img
 
         photoframe = ttk.Label(master=window)
+        clearbut = ttk.Button(master=window, text="Clear", command=clear)
         updatebut = ttk.Button(master=window, text="Update", command=update)
 
         window.columnconfigure(index=0, weight=1000)
+        window.columnconfigure(index=1, weight=1000)
         window.rowconfigure(index=0, weight=1000)
         window.rowconfigure(index=1, weight=1000)
 
-        photoframe.grid(column=0, row=0, sticky='nsew', padx=2, pady=2)
-        updatebut.grid(column=0, row=1, sticky='nsew', padx=2, pady=2)
+        photoframe.grid(column=0, row=0, columnspan=2, sticky='nsew', padx=2, pady=2)
+        clearbut.grid(column=0, row=1, sticky='nsew', padx=2, pady=2)
+        updatebut.grid(column=1, row=1, sticky='nsew', padx=2, pady=2)
 
         window.protocol("WM_DELETE_WINDOW", on_close)
         fetch_photo()
@@ -508,6 +517,9 @@ class DataEntry(SuperWidget):
                 self.db.ids_edit(item=doc["_id"], ids=physid)
             if self.current_photo != None:
                 self.db.photo_save(item=doc["_id"], img=self.current_photo)
+            else:
+                if self.last_photo != None:
+                    self.db.photo_delete(item=doc["_id"])
             if self._save != None:
                 self._save(id)
             self.last_doc = doc

@@ -1088,6 +1088,16 @@ class DEHCDatabase:
         return res
 
 
+    def photo_delete(self, item: str):
+        '''Deletes the photo, associated with an item, from the database.
+        
+        item: The item to delete the photo of.
+        '''
+        name = "photo-"+item
+        if self.db.document_exists(dbname="files", id=name) == True:
+            self.db.document_delete(dbname="files", id=name)
+
+
     def photo_load(self, item: str):
         '''Loads the photo, associated with an item, from the database.
         
