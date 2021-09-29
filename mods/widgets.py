@@ -1,13 +1,15 @@
 '''The module containing objects that create and manage groups of tkinter widgets.'''
 
+import time
+
+from PIL import ImageTk
 import tkinter as tk
 from tkinter import ttk
 from typing import Callable
 
 import mods.database as md
 import mods.log as ml
-import time
-from pprint import pprint
+import mods.photo as mp
 
 # ----------------------------------------------------------------------------
 
@@ -78,8 +80,10 @@ class DataEntry(SuperWidget):
     '''A SuperWidget representing a data entry pane.
     
     cats: The categories for which new items can be created using this DataEntry.
+    current_photo: The PIL data of the photo currently shown in the data pane.
     db: The database object which the widget uses for database transactions.
     last_doc: The last doc that was shown in the data pane.
+    last_photo: The PIL data of the photo last loaded into the data pane.
     level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
     logger: The logger object used for logging.
     master: The widget that the DataEntry's component widgets will be instantiated under.
@@ -101,6 +105,8 @@ class DataEntry(SuperWidget):
 
         self.cats = cats
         self.last_doc = {}
+        self.current_photo = None
+        self.last_photo = None
         self.level = level
         self._delete = delete
         self._save = save
@@ -153,7 +159,7 @@ class DataEntry(SuperWidget):
         # Widgets
         self.w_la_title = ttk.Label(master=self.w_fr, text="Title", font="Arial 12 bold")
         self.w_bu_copyid = ttk.Button(master=self.w_fr, text="Copy ID", command=self.copyid)
-        self.w_bu_photo = ttk.Button(master=self.w_fr, text="Photo", command=self.photo)
+        self.w_bu_photo = tk.Button(master=self.w_fr, text="Photo", command=self.photo, borderwidth=0)
         self.w_la_flags = ttk.Label(master=self.w_fr_flags, text="Flags")
         self.w_li_flags = tk.Listbox(master=self.w_fr_flags, selectmode=tk.SINGLE, relief=tk.GROOVE, exportselection=False)
         self.w_co_flags = ttk.Combobox(master=self.w_fr_flags, textvariable=self.w_var_flags, state="readonly")
@@ -230,7 +236,7 @@ class DataEntry(SuperWidget):
             if self._delete != None:
                 self._delete(id, parents)
         else:
-            self.logger.error("Could not delete top level item.")
+            self.logger.error("Could not delete top level item")
 
 
     def edit(self, *args):
@@ -242,6 +248,7 @@ class DataEntry(SuperWidget):
                 buttona.config(state="normal")
             if buttonb != None:
                 buttonb.config(state="normal")
+        self.w_bu_photo.config(command=self.photo)
         self.w_bu_edit.config(state="disabled")
         self.w_bu_cancel.config(state="normal")
         self.w_bu_save.config(state="normal")
@@ -266,7 +273,41 @@ class DataEntry(SuperWidget):
 
     def photo(self, *args):
         '''Callback for when the photo is pressed.'''
-        self.logger.info("Pressed PHOTO")
+        window = tk.Toplevel(master=self.w_bu_photo)
+        window.title("Photo")
+        photomanager = mp.PhotoManager(level=self.level)
+
+        def fetch_photo():
+            '''Updates the photoframe with a new photo.'''
+            img = ImageTk.PhotoImage(photomanager.take_photo())
+            photoframe.config(image=img)
+            photoframe.image = img
+            window.after(500, fetch_photo)
+        
+        def on_close():
+            '''Callback for when the window is closed.'''
+            photomanager.destroy()
+            window.destroy()
+
+        def update():
+            '''Pushes current photo to data pane.'''
+            self.current_photo = photomanager.take_photo()
+            img = ImageTk.PhotoImage(self.current_photo)
+            self.w_bu_photo.config(image=img)
+            self.w_bu_photo.image = img
+
+        photoframe = ttk.Label(master=window)
+        updatebut = ttk.Button(master=window, text="Update", command=update)
+
+        window.columnconfigure(index=0, weight=1000)
+        window.rowconfigure(index=0, weight=1000)
+        window.rowconfigure(index=1, weight=1000)
+
+        photoframe.grid(column=0, row=0, sticky='nsew', padx=2, pady=2)
+        updatebut.grid(column=0, row=1, sticky='nsew', padx=2, pady=2)
+
+        window.protocol("WM_DELETE_WINDOW", on_close)
+        fetch_photo()
 
 
     def read(self, event: tk.Event, source: str):
@@ -465,11 +506,13 @@ class DataEntry(SuperWidget):
                 id = doc["_id"]
             if physid != None:
                 self.db.ids_edit(item=doc["_id"], ids=physid)
+            if self.current_photo != None:
+                self.db.photo_save(item=doc["_id"], img=self.current_photo)
             if self._save != None:
                 self._save(id)
             self.last_doc = doc
             return True
-        self.logger.error("Could not save item because required fields are missing.")
+        self.logger.error("Could not save item because required fields are missing")
         return False
 
 
@@ -480,9 +523,13 @@ class DataEntry(SuperWidget):
         '''
         if doc != None:
             self.last_doc = doc
+            id = self.last_doc.get("_id", "")
+            self.last_photo = self.db.photo_load(item=id)
 
         for child in self.w_fr_data.winfo_children():
             child.destroy()
+        self.w_bu_photo.config(image="")
+        self.current_photo = self.last_photo
         self.w_li_flags.delete(0, "end")
         self.w_co_flags.set("")
         self.w_co_flags['values'] = []
@@ -494,6 +541,7 @@ class DataEntry(SuperWidget):
         self.w_buttonb_data = []
         self.w_hidden_data = []
 
+        self.w_bu_photo.config(command="")
         self.w_bu_edit.config(state="disabled")
         self.w_bu_cancel.config(state="disabled")
         self.w_bu_save.config(state="disabled")
@@ -633,6 +681,11 @@ class DataEntry(SuperWidget):
                 self.w_buttonb_data.append(buttonb)
                 self.w_hidden_data.append(hidden)
             
+            if self.current_photo != None:
+                img = ImageTk.PhotoImage(self.current_photo)
+                self.w_bu_photo.config(image=img)
+                self.w_bu_photo.image = img
+
             flags = self.last_doc.get("flags", [])
             flags.sort()
             
@@ -938,7 +991,7 @@ class SearchTree(SuperWidget):
         
         node: The node to open. If omitted, opens currently selected node.
         '''
-        self.logger.info("Tree Open Pressed")
+        self.logger.debug("Tree opened")
         start_time = time.perf_counter()
         self.selection = self.w_tr_tree.selection()
         if node != None:
@@ -949,15 +1002,12 @@ class SearchTree(SuperWidget):
             id, = self.selection
         else:
             id = None
-            raise RuntimeError("Unable to open tree nodes.")
+            raise RuntimeError("Unable to open tree nodes")
 
         children = self.db.container_children(container=id, result="DOC")
-
         self.logger.debug("Container Load finished at  %.5f" % (time.perf_counter() - start_time)  )
-
         children.sort(key=lambda doc: (doc["category"], doc[self.db.schema_name(cat=doc["category"])]))
         self.logger.debug("Children sort finished at  %.5f" % (time.perf_counter() - start_time)  )
-        #pprint(children)
         self.w_tr_tree.delete(*self.w_tr_tree.get_children(item=id))
         for child in children:
             child_id = child["_id"]
@@ -965,7 +1015,7 @@ class SearchTree(SuperWidget):
             self.tree_insert(parent=id, iid=child_id, text=child_name)
             self.tree_sum(node=child_id)
         self.w_tr_tree.item(item=id, open=True)
-        self.logger.info("Tree Open finished in %.5f" % (time.perf_counter() - start_time)  )
+        self.logger.debug("Tree open finished in %.5f" % (time.perf_counter() - start_time)  )
 
 
     def tree_sum(self, node: str):
@@ -1070,24 +1120,30 @@ class ContainerManager(SuperWidget):
     def prepare(self):
         '''Constructs the frames and widgets of the ContainerManager.'''
         # Widgets
+        self.w_la_top = ttk.Label(master=self.w_fr, text="Source")
         self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, cats=self.cats, level=self.level, prepare=True, select=self.select)
+        self.w_la_bottom = ttk.Label(master=self.w_fr, text="Destination")
         self.w_se_bottom = SearchTree(master=self.w_fr, db=self.db, base=self.botbase, cats=self.cats, level=self.level, prepare=True)
         self.w_bu_move_item = ttk.Button(master=self.w_fr, text="Move Item", command=self.move)
         self.w_bu_move_subs = ttk.Button(master=self.w_fr, text="Move Sub-Items", command=self.submove)
 
         self.w_fr.columnconfigure(0, weight=1000)
         self.w_fr.columnconfigure(1, weight=1000)
-        self.w_fr.rowconfigure(0, weight=1000)
+        self.w_fr.rowconfigure(0, weight=1, minsize=17)
         self.w_fr.rowconfigure(1, weight=1000)
-        self.w_fr.rowconfigure(2, weight=1, minsize=25)
+        self.w_fr.rowconfigure(2, weight=1, minsize=17)
+        self.w_fr.rowconfigure(3, weight=1000)
+        self.w_fr.rowconfigure(4, weight=1, minsize=25)
 
 
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the ContainerManager.'''
-        self.w_se_top.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_se_bottom.grid(column=0, row=1, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_bu_move_item.grid(column=0, row=2, sticky="nsew", padx=2, pady=2)
-        self.w_bu_move_subs.grid(column=1, row=2, sticky="nsew", padx=2, pady=2)
+        self.w_la_top.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_se_top.grid(column=0, row=1, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_la_bottom.grid(column=0, row=2, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_se_bottom.grid(column=0, row=3, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_bu_move_item.grid(column=0, row=4, sticky="nsew", padx=2, pady=2)
+        self.w_bu_move_subs.grid(column=1, row=4, sticky="nsew", padx=2, pady=2)
 
 
     def base(self, newbase: str = None):

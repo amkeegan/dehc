@@ -1,5 +1,6 @@
 '''The script that starts the main DEHC application.'''
 
+import argparse
 import sys
 
 import apps.ems as ae

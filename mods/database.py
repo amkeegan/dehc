@@ -1,10 +1,13 @@
 '''The module containing objects that manage the CouchDB database.'''
 
+import base64
+import io
 import json
 import random
 
 from ibmcloudant import CouchDbSessionAuthenticator
 from ibmcloudant.cloudant_v1 import CloudantV1, BulkDocs, Document, IndexDefinition, IndexField
+from PIL import Image
 
 import mods.log as ml
 
@@ -19,6 +22,7 @@ class Database:
     class down below.
     
     client: The Cloudant-CouchDB client object.
+    index_cache: Cache of indexes that have been created.
     logger: The logger object used for logging.
     '''
 
@@ -35,7 +39,7 @@ class Database:
         auth = CouchDbSessionAuthenticator(username=self.data['user'], password=self.data['pass'])
         self.client = CloudantV1(authenticator=auth)
         self.client.set_service_url(self.data['url'])
-        self.index_cache = {} #cache indexes we have seen, we presume these only add and aren't deleted
+        self.index_cache = {}
 
 
     def database_create(self, dbname: str):
@@ -338,16 +342,13 @@ class Database:
             response = self.client.head_design_document(db=dbname, ddoc=name).get_status_code()
             if response == 200:
                 self.logger.debug(f"Index {dbname} {name} exists")
-
                 if (dbname not in list(self.index_cache)): #new database to add indexes to the cache
                     self.index_cache[dbname] = []          #create a blank list in the dictionary
-                
                 if (name not in self.index_cache[dbname]): #new dictionary
                     self.index_cache[dbname].append(name)
-
                 return True
         except:
-            self.logger.exception("message")
+            pass
         self.logger.debug(f"Index {dbname} {name} does not exist")
         return False
 
@@ -418,7 +419,6 @@ class DEHCDatabase:
 
         self.schema = {}
         if quickstart == True:
-            
             self.databases_create(lazy=True)
             self.schema_load(schema="db_schema.json", forcelocal=True)
             self.schema_save()
@@ -431,6 +431,7 @@ class DEHCDatabase:
         lazy: If true, won't error if databases already exist.
         '''
         for db in self.db_list:
+            print(db, self.db.database_exists(db))
             if lazy == False or self.db.database_exists(db) == False:
                 self.db.database_create(db)
     
@@ -1085,6 +1086,39 @@ class DEHCDatabase:
                 self.db.index_create(dbname="items", name=index_name, fields=[{"category": "asc"}]+sort)
         res = self.db.query(dbname="items", selector=selector, fields=fields, sort=sort, limit=self.limit)
         return res
+
+
+    def photo_load(self, item: str):
+        '''Loads the photo, associated with an item, from the database.
+        
+        item: The item to load the photo of.
+        '''
+        name = "photo-"+item
+        if self.db.document_exists(dbname="files", id=name) == True:
+            doc = self.db.document_get(dbname="files", id=name)
+            img = base64.b64decode(doc['photo'])
+            buffer = io.BytesIO(img)
+            return Image.open(buffer)
+        else:
+            return None
+
+
+    def photo_save(self, item: str, img: Image):
+        '''Saves a photo, associated with an item, to the database.
+
+        Photos are saved as JPEG using base64 encoding.
+        
+        item: The item the photo is associated with.
+        img: The PIL object to save to the database.
+        '''
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG")
+        data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        name = "photo-"+item
+        if self.db.document_exists(dbname="files", id=name) == True:
+            self.db.document_edit(dbname="files", doc={"item": item, "photo": data}, id=name)
+        else:
+            self.db.document_create(dbname="files", doc={"item": item, "photo": data}, id=name)
 
 
     def schema_cats(self):
