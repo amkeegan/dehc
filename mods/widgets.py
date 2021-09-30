@@ -764,7 +764,7 @@ class SearchTree(SuperWidget):
         super().__init__(master=master, db=db, level=level)
 
         self.cats = cats
-        self.ops = ["=", "<", ">", "≤", "≥", "≠"]
+        self.ops = ["=", "<", ">", "≤", "≥", "≠", "≈"]
 
         self._select = select
 
@@ -902,9 +902,17 @@ class SearchTree(SuperWidget):
         '''Callback for when the search button is pressed.'''
         cat = self.w_var_cat.get()
         field = self.w_var_field.get()
-        op = {"=":"$eq", "<":"$lt", ">":"$gt", "≤":"$lte", "≥":"$gte", "≠":"$ne"}[self.w_var_op.get()]
         value = self.w_var_value.get()
-        selector = {field: {op: value}}
+        opvalue = {
+            "=": {"$eq": value}, 
+            "<": {"$lt": value}, 
+            ">": {"$gt": value}, 
+            "≤": {"$lte": value},
+            "≥": {"$gte": value}, 
+            "≠": {"$ne": value},
+            "≈": {"$regex": value}
+            }[self.w_var_op.get()]
+        selector = {field: opvalue}
         name = self.db.schema_name(cat=cat)
         fields = ["_id", name]
         sort = [{key: 'asc'} for key in self.db.schema_keys(cat=cat)]
