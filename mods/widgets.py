@@ -797,6 +797,7 @@ class SearchTree(SuperWidget):
         self.w_fr_search.columnconfigure(2, weight=1000)
         self.w_fr_search.columnconfigure(3, weight=1000)
         self.w_fr_search.columnconfigure(4, weight=1000)
+        self.w_fr_search.columnconfigure(5, weight=1000)
         self.w_fr_search.rowconfigure(0, weight=1000)
 
         # Variables
@@ -814,6 +815,7 @@ class SearchTree(SuperWidget):
         self.w_co_op = ttk.Combobox(master=self.w_fr_search, value=self.ops, textvariable=self.w_var_op, state="readonly")
         self.w_en_value = ttk.Entry(master=self.w_fr_search, textvariable=self.w_var_value)
         self.w_bu_search = ttk.Button(master=self.w_fr_search, text="Search", command=self.search)
+        self.w_bu_scan = ttk.Button(master=self.w_fr_search, text="Scan", command=self.scan)
         self.w_li_search = tk.Listbox(master=self.w_fr, selectmode=tk.SINGLE, relief=tk.GROOVE, exportselection=False)
         self.w_tr_tree = ttk.Treeview(master=self.w_fr, columns=list(range(1,len(self.summables)+2)), show="tree", selectmode="browse")
         self.w_ch_summation = ttk.Checkbutton(master=self.w_fr, variable=self.w_var_summation, text="Show Sums?")
@@ -860,11 +862,40 @@ class SearchTree(SuperWidget):
         self.w_co_op.grid(column=2, row=0, sticky="nsew", padx=1, pady=1)
         self.w_en_value.grid(column=3, row=0, sticky="nsew", padx=1, pady=1)
         self.w_bu_search.grid(column=4, row=0, sticky="nsew", padx=1, pady=1)
+        self.w_bu_scan.grid(column=5, row=0, sticky="nsew", padx=1, pady=1)
         self.w_li_search.grid(column=0, row=1, rowspan=2, sticky="nsew", padx=1, pady=1)
         self.w_sc_search.grid(column=1, row=1, rowspan=2, sticky="nse", padx=1, pady=1)
         self.w_tr_tree.grid(column=2, row=1, sticky="nsew", padx=1, pady=1)
         self.w_sc_tree.grid(column=3, row=1, sticky="nse", padx=1, pady=1)
         self.w_ch_summation.grid(column=2, row=2, columnspan=2, sticky="nsew", padx=1, pady=1)
+
+
+    def scan(self, *args):
+        '''Callback for when the scan button is pressed.'''
+        window = tk.Toplevel(master=self.w_bu_scan)
+        window.title("Scan")
+        
+        def scan():
+            self.logger.info("You pressed SCAN.")
+
+        def find():
+            physid = input_var.get()
+            id, *_ = self.db.ids_find(physid=physid)
+            self.tree_focus(goal=id, rebase=True)
+
+        input_var = tk.StringVar()
+        input_box = ttk.Entry(master=window, textvariable=input_var)
+        scan_button = ttk.Button(master=window, text="Scan", command=scan)
+        find_button = ttk.Button(master=window, text="Find", command=find)
+
+        window.columnconfigure(0, weight=1000)
+        window.columnconfigure(1, weight=1000)
+        window.rowconfigure(0, weight=1000)
+        window.rowconfigure(1, weight=1000)
+
+        input_box.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        scan_button.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
+        find_button.grid(column=1, row=1, sticky="nsew", padx=2, pady=2)
 
 
     def search(self, *args):
@@ -885,7 +916,15 @@ class SearchTree(SuperWidget):
 
     def search_cat(self, *args):
         '''Callback for when the search category is changed.'''
-        self.w_co_field['values'] = ['_id']+self.db.schema_fields(cat=self.w_var_cat.get())
+        cat = self.w_var_cat.get()
+        fields = ['_id']+self.db.schema_fields(cat=cat)
+
+        # Searching by IDS and PHYSIDS fields doesn't work, so hide them:
+        for field, info in self.db.schema_schema(cat=cat).items():
+            if info.get('source','') in ["IDS", "PHYSIDS"]:
+                fields.remove(field)
+
+        self.w_co_field['values'] = fields
         self.w_co_field.current(1)
 
 
@@ -1188,8 +1227,9 @@ class ContainerManager(SuperWidget):
         self.db.container_move(from_con=source, to_con=destination, item=target)
         self.highlight(item=source)
         self.refresh()
-        self.highlight(botitem=target)
+        self.highlight(botitem=destination)
         self.open()
+        self.botopen()
 
 
     def submove(self, *args):
