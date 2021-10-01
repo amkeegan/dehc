@@ -99,12 +99,13 @@ class DataEntry(SuperWidget):
         cats: The categories of items that can be created using the New button.
         level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         save: If present, a callback function that triggers when an item is saved.
-        show: If present, a callback function that triggers when 'show' is pressed in the data pane.
+        show: If present, a callback function that triggers when 'show' or 'back' is pressed in the data pane.
         prepare: If true, automatically prepares widgets for packing.
         '''
         super().__init__(master=master, db=db, level=level)
 
         self.cats = cats
+        self.back_doc = {}
         self.last_doc = {}
         self.current_photo = None
         self.last_photo = None
@@ -127,7 +128,8 @@ class DataEntry(SuperWidget):
         self.w_fr.columnconfigure(index=0, weight=1000)
         self.w_fr.columnconfigure(index=1, weight=1000)
         self.w_fr.columnconfigure(index=2, weight=1000)
-        self.w_fr.columnconfigure(index=3, weight=1, minsize=16)
+        self.w_fr.columnconfigure(index=3, weight=1000)
+        self.w_fr.columnconfigure(index=4, weight=1, minsize=16)
         self.w_fr.rowconfigure(index=0, weight=1, minsize=25)
         self.w_fr.rowconfigure(index=1, weight=500)
         self.w_fr.rowconfigure(index=2, weight=1000)
@@ -160,6 +162,7 @@ class DataEntry(SuperWidget):
         # Widgets
         self.w_la_title = ttk.Label(master=self.w_fr, text="Title", font="Arial 12 bold")
         self.w_bu_copyid = ttk.Button(master=self.w_fr, text="Copy ID", command=self.copyid)
+        self.w_bu_back = ttk.Button(master=self.w_fr, text="Back", command=self.back)
         self.w_bu_photo = tk.Button(master=self.w_fr, text="Photo", command=self.photo, borderwidth=0)
         self.w_la_flags = ttk.Label(master=self.w_fr_flags, text="Flags")
         self.w_li_flags = tk.Listbox(master=self.w_fr_flags, selectmode=tk.SINGLE, relief=tk.GROOVE, exportselection=False)
@@ -185,10 +188,11 @@ class DataEntry(SuperWidget):
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the DataEntry.'''
         self.w_la_title.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_bu_copyid.grid(column=2, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_bu_copyid.grid(column=2, row=0, sticky="nsew", padx=2, pady=2)
+        self.w_bu_back.grid(column=3, row=0, sticky="nsew", padx=2, pady=2)
         self.w_bu_photo.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
-        self.w_fr_flags.grid(column=1, row=1, columnspan=3, sticky="nsew", padx=2, pady=2)
-        self.w_fr_body.grid(column=0, row=2, columnspan=3, sticky="nsew", padx=2, pady=2)
+        self.w_fr_flags.grid(column=1, row=1, columnspan=4, sticky="nsew", padx=2, pady=2)
+        self.w_fr_body.grid(column=0, row=2, columnspan=4, sticky="nsew", padx=2, pady=2)
         self.w_fr_data.grid(column=0, row=0, sticky="nsew")
         self.w_fr_foot.grid(column=0, row=3, columnspan=4, sticky="nsew", padx=2, pady=1)
 
@@ -208,11 +212,17 @@ class DataEntry(SuperWidget):
 
 
     def add(self, *args):
-        '''Callback for when the flag add button is pressed'''
+        '''Callback for when the flag add button is pressed.'''
         flag = self.w_var_flags.get()
         if flag not in self.w_li_flags.get(0, "end"):
             self.w_li_flags.insert("end", flag)
 
+
+    def back(self, *args):
+        '''Callback for when the back button is pressed.'''
+        if "_id" in self.back_doc:
+            self.last_doc, self.back_doc = self.back_doc, self.last_doc
+            self._show(self.last_doc["_id"])
 
     def cancel(self, *args):
         '''Callback for when the cancel button is pressed.'''
@@ -266,6 +276,7 @@ class DataEntry(SuperWidget):
 
     def new(self, *args):
         '''Callback for when the new button is pressed.'''
+        self.back_doc = self.last_doc
         self.last_doc = {"category": self.w_var_cat.get()}
         self.show()
         self.edit()
@@ -286,10 +297,13 @@ class DataEntry(SuperWidget):
 
         def fetch_photo():
             '''Updates the photoframe with a new photo.'''
-            img = ImageTk.PhotoImage(photomanager.take_photo())
-            photoframe.config(image=img)
-            photoframe.image = img
-            window.after(250, fetch_photo)
+            try:
+                img = ImageTk.PhotoImage(photomanager.take_photo())
+                photoframe.config(image=img)
+                photoframe.image = img
+                window.after(250, fetch_photo)
+            except:
+                self.logger.error("Could not take photo. Webcam may be unavailable.")
         
         def on_close():
             '''Callback for when the window is closed.'''
@@ -523,6 +537,7 @@ class DataEntry(SuperWidget):
                     self.db.photo_delete(item=doc["_id"])
             if self._save != None:
                 self._save(id)
+            self.back_doc = self.last_doc
             self.last_doc = doc
             return True
         self.logger.error("Could not save item because required fields are missing")
@@ -535,7 +550,9 @@ class DataEntry(SuperWidget):
         doc: The document to display. If omitted, the previous document will be used.
         '''
         if doc != None:
-            self.last_doc = doc
+            if self.last_doc != doc:
+                self.back_doc = self.last_doc
+                self.last_doc = doc
             id = self.last_doc.get("_id", "")
             self.last_photo = self.db.photo_load(item=id)
 
