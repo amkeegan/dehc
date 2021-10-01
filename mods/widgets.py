@@ -163,7 +163,7 @@ class DataEntry(SuperWidget):
         self.w_la_title = ttk.Label(master=self.w_fr, text="Title", font="Arial 12 bold")
         self.w_bu_copyid = ttk.Button(master=self.w_fr, text="Copy ID", command=self.copyid)
         self.w_bu_back = ttk.Button(master=self.w_fr, text="Back", command=self.back)
-        self.w_bu_photo = tk.Button(master=self.w_fr, text="Photo", command=self.photo, borderwidth=0)
+        self.w_bu_photo = ttk.Button(master=self.w_fr, text="Photo", command=self.photo)
         self.w_la_flags = ttk.Label(master=self.w_fr_flags, text="Flags")
         self.w_li_flags = tk.Listbox(master=self.w_fr_flags, selectmode=tk.SINGLE, relief=tk.GROOVE, exportselection=False)
         self.w_co_flags = ttk.Combobox(master=self.w_fr_flags, textvariable=self.w_var_flags, state="readonly")
@@ -354,8 +354,8 @@ class DataEntry(SuperWidget):
             if source == "WEIGHT":
                 import random
                 
-                msg = tk.Label(master=window, font="Arial 14 bold")
-                getbutton = tk.Button(master=window, text="Update", font="Arial 14 bold")
+                msg = ttk.Label(master=window)
+                getbutton = ttk.Button(master=window, text="Update")
 
                 def read_weight(*args):
                     '''Reads the current weight from another device.'''
@@ -419,8 +419,8 @@ class DataEntry(SuperWidget):
                     entry.current(0)
                     self.w_hidden_data[row] = listids
 
-                tree = SearchTree(master=window, db=self.db, base=base, cats=self.cats, level=self.level, prepare=True)
-                namelistlb = tk.Label(master=window, text="Guardians")
+                tree = SearchTree(master=window, db=self.db, base=base, cats=self.cats, level=self.level, prepare=True, style="top.Treeview")
+                namelistlb = ttk.Label(master=window, text="Guardians")
                 namelist = tk.Listbox(master=window, selectmode=tk.SINGLE)
                 for name in entry['values']:
                     namelist.insert("end", name)
@@ -595,7 +595,7 @@ class DataEntry(SuperWidget):
                 value = self.last_doc.get(field, "")
                 var = tk.StringVar()
                 var.set(value)
-                label = tk.Label(master=self.w_fr_data, text=field, justify=tk.LEFT, anchor="w")
+                label = ttk.Label(master=self.w_fr_data, text=field, justify=tk.LEFT, anchor="w")
 
                 w_type = info['type']
 
@@ -765,10 +765,11 @@ class SearchTree(SuperWidget):
     selection: The last selected element of the tree.
     summables: A list of summable fields defined in the database schema.
     summation: Whether or not to sum summable fields in the tree.
+    style: The style to use for the tree's appearence.
     _select: If present, a callback function that triggers when a tree item is selected.
     '''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, style: str = ""):
         '''Constructs a SearchTree object.
         
         master: The widget that the SearchTree's component widgets will be instantiated under.
@@ -778,6 +779,7 @@ class SearchTree(SuperWidget):
         level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         prepare: If true, automatically prepares widgets for packing.
         select: If present, a callback function that triggers when a tree item is selected.
+        style: The style to use for the tree's appearence.
         '''
         super().__init__(master=master, db=db, level=level)
 
@@ -792,6 +794,7 @@ class SearchTree(SuperWidget):
         self.search_result = None
         self.summables = self.db.schema_sums()
         self.summation = False
+        self.style = style
 
         if prepare == True:
             self.prepare()
@@ -835,8 +838,10 @@ class SearchTree(SuperWidget):
         self.w_bu_search = ttk.Button(master=self.w_fr_search, text="Search", command=self.search)
         self.w_bu_scan = ttk.Button(master=self.w_fr_search, text="Scan", command=self.scan)
         self.w_li_search = tk.Listbox(master=self.w_fr, selectmode=tk.SINGLE, relief=tk.GROOVE, exportselection=False)
-        self.w_tr_tree = ttk.Treeview(master=self.w_fr, columns=list(range(1,len(self.summables)+2)), show="tree", selectmode="browse")
+        self.w_tr_tree = ttk.Treeview(master=self.w_fr, columns=list(range(1,len(self.summables)+2)), show="tree", selectmode="browse", style=self.style)
         self.w_ch_summation = ttk.Checkbutton(master=self.w_fr, variable=self.w_var_summation, text="Show Sums?")
+        if self.style == "bottom.Treeview":
+            self.w_li_search.configure(bg="#fcf0cf")
 
         self.w_li_search.bind("<<ListboxSelect>>", self.search_select)
         self.w_tr_tree.bind("<<TreeviewSelect>>", self.tree_select)
@@ -1211,9 +1216,9 @@ class ContainerManager(SuperWidget):
         self.w_bu_bm3 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["3"]["name"], command=lambda *_: self.bookmark(preset="3"))
         self.w_bu_bm4 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["4"]["name"], command=lambda *_: self.bookmark(preset="4"))
         self.w_la_top = ttk.Label(master=self.w_fr, text="Source")
-        self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, cats=self.cats, level=self.level, prepare=True, select=self.select)
+        self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, cats=self.cats, level=self.level, prepare=True, select=self.select, style="top.Treeview")
         self.w_la_bottom = ttk.Label(master=self.w_fr, text="Destination")
-        self.w_se_bottom = SearchTree(master=self.w_fr, db=self.db, base=self.botbase, cats=self.cats, level=self.level, prepare=True)
+        self.w_se_bottom = SearchTree(master=self.w_fr, db=self.db, base=self.botbase, cats=self.cats, level=self.level, prepare=True, style="bottom.Treeview")
         self.w_bu_move_item = ttk.Button(master=self.w_fr, text="Move Item", command=self.move)
         self.w_bu_move_subs = ttk.Button(master=self.w_fr, text="Move Sub-Items", command=self.submove)
 
@@ -1376,7 +1381,7 @@ class StatusBar(SuperWidget):
 
     def prepare(self):
         '''Constructs the frames and widgets of the StatusBar.'''
-        self.w_status = tk.Label(master=self.w_fr, text="Status Online", justify=tk.LEFT, anchor="w")
+        self.w_status = ttk.Label(master=self.w_fr, text="Status Online", justify=tk.LEFT, anchor="w")
         
     
     def _pack_children(self):
