@@ -1,5 +1,6 @@
 '''The module containing objects that create and manage groups of tkinter widgets.'''
 
+import json
 import time
 
 from PIL import ImageTk
@@ -1142,6 +1143,7 @@ class SearchTree(SuperWidget):
 class ContainerManager(SuperWidget):
     '''A SuperWidget representing a container manager.
     
+    bookmarks: Dictionary describing where to base trees when bookmark buttons are pressed.
     cats: The categories which may be searched using this ContainerManager.
     db: The database object which the widget uses for database transactions.
     level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
@@ -1151,13 +1153,14 @@ class ContainerManager(SuperWidget):
     select: If present, a callback function that triggers when a tree item is selected.
     '''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, topbase: dict, botbase: dict,  *, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, topbase: dict, botbase: dict,  *, bookmarks: str = "bookmarks.json", cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None):
         '''Constructs a ContainerManager object.
         
         master: The widget that the ContainerManager's component widgets will be instantiated under.
         db: The database object which  the widget uses for database transactions.
         topbase: The document of the item upon which the top tree is initially based.
         botbase: The document of the item upon which the bottom tree is initially based.
+        bookmarks: Relative filepath to the bookmarks definition file.
         cats: The categories of items that can be searched.
         level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         ops: The operations that can be used in seraches.
@@ -1172,13 +1175,24 @@ class ContainerManager(SuperWidget):
         self.level = level
         self.select = select
 
+        with open(bookmarks, "r") as f:
+            self.bookmarks = json.loads(f.read())
+
         if prepare == True:
             self.prepare()
 
 
     def prepare(self):
         '''Constructs the frames and widgets of the ContainerManager.'''
+        # Frames
+        self.w_fr_bookmarks = ttk.Frame(master=self.w_fr)
+        self.w_fr_treeops = ttk.Frame(master=self.w_fr)
+        
         # Widgets
+        self.w_bu_bm1 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["1"]["name"], command=lambda *_: self.bookmark(preset="1"))
+        self.w_bu_bm2 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["2"]["name"], command=lambda *_: self.bookmark(preset="2"))
+        self.w_bu_bm3 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["3"]["name"], command=lambda *_: self.bookmark(preset="3"))
+        self.w_bu_bm4 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["4"]["name"], command=lambda *_: self.bookmark(preset="4"))
         self.w_la_top = ttk.Label(master=self.w_fr, text="Source")
         self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, cats=self.cats, level=self.level, prepare=True, select=self.select)
         self.w_la_bottom = ttk.Label(master=self.w_fr, text="Destination")
@@ -1189,20 +1203,34 @@ class ContainerManager(SuperWidget):
         self.w_fr.columnconfigure(0, weight=1000)
         self.w_fr.columnconfigure(1, weight=1000)
         self.w_fr.rowconfigure(0, weight=1, minsize=17)
-        self.w_fr.rowconfigure(1, weight=1000)
-        self.w_fr.rowconfigure(2, weight=1, minsize=17)
-        self.w_fr.rowconfigure(3, weight=1000)
-        self.w_fr.rowconfigure(4, weight=1, minsize=25)
+        self.w_fr.rowconfigure(1, weight=1, minsize=17)
+        self.w_fr.rowconfigure(2, weight=1000)
+        self.w_fr.rowconfigure(3, weight=1, minsize=17) # For tree operations later, like cloning/swapping
+        self.w_fr.rowconfigure(4, weight=1, minsize=17)
+        self.w_fr.rowconfigure(5, weight=1000)
+        self.w_fr.rowconfigure(6, weight=1, minsize=25)
+
+        self.w_fr_bookmarks.columnconfigure(0, weight=1000)
+        self.w_fr_bookmarks.columnconfigure(1, weight=1000)
+        self.w_fr_bookmarks.columnconfigure(2, weight=1000)
+        self.w_fr_bookmarks.columnconfigure(3, weight=1000)
+        self.w_fr_bookmarks.rowconfigure(0, weight=1000)
 
 
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the ContainerManager.'''
-        self.w_la_top.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_se_top.grid(column=0, row=1, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_la_bottom.grid(column=0, row=2, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_se_bottom.grid(column=0, row=3, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_bu_move_item.grid(column=0, row=4, sticky="nsew", padx=2, pady=2)
-        self.w_bu_move_subs.grid(column=1, row=4, sticky="nsew", padx=2, pady=2)
+        self.w_fr_bookmarks.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_bu_bm1.grid(column=0, row=0, sticky="nsew", padx=2, pady=2)
+        self.w_bu_bm2.grid(column=1, row=0, sticky="nsew", padx=2, pady=2)
+        self.w_bu_bm3.grid(column=2, row=0, sticky="nsew", padx=2, pady=2)
+        self.w_bu_bm4.grid(column=3, row=0, sticky="nsew", padx=2, pady=2)
+        self.w_la_top.grid(column=0, row=1, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_se_top.grid(column=0, row=2, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_fr_treeops.grid(column=0, row=3, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_la_bottom.grid(column=0, row=4, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_se_bottom.grid(column=0, row=5, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_bu_move_item.grid(column=0, row=6, sticky="nsew", padx=2, pady=2)
+        self.w_bu_move_subs.grid(column=1, row=6, sticky="nsew", padx=2, pady=2)
 
 
     def base(self, newbase: str = None):
@@ -1215,6 +1243,32 @@ class ContainerManager(SuperWidget):
         else:
             self.w_se_top.base = newbase
 
+
+    def basebot(self, newbase: str = None):
+        '''Sets or returns the base of the bottom tree.
+        
+        newbase: If specified, rebases the bottom tree to the new base.
+        '''
+        if newbase == None:
+            return self.w_se_bottom.base
+        else:
+            self.w_se_bottom.base = newbase
+
+
+    def bookmark(self, preset: str):
+        '''Sets both trees to the settings described by a bookmark.
+        
+        preset: Which bookmark to use.
+        '''
+        guide = self.bookmarks[preset]
+        top, bottom = self.db.items_get(ids=[guide["top"], guide["bottom"]])
+        self.base(newbase=top)
+        self.basebot(newbase=bottom)
+        self.refresh()
+        self.highlight(item=top["_id"], botitem=bottom["_id"])
+        self.open()
+        self.botopen()
+        
 
     def highlight(self, item: str = None, botitem: str = None):
         '''Selects an item in the top and/or bottom tree with the matching id.
