@@ -12,6 +12,7 @@ import mods.widgets as mw
 class EMS():
     '''A class which represents the EMS application.
     
+    bookmarks: Relative filepath to the bookmark definition file.
     cats: The categories which can be searched and created on the EMS screen.
     flags: The flags which can be assigned on the EMS screen.
     db: The database object which the app uses for database transactions.
@@ -19,13 +20,15 @@ class EMS():
     root: The root of the application, a tk.Tk object.
     '''
 
-    def __init__(self, db: md.DEHCDatabase, *, level: str = "NOTSET", autorun: bool = False):
+    def __init__(self, db: md.DEHCDatabase, *, bookmarks: str = "bookmarks.json", level: str = "NOTSET", autorun: bool = False):
         '''Constructs an EMS object.
         
         db: The database object which the app uses for database transactions.
+        bookmarks: Relative filepath to the bookmark definition file.
         level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         prepare: If true, automatically prepares widgets for packing.
         '''
+        self.bookmarks = bookmarks
         self.level = level
         self.logger = ml.get("EMS", level=self.level)
         self.logger.debug("EMS object instantiated")
@@ -36,7 +39,17 @@ class EMS():
         self.root = tk.Tk()
         self.root.title(f"EMS ({self.db.db.data['url']})")
         self.root.state('zoomed')
+        self.root.configure(background="#D9D9D9")
         self.root.bind("<Escape>", lambda *_: self.root.destroy())
+
+        self.style = ttk.Style(self.root)
+        self.style.theme_use("clam")
+        self.style.map('TCombobox', fieldbackground=[('readonly', 'white')])
+        self.style.configure("top.Treeview", fieldbackground="white", background="white", foreground="black")
+        self.style.map('top.Treeview', background=[('selected', 'blue')], foreground=[('selected', 'white')])
+        self.style.configure("bottom.Treeview", fieldbackground="#fcf0cf", background="#fcf0cf", foreground="black")
+        self.style.map('bottom.Treeview', background=[('selected', 'blue')], foreground=[('selected', '#fcf0cf')])
+        
 
         if autorun == True:
             self.prepare()
@@ -47,7 +60,7 @@ class EMS():
     def prepare(self):
         '''Constructs the frames and widgets of the EMS.'''
         base, = self.db.items_query(cat="Evacuation", fields=["_id", "Display Name"])
-        self.cm = mw.ContainerManager(master=self.root, db=self.db, topbase=base, botbase=base, cats=self.cats, level=self.level, prepare=True, select=self.item_select)
+        self.cm = mw.ContainerManager(master=self.root, db=self.db, topbase=base, botbase=base, bookmarks=self.bookmarks, cats=self.cats, level=self.level, prepare=True, select=self.item_select)
         self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, delete=self.delete, level=self.level, prepare=True, save=self.save, show=self.show)
         self.sb = mw.StatusBar(master=self.root, db=self.db, level=self.level, prepare=True)
         self.root.rowconfigure(0, weight=1000)

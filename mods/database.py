@@ -70,6 +70,9 @@ class Database:
             if response == 200:
                 self.logger.debug(f"Database {dbname} exists")
                 return True
+            else:
+                # This is here to help diagonse the random "file_exists" bug on startup
+                self.logger.error(f"Database might exist? Database response: {response}.")
         except:
             pass
         self.logger.debug(f"Database {dbname} does not exist")
@@ -431,7 +434,6 @@ class DEHCDatabase:
         lazy: If true, won't error if databases already exist.
         '''
         for db in self.db_list:
-            print(db, self.db.database_exists(db))
             if lazy == False or self.db.database_exists(db) == False:
                 self.db.database_create(db)
     
@@ -743,6 +745,15 @@ class DEHCDatabase:
             self.db.documents_delete(dbname="ids", ids=ids_delete, lazy=True)
 
 
+    def ids_find(self, physid: str):
+        '''Finds the items associated with a physical ID, and returns their database IDs.
+        
+        physid: The physical ID to search against.
+        '''
+        res = self.db.query(dbname="ids", selector={'physid': {'$eq': physid}}, fields=['item'], sort=[{'physid': 'asc'}], limit=self.limit)
+        return [row['item'] for row in res]
+
+
     def ids_get(self, item: str):
         '''Fetches all physical IDs associated with an item.
         
@@ -753,9 +764,11 @@ class DEHCDatabase:
 
 
     def index_prepare(self):
-        '''Prepares known indexes used by database queries.'''
+        '''Prepares certain known indexes used by database queries.'''
         if self.db.index_exists(dbname="ids", name="idx-item") == False:
             self.db.index_create(dbname="ids", name="idx-item", fields=[{'item': 'asc'}])
+        if self.db.index_exists(dbname="ids", name="idx-physid") == False:
+            self.db.index_create(dbname="ids", name="idx-physid", fields=[{'physid': 'asc'}])
 
 
     def item_create(self, cat: str, doc: dict):

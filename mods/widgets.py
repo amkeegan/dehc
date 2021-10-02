@@ -1,5 +1,6 @@
 '''The module containing objects that create and manage groups of tkinter widgets.'''
 
+import json
 import time
 
 from PIL import ImageTk
@@ -98,12 +99,13 @@ class DataEntry(SuperWidget):
         cats: The categories of items that can be created using the New button.
         level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         save: If present, a callback function that triggers when an item is saved.
-        show: If present, a callback function that triggers when 'show' is pressed in the data pane.
+        show: If present, a callback function that triggers when 'show' or 'back' is pressed in the data pane.
         prepare: If true, automatically prepares widgets for packing.
         '''
         super().__init__(master=master, db=db, level=level)
 
         self.cats = cats
+        self.back_doc = {}
         self.last_doc = {}
         self.current_photo = None
         self.last_photo = None
@@ -126,7 +128,8 @@ class DataEntry(SuperWidget):
         self.w_fr.columnconfigure(index=0, weight=1000)
         self.w_fr.columnconfigure(index=1, weight=1000)
         self.w_fr.columnconfigure(index=2, weight=1000)
-        self.w_fr.columnconfigure(index=3, weight=1, minsize=16)
+        self.w_fr.columnconfigure(index=3, weight=1000)
+        self.w_fr.columnconfigure(index=4, weight=1, minsize=16)
         self.w_fr.rowconfigure(index=0, weight=1, minsize=25)
         self.w_fr.rowconfigure(index=1, weight=500)
         self.w_fr.rowconfigure(index=2, weight=1000)
@@ -159,7 +162,8 @@ class DataEntry(SuperWidget):
         # Widgets
         self.w_la_title = ttk.Label(master=self.w_fr, text="Title", font="Arial 12 bold")
         self.w_bu_copyid = ttk.Button(master=self.w_fr, text="Copy ID", command=self.copyid)
-        self.w_bu_photo = tk.Button(master=self.w_fr, text="Photo", command=self.photo, borderwidth=0)
+        self.w_bu_back = ttk.Button(master=self.w_fr, text="Back", command=self.back)
+        self.w_bu_photo = ttk.Button(master=self.w_fr, text="Photo", command=self.photo)
         self.w_la_flags = ttk.Label(master=self.w_fr_flags, text="Flags")
         self.w_li_flags = tk.Listbox(master=self.w_fr_flags, selectmode=tk.SINGLE, relief=tk.GROOVE, exportselection=False)
         self.w_co_flags = ttk.Combobox(master=self.w_fr_flags, textvariable=self.w_var_flags, state="readonly")
@@ -184,10 +188,11 @@ class DataEntry(SuperWidget):
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the DataEntry.'''
         self.w_la_title.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_bu_copyid.grid(column=2, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_bu_copyid.grid(column=2, row=0, sticky="nsew", padx=2, pady=2)
+        self.w_bu_back.grid(column=3, row=0, sticky="nsew", padx=2, pady=2)
         self.w_bu_photo.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
-        self.w_fr_flags.grid(column=1, row=1, columnspan=3, sticky="nsew", padx=2, pady=2)
-        self.w_fr_body.grid(column=0, row=2, columnspan=3, sticky="nsew", padx=2, pady=2)
+        self.w_fr_flags.grid(column=1, row=1, columnspan=4, sticky="nsew", padx=2, pady=2)
+        self.w_fr_body.grid(column=0, row=2, columnspan=4, sticky="nsew", padx=2, pady=2)
         self.w_fr_data.grid(column=0, row=0, sticky="nsew")
         self.w_fr_foot.grid(column=0, row=3, columnspan=4, sticky="nsew", padx=2, pady=1)
 
@@ -207,11 +212,17 @@ class DataEntry(SuperWidget):
 
 
     def add(self, *args):
-        '''Callback for when the flag add button is pressed'''
+        '''Callback for when the flag add button is pressed.'''
         flag = self.w_var_flags.get()
         if flag not in self.w_li_flags.get(0, "end"):
             self.w_li_flags.insert("end", flag)
 
+
+    def back(self, *args):
+        '''Callback for when the back button is pressed.'''
+        if "_id" in self.back_doc:
+            self.last_doc, self.back_doc = self.back_doc, self.last_doc
+            self._show(self.last_doc["_id"])
 
     def cancel(self, *args):
         '''Callback for when the cancel button is pressed.'''
@@ -265,6 +276,7 @@ class DataEntry(SuperWidget):
 
     def new(self, *args):
         '''Callback for when the new button is pressed.'''
+        self.back_doc = self.last_doc
         self.last_doc = {"category": self.w_var_cat.get()}
         self.show()
         self.edit()
@@ -285,10 +297,13 @@ class DataEntry(SuperWidget):
 
         def fetch_photo():
             '''Updates the photoframe with a new photo.'''
-            img = ImageTk.PhotoImage(photomanager.take_photo())
-            photoframe.config(image=img)
-            photoframe.image = img
-            window.after(250, fetch_photo)
+            try:
+                img = ImageTk.PhotoImage(photomanager.take_photo())
+                photoframe.config(image=img)
+                photoframe.image = img
+                window.after(250, fetch_photo)
+            except:
+                self.logger.error("Could not take photo. Webcam may be unavailable.")
         
         def on_close():
             '''Callback for when the window is closed.'''
@@ -339,8 +354,8 @@ class DataEntry(SuperWidget):
             if source == "WEIGHT":
                 import random
                 
-                msg = tk.Label(master=window, font="Arial 14 bold")
-                getbutton = tk.Button(master=window, text="Update", font="Arial 14 bold")
+                msg = ttk.Label(master=window)
+                getbutton = ttk.Button(master=window, text="Update")
 
                 def read_weight(*args):
                     '''Reads the current weight from another device.'''
@@ -404,8 +419,8 @@ class DataEntry(SuperWidget):
                     entry.current(0)
                     self.w_hidden_data[row] = listids
 
-                tree = SearchTree(master=window, db=self.db, base=base, cats=self.cats, level=self.level, prepare=True)
-                namelistlb = tk.Label(master=window, text="Guardians")
+                tree = SearchTree(master=window, db=self.db, base=base, cats=self.cats, level=self.level, prepare=True, style="top.Treeview")
+                namelistlb = ttk.Label(master=window, text="Guardians")
                 namelist = tk.Listbox(master=window, selectmode=tk.SINGLE)
                 for name in entry['values']:
                     namelist.insert("end", name)
@@ -522,6 +537,7 @@ class DataEntry(SuperWidget):
                     self.db.photo_delete(item=doc["_id"])
             if self._save != None:
                 self._save(id)
+            self.back_doc = self.last_doc
             self.last_doc = doc
             return True
         self.logger.error("Could not save item because required fields are missing")
@@ -534,7 +550,9 @@ class DataEntry(SuperWidget):
         doc: The document to display. If omitted, the previous document will be used.
         '''
         if doc != None:
-            self.last_doc = doc
+            if self.last_doc != doc:
+                self.back_doc = self.last_doc
+                self.last_doc = doc
             id = self.last_doc.get("_id", "")
             self.last_photo = self.db.photo_load(item=id)
 
@@ -577,7 +595,7 @@ class DataEntry(SuperWidget):
                 value = self.last_doc.get(field, "")
                 var = tk.StringVar()
                 var.set(value)
-                label = tk.Label(master=self.w_fr_data, text=field, justify=tk.LEFT, anchor="w")
+                label = ttk.Label(master=self.w_fr_data, text=field, justify=tk.LEFT, anchor="w")
 
                 w_type = info['type']
 
@@ -747,10 +765,11 @@ class SearchTree(SuperWidget):
     selection: The last selected element of the tree.
     summables: A list of summable fields defined in the database schema.
     summation: Whether or not to sum summable fields in the tree.
+    style: The style to use for the tree's appearence.
     _select: If present, a callback function that triggers when a tree item is selected.
     '''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, style: str = ""):
         '''Constructs a SearchTree object.
         
         master: The widget that the SearchTree's component widgets will be instantiated under.
@@ -760,11 +779,12 @@ class SearchTree(SuperWidget):
         level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         prepare: If true, automatically prepares widgets for packing.
         select: If present, a callback function that triggers when a tree item is selected.
+        style: The style to use for the tree's appearence.
         '''
         super().__init__(master=master, db=db, level=level)
 
         self.cats = cats
-        self.ops = ["=", "<", ">", "≤", "≥", "≠"]
+        self.ops = ["=", "<", ">", "≤", "≥", "≠", "≈"]
 
         self._select = select
 
@@ -774,6 +794,7 @@ class SearchTree(SuperWidget):
         self.search_result = None
         self.summables = self.db.schema_sums()
         self.summation = False
+        self.style = style
 
         if prepare == True:
             self.prepare()
@@ -797,6 +818,7 @@ class SearchTree(SuperWidget):
         self.w_fr_search.columnconfigure(2, weight=1000)
         self.w_fr_search.columnconfigure(3, weight=1000)
         self.w_fr_search.columnconfigure(4, weight=1000)
+        self.w_fr_search.columnconfigure(5, weight=1000)
         self.w_fr_search.rowconfigure(0, weight=1000)
 
         # Variables
@@ -814,9 +836,12 @@ class SearchTree(SuperWidget):
         self.w_co_op = ttk.Combobox(master=self.w_fr_search, value=self.ops, textvariable=self.w_var_op, state="readonly")
         self.w_en_value = ttk.Entry(master=self.w_fr_search, textvariable=self.w_var_value)
         self.w_bu_search = ttk.Button(master=self.w_fr_search, text="Search", command=self.search)
+        self.w_bu_scan = ttk.Button(master=self.w_fr_search, text="Scan", command=self.scan)
         self.w_li_search = tk.Listbox(master=self.w_fr, selectmode=tk.SINGLE, relief=tk.GROOVE, exportselection=False)
-        self.w_tr_tree = ttk.Treeview(master=self.w_fr, columns=list(range(1,len(self.summables)+2)), show="tree", selectmode="browse")
+        self.w_tr_tree = ttk.Treeview(master=self.w_fr, columns=list(range(1,len(self.summables)+2)), show="tree", selectmode="browse", style=self.style)
         self.w_ch_summation = ttk.Checkbutton(master=self.w_fr, variable=self.w_var_summation, text="Show Sums?")
+        if self.style == "bottom.Treeview":
+            self.w_li_search.configure(bg="#fcf0cf")
 
         self.w_li_search.bind("<<ListboxSelect>>", self.search_select)
         self.w_tr_tree.bind("<<TreeviewSelect>>", self.tree_select)
@@ -860,6 +885,7 @@ class SearchTree(SuperWidget):
         self.w_co_op.grid(column=2, row=0, sticky="nsew", padx=1, pady=1)
         self.w_en_value.grid(column=3, row=0, sticky="nsew", padx=1, pady=1)
         self.w_bu_search.grid(column=4, row=0, sticky="nsew", padx=1, pady=1)
+        self.w_bu_scan.grid(column=5, row=0, sticky="nsew", padx=1, pady=1)
         self.w_li_search.grid(column=0, row=1, rowspan=2, sticky="nsew", padx=1, pady=1)
         self.w_sc_search.grid(column=1, row=1, rowspan=2, sticky="nse", padx=1, pady=1)
         self.w_tr_tree.grid(column=2, row=1, sticky="nsew", padx=1, pady=1)
@@ -867,13 +893,49 @@ class SearchTree(SuperWidget):
         self.w_ch_summation.grid(column=2, row=2, columnspan=2, sticky="nsew", padx=1, pady=1)
 
 
+    def scan(self, *args):
+        '''Callback for when the scan button is pressed.'''
+        window = tk.Toplevel(master=self.w_bu_scan)
+        window.title("Scan")
+        
+        def scan():
+            self.logger.info("You pressed SCAN.")
+
+        def find():
+            physid = input_var.get()
+            id, *_ = self.db.ids_find(physid=physid)
+            self.tree_focus(goal=id, rebase=True)
+
+        input_var = tk.StringVar()
+        input_box = ttk.Entry(master=window, textvariable=input_var)
+        scan_button = ttk.Button(master=window, text="Scan", command=scan)
+        find_button = ttk.Button(master=window, text="Find", command=find)
+
+        window.columnconfigure(0, weight=1000)
+        window.columnconfigure(1, weight=1000)
+        window.rowconfigure(0, weight=1000)
+        window.rowconfigure(1, weight=1000)
+
+        input_box.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        scan_button.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
+        find_button.grid(column=1, row=1, sticky="nsew", padx=2, pady=2)
+
+
     def search(self, *args):
         '''Callback for when the search button is pressed.'''
         cat = self.w_var_cat.get()
         field = self.w_var_field.get()
-        op = {"=":"$eq", "<":"$lt", ">":"$gt", "≤":"$lte", "≥":"$gte", "≠":"$ne"}[self.w_var_op.get()]
         value = self.w_var_value.get()
-        selector = {field: {op: value}}
+        opvalue = {
+            "=": {"$eq": value}, 
+            "<": {"$lt": value}, 
+            ">": {"$gt": value}, 
+            "≤": {"$lte": value},
+            "≥": {"$gte": value}, 
+            "≠": {"$ne": value},
+            "≈": {"$regex": value}
+            }[self.w_var_op.get()]
+        selector = {field: opvalue}
         name = self.db.schema_name(cat=cat)
         fields = ["_id", name]
         sort = [{key: 'asc'} for key in self.db.schema_keys(cat=cat)]
@@ -885,7 +947,15 @@ class SearchTree(SuperWidget):
 
     def search_cat(self, *args):
         '''Callback for when the search category is changed.'''
-        self.w_co_field['values'] = ['_id']+self.db.schema_fields(cat=self.w_var_cat.get())
+        cat = self.w_var_cat.get()
+        fields = ['_id']+self.db.schema_fields(cat=cat)
+
+        # Searching by IDS and PHYSIDS fields doesn't work, so hide them:
+        for field, info in self.db.schema_schema(cat=cat).items():
+            if info.get('source','') in ["IDS", "PHYSIDS"]:
+                fields.remove(field)
+
+        self.w_co_field['values'] = fields
         self.w_co_field.current(1)
 
 
@@ -1095,6 +1165,7 @@ class SearchTree(SuperWidget):
 class ContainerManager(SuperWidget):
     '''A SuperWidget representing a container manager.
     
+    bookmarks: Dictionary describing where to base trees when bookmark buttons are pressed.
     cats: The categories which may be searched using this ContainerManager.
     db: The database object which the widget uses for database transactions.
     level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
@@ -1104,13 +1175,14 @@ class ContainerManager(SuperWidget):
     select: If present, a callback function that triggers when a tree item is selected.
     '''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, topbase: dict, botbase: dict,  *, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, topbase: dict, botbase: dict,  *, bookmarks: str = "bookmarks.json", cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None):
         '''Constructs a ContainerManager object.
         
         master: The widget that the ContainerManager's component widgets will be instantiated under.
         db: The database object which  the widget uses for database transactions.
         topbase: The document of the item upon which the top tree is initially based.
         botbase: The document of the item upon which the bottom tree is initially based.
+        bookmarks: Relative filepath to the bookmarks definition file.
         cats: The categories of items that can be searched.
         level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         ops: The operations that can be used in seraches.
@@ -1125,37 +1197,62 @@ class ContainerManager(SuperWidget):
         self.level = level
         self.select = select
 
+        with open(bookmarks, "r") as f:
+            self.bookmarks = json.loads(f.read())
+
         if prepare == True:
             self.prepare()
 
 
     def prepare(self):
         '''Constructs the frames and widgets of the ContainerManager.'''
+        # Frames
+        self.w_fr_bookmarks = ttk.Frame(master=self.w_fr)
+        self.w_fr_treeops = ttk.Frame(master=self.w_fr)
+        
         # Widgets
+        self.w_bu_bm1 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["1"]["name"], command=lambda *_: self.bookmark(preset="1"))
+        self.w_bu_bm2 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["2"]["name"], command=lambda *_: self.bookmark(preset="2"))
+        self.w_bu_bm3 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["3"]["name"], command=lambda *_: self.bookmark(preset="3"))
+        self.w_bu_bm4 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["4"]["name"], command=lambda *_: self.bookmark(preset="4"))
         self.w_la_top = ttk.Label(master=self.w_fr, text="Source")
-        self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, cats=self.cats, level=self.level, prepare=True, select=self.select)
+        self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, cats=self.cats, level=self.level, prepare=True, select=self.select, style="top.Treeview")
         self.w_la_bottom = ttk.Label(master=self.w_fr, text="Destination")
-        self.w_se_bottom = SearchTree(master=self.w_fr, db=self.db, base=self.botbase, cats=self.cats, level=self.level, prepare=True)
+        self.w_se_bottom = SearchTree(master=self.w_fr, db=self.db, base=self.botbase, cats=self.cats, level=self.level, prepare=True, style="bottom.Treeview")
         self.w_bu_move_item = ttk.Button(master=self.w_fr, text="Move Item", command=self.move)
         self.w_bu_move_subs = ttk.Button(master=self.w_fr, text="Move Sub-Items", command=self.submove)
 
         self.w_fr.columnconfigure(0, weight=1000)
         self.w_fr.columnconfigure(1, weight=1000)
         self.w_fr.rowconfigure(0, weight=1, minsize=17)
-        self.w_fr.rowconfigure(1, weight=1000)
-        self.w_fr.rowconfigure(2, weight=1, minsize=17)
-        self.w_fr.rowconfigure(3, weight=1000)
-        self.w_fr.rowconfigure(4, weight=1, minsize=25)
+        self.w_fr.rowconfigure(1, weight=1, minsize=17)
+        self.w_fr.rowconfigure(2, weight=1000)
+        self.w_fr.rowconfigure(3, weight=1, minsize=17) # For tree operations later, like cloning/swapping
+        self.w_fr.rowconfigure(4, weight=1, minsize=17)
+        self.w_fr.rowconfigure(5, weight=1000)
+        self.w_fr.rowconfigure(6, weight=1, minsize=25)
+
+        self.w_fr_bookmarks.columnconfigure(0, weight=1000)
+        self.w_fr_bookmarks.columnconfigure(1, weight=1000)
+        self.w_fr_bookmarks.columnconfigure(2, weight=1000)
+        self.w_fr_bookmarks.columnconfigure(3, weight=1000)
+        self.w_fr_bookmarks.rowconfigure(0, weight=1000)
 
 
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the ContainerManager.'''
-        self.w_la_top.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_se_top.grid(column=0, row=1, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_la_bottom.grid(column=0, row=2, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_se_bottom.grid(column=0, row=3, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_bu_move_item.grid(column=0, row=4, sticky="nsew", padx=2, pady=2)
-        self.w_bu_move_subs.grid(column=1, row=4, sticky="nsew", padx=2, pady=2)
+        self.w_fr_bookmarks.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_bu_bm1.grid(column=0, row=0, sticky="nsew", padx=2, pady=2)
+        self.w_bu_bm2.grid(column=1, row=0, sticky="nsew", padx=2, pady=2)
+        self.w_bu_bm3.grid(column=2, row=0, sticky="nsew", padx=2, pady=2)
+        self.w_bu_bm4.grid(column=3, row=0, sticky="nsew", padx=2, pady=2)
+        self.w_la_top.grid(column=0, row=1, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_se_top.grid(column=0, row=2, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_fr_treeops.grid(column=0, row=3, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_la_bottom.grid(column=0, row=4, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_se_bottom.grid(column=0, row=5, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_bu_move_item.grid(column=0, row=6, sticky="nsew", padx=2, pady=2)
+        self.w_bu_move_subs.grid(column=1, row=6, sticky="nsew", padx=2, pady=2)
 
 
     def base(self, newbase: str = None):
@@ -1168,6 +1265,32 @@ class ContainerManager(SuperWidget):
         else:
             self.w_se_top.base = newbase
 
+
+    def basebot(self, newbase: str = None):
+        '''Sets or returns the base of the bottom tree.
+        
+        newbase: If specified, rebases the bottom tree to the new base.
+        '''
+        if newbase == None:
+            return self.w_se_bottom.base
+        else:
+            self.w_se_bottom.base = newbase
+
+
+    def bookmark(self, preset: str):
+        '''Sets both trees to the settings described by a bookmark.
+        
+        preset: Which bookmark to use.
+        '''
+        guide = self.bookmarks[preset]
+        top, bottom = self.db.items_get(ids=[guide["top"], guide["bottom"]])
+        self.base(newbase=top)
+        self.basebot(newbase=bottom)
+        self.refresh()
+        self.highlight(item=top["_id"], botitem=bottom["_id"])
+        self.open()
+        self.botopen()
+        
 
     def highlight(self, item: str = None, botitem: str = None):
         '''Selects an item in the top and/or bottom tree with the matching id.
@@ -1188,8 +1311,9 @@ class ContainerManager(SuperWidget):
         self.db.container_move(from_con=source, to_con=destination, item=target)
         self.highlight(item=source)
         self.refresh()
-        self.highlight(botitem=target)
+        self.highlight(botitem=destination)
         self.open()
+        self.botopen()
 
 
     def submove(self, *args):
@@ -1257,7 +1381,7 @@ class StatusBar(SuperWidget):
 
     def prepare(self):
         '''Constructs the frames and widgets of the StatusBar.'''
-        self.w_status = tk.Label(master=self.w_fr, text="Status Online", justify=tk.LEFT, anchor="w")
+        self.w_status = ttk.Label(master=self.w_fr, text="Status Online", justify=tk.LEFT, anchor="w")
         
     
     def _pack_children(self):

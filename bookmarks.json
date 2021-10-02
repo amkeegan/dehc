@@ -1,0 +1,22 @@
+{
+    "1": {
+        "name": "Bookmark 1",
+        "top": "Station/4c000c5945e0",
+        "bottom": "Station/2e95e17ed8aa"
+    },
+    "2": {
+        "name": "Bookmark 2",
+        "top": "Station/2e95e17ed8aa",
+        "bottom": "Station/fe6ca86089d3"
+    },
+    "3": {
+        "name": "Bookmark 3",
+        "top": "Station/fe6ca86089d3",
+        "bottom": "Station/2e95e17ed8aa"
+    },
+    "4": {
+        "name": "Bookmark 4",
+        "top": "Station/2e95e17ed8aa",
+        "bottom": "Station/4c177b893ad3"
+    }
+}
