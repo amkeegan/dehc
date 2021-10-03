@@ -1,11 +1,32 @@
 '''The script that populates the CouchDB database with test data.'''
 
+import argparse
 import random
 import sys
 
 import mods.database as md
 
 # ----------------------------------------------------------------------------
+
+parser = argparse.ArgumentParser(description='Inserts data into the DEHC database.')
+parser.add_argument('persons', type=int, help="number of persons to add to the database", metavar="PERSONS")
+parser.add_argument('vessels', type=int, help="number of vessels to add to the database", metavar="VESSELS")
+parser.add_argument('-a','-auth', type=str, default="db_auth.json", help="relative path to database authentication file", metavar="PATH")
+parser.add_argument('-n','-name', type=str, default="dehc", help="which database namespace to use", metavar="NAME")
+parser.add_argument('-s','-sche', type=str, default="db_schema.json", help="relative path to database schema file", metavar="PATH")
+args = parser.parse_args()
+
+np = args.persons # Number of persons to insert
+nv = args.vessels # Number of vessels to insert
+
+db = md.DEHCDatabase(config=args.a, level="INFO", namespace=args.n, quickstart=False, schema=args.s)
+db.databases_delete(lazy=True)
+db.databases_create(lazy=True)
+db.schema_load(schema=args.s, forcelocal=True)
+db.schema_save()
+
+# ----------------------------------------------------------------------------
+
 
 MALE_NAMES = ["William","Ashton","Jack","Cameron","Lachlan","Nathan","Cooper","Elijah","Joshua","Nate","Thomas","Aidan","Oliver","Kai","Noah","Caleb","Ethan","Mitchell","Riley","Gabriel","James","Callum","Lucas","Marcus","Samuel","Alex","Benjamin","Anthony","Daniel","Patrick","Liam","Hunter","Max","Andrew","Alexander","Sebastian","Ryan","Toby","Jacob","Hamish","Isaac","Luca","Matthew","Jett","Jayden","Zac","Charlie","George","Tyler","Charles","Luke","Ali","Jake","Edward","Nicholas","Jesse","Harry","Beau","Xavier","Finn","Oscar","Joel","Dylan","Christopher","Jackson","Declan","Harrison","Owen","Aiden","Lincoln","Michael","Seth","Levi","David","Connor","Aaron","Zachary","Cody","Bailey","Justin","Blake","Eli","Logan","Hugo","Christian","John","Hayden","Leo","Joseph","Koby","Archie","Mason","Jordan","Jasper","Adam","Jonathan","Angus","Rhys","Henry","Brock"]
 
@@ -112,12 +133,6 @@ def create_vessel(**kwargs):
 
 # ----------------------------------------------------------------------------
 
-np = 30 # Number of persons to insert
-nv = 5 # Number of vessels to insert
-
-db = md.DEHCDatabase(config="db_auth.json", level="INFO", quickstart=False)
-db.databases_delete(lazy=True)
-
 '''
 items = db.db.documents_list(dbname="items", limit=1000000)
 items = [item["_id"] for item in items]
@@ -129,10 +144,7 @@ physids = db.db.documents_list(dbname="ids", limit=1000000)
 physids = [physid["_id"] for physid in physids]
 db.db.documents_delete(dbname="ids", ids=physids)
 '''
-
-db.databases_create(lazy=True)
-db.schema_load(schema="db_schema.json", forcelocal=True)
-db.schema_save()
+# Don't forget to add files and config to this.
 
 evac = {"Display Name": "DEHC"}
 stat = [
@@ -165,7 +177,5 @@ db.container_adds(container=evac, items=stat)
 db.container_adds(container=stat[0], items=lane)
 db.container_adds(container=stat[6], items=pers)
 db.container_adds(container=stat[4], items=vess)
-
-# ----------------------------------------------------------------------------
 
 sys.exit(0)

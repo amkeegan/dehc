@@ -123,7 +123,7 @@ class Database:
         id: The UUID of the document to edit.
         lazy: If true, won't error if document doesn't exist.
         '''
-        if lazy == False or self.document_exists(dbname="items", id=id) == True:
+        if lazy == False or self.document_exists(dbname=dbname, id=id) == True:
             remote_doc = self.client.get_document(db=dbname, doc_id=id).get_result()
             remote_doc.update(doc)
             self.client.post_document(db=dbname, document=remote_doc)
@@ -156,7 +156,7 @@ class Database:
         id: The UUID of document to fetch.
         lazy: If true, won't error if document doesn't exist.
         '''
-        if lazy == False or self.document_exists(dbname="items", id=id) == True:
+        if lazy == False or self.document_exists(dbname=dbname, id=id) == True:
             remote_doc = self.client.get_document(db=dbname, doc_id=id).get_result()
             self.logger.debug(f"Fetched document {dbname} {id}")
         else:
@@ -397,33 +397,49 @@ class DEHCDatabase:
     This class is specific to DEHC and is the one to import into the apps. 
     Importing the Database class up above should not be necessary.
     
-    database: The associated Database object.
+    db: The associated Database object.
     db_list: List of DEHC database names.
+    db_items: The name of the items database.
+    db_containers: The name of the containers database.
+    db_ids: The name of the ids database.
+    db_files: The name of the files database.
+    db_configs: The name of the configs database.
+    db_list: A list of the databases used by the DEHCDatabase object.
     id_len: Length of hex part of document UUIDs used in the database.
     limit: Max number of documents to return from _list and _query methods.
     logger: The logger object used for logging.
     schema: Dictionary describing objects and fields in the database.
+    schema_path: Path to .json file containing database schema.
     '''
 
-    def __init__(self, *, config: str, level: str = "NOTSET", quickstart: bool = False):
+    def __init__(self, *, config: str, level: str = "NOTSET", namespace: str = "dehc", quickstart: bool = False, schema: str = "db_schema.json"):
         '''Constructs a DEHCDatabase object.
 
         config: Path to .json file containing database server credentials.
         level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
+        namespace: A name to prefix all CouchDB databases with.
         quickstart: Creates databases and loads schema automatically.
+        schema: Path to .json file containing database schema, if required.
         '''
         self.logger = ml.get(name="DEHCDatabase", level=level)
         self.logger.debug("DEHCDatabase object instantiated")
         self.db = Database(config=config, level=level)
 
-        self.db_list = ["items", "containers", "config", "ids", "files"]
+        self.db_items = namespace+"-items"
+        self.db_containers = namespace+"-containers"
+        self.db_ids = namespace+"-ids"
+        self.db_files = namespace+"-files"
+        self.db_configs = namespace+"-configs"
+        self.db_list = [self.db_items, self.db_containers, self.db_ids, self.db_files, self.db_configs]
+
         self.id_len = 12
         self.limit = 1000000
 
         self.schema = {}
+        self.schema_path = schema
         if quickstart == True:
             self.databases_create(lazy=True)
-            self.schema_load(schema="db_schema.json", forcelocal=True)
+            self.schema_load(schema=self.schema_path, forcelocal=True)
             self.schema_save()
             self.index_prepare()
 
@@ -456,9 +472,9 @@ class DEHCDatabase:
         lazy: If true, won't error if item already in container.
         '''
         idc = container+"/"+item
-        if lazy == False or self.db.document_exists(dbname="containers", id=idc) == False:
+        if lazy == False or self.db.document_exists(dbname=self.db_containers, id=idc) == False:
             doc = {"container": container, "child": item}
-            self.db.document_create(dbname="containers", doc=doc, id=idc)
+            self.db.document_create(dbname=self.db_containers, doc=doc, id=idc)
         return idc
 
 
@@ -470,7 +486,7 @@ class DEHCDatabase:
         '''
         ids_list = [container+"/"+item for item in items]
         docs_list = [{"container": container, "child": item} for item in items]
-        self.db.documents_create(dbname="containers", ids=ids_list, docs=docs_list)
+        self.db.documents_create(dbname=self.db_containers, ids=ids_list, docs=docs_list)
         return ids_list
 
 
@@ -490,7 +506,7 @@ class DEHCDatabase:
         elif result == "ITEM" or result == "DOC":
             children = [row['child'] for row in query if cat == None or self.id_cat(row['child']) in cat]
             if result == "DOC":
-                children = self.db.documents_get(dbname="items", ids=children)
+                children = self.db.documents_get(dbname=self.db_items, ids=children)
         else:
             raise ValueError("result should be one of ITEM, CON or DOC")
         return children
@@ -534,7 +550,7 @@ class DEHCDatabase:
         item: The UUID of item to check.
         '''
         idc = container+"/"+item
-        result = self.db.document_exists(dbname="containers", id=idc)
+        result = self.db.document_exists(dbname=self.db_containers, id=idc)
         return result
 
 
@@ -582,7 +598,7 @@ class DEHCDatabase:
         lazy: If true, won't error if container or child doesn't exist.
         '''
         id = container+"/"+item
-        self.db.document_delete(dbname="containers", id=id, lazy=lazy)
+        self.db.document_delete(dbname=self.db_containers, id=id, lazy=lazy)
 
 
     def container_removes(self, container: str, items: list, lazy: bool = False):
@@ -593,7 +609,7 @@ class DEHCDatabase:
         lazy: If true, won't error if container or child doesn't exist.
         '''
         ids = [container+"/"+item for item in items]
-        self.db.documents_delete(dbname="containers", ids=ids, lazy=lazy)
+        self.db.documents_delete(dbname=self.db_containers, ids=ids, lazy=lazy)
 
 
     def containers_children(self, containers: list, cat: list = None, result: str = "ITEM"):
@@ -614,7 +630,7 @@ class DEHCDatabase:
             children = [row['child'] for row in query if cat == None or self.id_cat(row['child']) in cat]
             children = list(dict.fromkeys(children))
             if result == "DOC":
-                children = self.db.documents_get(dbname="items", ids=children)
+                children = self.db.documents_get(dbname=self.db_items, ids=children)
         else:
             raise ValueError("result should be one of ITEM, CON or DOC")
         return children
@@ -691,7 +707,7 @@ class DEHCDatabase:
 
     def containers_list(self):
         '''Retrieves every doc from container database. Intensive!'''
-        docs = self.db.documents_list(dbname="containers", limit=self.limit)
+        docs = self.db.documents_list(dbname=self.db_containers, limit=self.limit)
         return docs
 
 
@@ -709,9 +725,9 @@ class DEHCDatabase:
             for field in sort:
                 key = next(iter(field.keys()))
                 index_name += f"-{key}"
-            if self.db.index_exists(dbname="containers", name=index_name) == False:
-                self.db.index_create(dbname="containers", name=index_name, fields=sort)
-        res = self.db.query(dbname="containers", selector=selector, fields=fields, sort=sort, limit=self.limit)
+            if self.db.index_exists(dbname=self.db_containers, name=index_name) == False:
+                self.db.index_create(dbname=self.db_containers, name=index_name, fields=sort)
+        res = self.db.query(dbname=self.db_containers, selector=selector, fields=fields, sort=sort, limit=self.limit)
         return res
 
 
@@ -738,11 +754,11 @@ class DEHCDatabase:
         if len(ids_to_create) > 0:
             docs_create = [{"item": item, "physid": physid} for physid in ids_to_create]
             ids_create = [f"{item}/{physid}" for physid in ids_to_create]
-            self.db.documents_create(dbname="ids", docs=docs_create, ids=ids_create)
+            self.db.documents_create(dbname=self.db_ids, docs=docs_create, ids=ids_create)
 
         if len(ids_to_delete) > 0:
             ids_delete = [f"{item}/{physid}" for physid in ids_to_delete]
-            self.db.documents_delete(dbname="ids", ids=ids_delete, lazy=True)
+            self.db.documents_delete(dbname=self.db_ids, ids=ids_delete, lazy=True)
 
 
     def ids_find(self, physid: str):
@@ -750,7 +766,7 @@ class DEHCDatabase:
         
         physid: The physical ID to search against.
         '''
-        res = self.db.query(dbname="ids", selector={'physid': {'$eq': physid}}, fields=['item'], sort=[{'physid': 'asc'}], limit=self.limit)
+        res = self.db.query(dbname=self.db_ids, selector={'physid': {'$eq': physid}}, fields=['item'], sort=[{'physid': 'asc'}], limit=self.limit)
         return [row['item'] for row in res]
 
 
@@ -759,16 +775,16 @@ class DEHCDatabase:
         
         item: The item to get the physical IDs of.
         '''
-        res = self.db.query(dbname="ids", selector={'item': {'$eq': item}}, fields=['physid'], sort=[{'item': 'asc'}], limit=self.limit)
+        res = self.db.query(dbname=self.db_ids, selector={'item': {'$eq': item}}, fields=['physid'], sort=[{'item': 'asc'}], limit=self.limit)
         return [row['physid'] for row in res]
 
 
     def index_prepare(self):
         '''Prepares certain known indexes used by database queries.'''
-        if self.db.index_exists(dbname="ids", name="idx-item") == False:
-            self.db.index_create(dbname="ids", name="idx-item", fields=[{'item': 'asc'}])
-        if self.db.index_exists(dbname="ids", name="idx-physid") == False:
-            self.db.index_create(dbname="ids", name="idx-physid", fields=[{'physid': 'asc'}])
+        if self.db.index_exists(dbname=self.db_ids, name="idx-item") == False:
+            self.db.index_create(dbname=self.db_ids, name="idx-item", fields=[{'item': 'asc'}])
+        if self.db.index_exists(dbname=self.db_ids, name="idx-physid") == False:
+            self.db.index_create(dbname=self.db_ids, name="idx-physid", fields=[{'physid': 'asc'}])
 
 
     def item_create(self, cat: str, doc: dict):
@@ -781,7 +797,7 @@ class DEHCDatabase:
         doc['category'] = cat
         if 'flags' not in doc:
             doc['flags'] = []
-        self.db.document_create(dbname="items", doc=doc, id=id)
+        self.db.document_create(dbname=self.db_items, doc=doc, id=id)
         return id
 
 
@@ -793,14 +809,14 @@ class DEHCDatabase:
         recur: If true, also deletes all children the item contains.
         lazy: If true, won't error if document doesn't exist.
         '''
-        self.db.document_delete(dbname="items", id=id, lazy=lazy)
+        self.db.document_delete(dbname=self.db_items, id=id, lazy=lazy)
         if recur == True:
             all_children = self.container_children_all(container=id, result="ITEM")
             self.items_delete(ids=all_children, all=all, recur=False, lazy=True)
         if all == True:
             children = self.container_children(container=id, result="CON")
             parents = self.item_parents(item=id, result="CON")
-            self.db.documents_delete(dbname="containers", ids=children+parents, lazy=lazy)
+            self.db.documents_delete(dbname=self.db_containers, ids=children+parents, lazy=lazy)
 
 
     def item_edit(self, id: str, data: dict, lazy: bool = False):
@@ -810,7 +826,7 @@ class DEHCDatabase:
         data: Dictionary of fields+values to adjust.
         lazy: If true, won't error if document doesn't exist.
         '''
-        self.db.document_edit(dbname="items", id=id, doc=data, lazy=lazy)
+        self.db.document_edit(dbname=self.db_items, id=id, doc=data, lazy=lazy)
 
 
     def item_exists(self, id: str):
@@ -818,7 +834,7 @@ class DEHCDatabase:
         
         id: The UUID of item to check.
         '''
-        result = self.db.document_exists(dbname="items", id=id)
+        result = self.db.document_exists(dbname=self.db_items, id=id)
         return result
 
 
@@ -830,7 +846,7 @@ class DEHCDatabase:
         value: Numerical value to set flag to.
         lazy: If true, won't error if item doesn't exist.
         '''
-        self.db.document_edit(dbname="items", doc={flag: value}, id=item, lazy=lazy)
+        self.db.document_edit(dbname=self.db_items, doc={flag: value}, id=item, lazy=lazy)
 
 
     def item_get(self, id: str, fields: list = None, lazy: bool = False):
@@ -840,7 +856,7 @@ class DEHCDatabase:
         fields: If included, only returns listed fields.
         lazy: If true, won't error if document doesn't exist.
         '''
-        doc = self.db.document_get(dbname="items", id=id, lazy=lazy)
+        doc = self.db.document_get(dbname=self.db_items, id=id, lazy=lazy)
         if fields != None:
             doc = {field: doc.get(field, "") for field in fields}
         return doc
@@ -862,7 +878,7 @@ class DEHCDatabase:
         elif result == "ITEM" or result == "DOC":
             parents = [row['container'] for row in query if cat == None or self.id_cat(row['container']) in cat]
             if result == "DOC":
-                parents = self.db.documents_get(dbname="items", ids=parents)
+                parents = self.db.documents_get(dbname=self.db_items, ids=parents)
         else:
             raise ValueError("result should be one of ITEM, CON or DOC")
         return parents
@@ -913,7 +929,7 @@ class DEHCDatabase:
             if 'flags' not in doc:
                 doc['flags'] = []
             new_docs.append(doc_c)
-        self.db.documents_create(dbname="items", docs=new_docs, ids=ids)
+        self.db.documents_create(dbname=self.db_items, docs=new_docs, ids=ids)
         return ids
 
 
@@ -924,14 +940,14 @@ class DEHCDatabase:
         all: If true, also deletes items' container and file docs.
         lazy: If true, won't error if document doesn't exist.
         '''
-        self.db.documents_delete(dbname="items", ids=ids, lazy=lazy)
+        self.db.documents_delete(dbname=self.db_items, ids=ids, lazy=lazy)
         if recur == True:
             all_children = self.containers_children(containers=ids, result="ITEM")
             self.items_delete(ids=all_children, all=all, recur=False, lazy=True)
         if all == True:
             children = self.containers_children(containers=ids, result="CON")
             parents = self.items_parents(items=ids, result="CON")
-            self.db.documents_delete(dbname="containers", ids=children+parents, lazy=lazy)
+            self.db.documents_delete(dbname=self.db_containers, ids=children+parents, lazy=lazy)
 
 
     def items_edit(self, ids: list, data: list, lazy: bool = False):
@@ -941,7 +957,7 @@ class DEHCDatabase:
         data: Dictionary of fields+values to adjust.
         lazy: If true, won't error if document doesn't exist.
         '''
-        self.db.documents_edit(dbname="items", ids=ids, docs=data, lazy=lazy)
+        self.db.documents_edit(dbname=self.db_items, ids=ids, docs=data, lazy=lazy)
 
 
     def items_flag(self, items: list, flag: str, value: int, lazy: bool = False):
@@ -952,7 +968,7 @@ class DEHCDatabase:
         value: Numerical value to set flag to.
         lazy: If true, won't error if item doesn't exist.
         '''
-        self.db.documents_edit(dbname="items", docs=[{flag: value}]*len(items), ids=items, lazy=lazy)
+        self.db.documents_edit(dbname=self.db_items, docs=[{flag: value}]*len(items), ids=items, lazy=lazy)
 
 
     def items_get(self, ids: list, fields: list = None, lazy: bool = False):
@@ -962,7 +978,7 @@ class DEHCDatabase:
         fields: If included, only returns listed fields.
         lazy: If true, won't error if any documents don't exist.
         '''
-        docs = self.db.documents_get(dbname="items", ids=ids, lazy=lazy)
+        docs = self.db.documents_get(dbname=self.db_items, ids=ids, lazy=lazy)
         if fields != None:
             new_docs = []
             for doc in docs:
@@ -984,7 +1000,7 @@ class DEHCDatabase:
         else:
             startkey = cat+"/"+self.id_len*"0"
             endkey = cat+"/"+self.id_len*"f"
-        docs = self.db.documents_list(dbname="items", startkey=startkey, endkey=endkey, limit=self.limit)
+        docs = self.db.documents_list(dbname=self.db_items, startkey=startkey, endkey=endkey, limit=self.limit)
         if fields != None:
             new_docs = []
             for doc in docs:
@@ -1013,7 +1029,7 @@ class DEHCDatabase:
             parents = [row['container'] for row in query if cat == None or self.id_cat(row['container']) in cat]
             parents = list(dict.fromkeys(parents))
             if result == "DOC":
-                parents = self.db.documents_get(dbname="items", ids=parents)
+                parents = self.db.documents_get(dbname=self.db_items, ids=parents)
         else:
             raise ValueError("result should be one of ITEM, CON or DOC")
         return parents
@@ -1095,9 +1111,9 @@ class DEHCDatabase:
             for field in sort:
                 key = next(iter(field.keys()))
                 index_name += f"-{key}"
-            if self.db.index_exists(dbname="items", name=index_name) == False:
-                self.db.index_create(dbname="items", name=index_name, fields=[{"category": "asc"}]+sort)
-        res = self.db.query(dbname="items", selector=selector, fields=fields, sort=sort, limit=self.limit)
+            if self.db.index_exists(dbname=self.db_items, name=index_name) == False:
+                self.db.index_create(dbname=self.db_items, name=index_name, fields=[{"category": "asc"}]+sort)
+        res = self.db.query(dbname=self.db_items, selector=selector, fields=fields, sort=sort, limit=self.limit)
         return res
 
 
@@ -1107,8 +1123,8 @@ class DEHCDatabase:
         item: The item to delete the photo of.
         '''
         name = "photo-"+item
-        if self.db.document_exists(dbname="files", id=name) == True:
-            self.db.document_delete(dbname="files", id=name)
+        if self.db.document_exists(dbname=self.db_files, id=name) == True:
+            self.db.document_delete(dbname=self.db_files, id=name)
 
 
     def photo_load(self, item: str):
@@ -1117,8 +1133,8 @@ class DEHCDatabase:
         item: The item to load the photo of.
         '''
         name = "photo-"+item
-        if self.db.document_exists(dbname="files", id=name) == True:
-            doc = self.db.document_get(dbname="files", id=name)
+        if self.db.document_exists(dbname=self.db_files, id=name) == True:
+            doc = self.db.document_get(dbname=self.db_files, id=name)
             img = base64.b64decode(doc['photo'])
             buffer = io.BytesIO(img)
             return Image.open(buffer)
@@ -1138,10 +1154,10 @@ class DEHCDatabase:
         img.save(buffer, format="JPEG")
         data = base64.b64encode(buffer.getvalue()).decode('utf-8')
         name = "photo-"+item
-        if self.db.document_exists(dbname="files", id=name) == True:
-            self.db.document_edit(dbname="files", doc={"item": item, "photo": data}, id=name)
+        if self.db.document_exists(dbname=self.db_files, id=name) == True:
+            self.db.document_edit(dbname=self.db_files, doc={"item": item, "photo": data}, id=name)
         else:
-            self.db.document_create(dbname="files", doc={"item": item, "photo": data}, id=name)
+            self.db.document_create(dbname=self.db_files, doc={"item": item, "photo": data}, id=name)
 
 
     def schema_cats(self):
@@ -1200,8 +1216,8 @@ class DEHCDatabase:
         schema: Path to local .json file containing database schema.
         forcelocal: If true, uses local schema over one stored in the database.
         '''
-        if forcelocal == False and self.db.document_exists(dbname="config", id="schema") == True:
-            loaded_schema = self.db.document_get(dbname="config", id="schema")
+        if forcelocal == False and self.db.document_exists(dbname=self.db_configs, id="schema") == True:
+            loaded_schema = self.db.document_get(dbname=self.db_configs, id="schema")
         else:
             with open(schema, "r") as f:
                 loaded_schema = json.loads(f.read())
@@ -1229,10 +1245,10 @@ class DEHCDatabase:
 
     def schema_save(self):
         '''Saves database schema to the database.'''
-        if self.db.document_exists(dbname="config", id="schema"):
-            self.db.document_edit(dbname="config", doc=self.schema, id="schema")
+        if self.db.document_exists(dbname=self.db_configs, id="schema"):
+            self.db.document_edit(dbname=self.db_configs, doc=self.schema, id="schema")
         else:
-            self.db.document_create(dbname="config", doc=self.schema, id="schema")
+            self.db.document_create(dbname=self.db_configs, doc=self.schema, id="schema")
 
 
     def schema_schema(self, *, cat: str = None, id: str = None):
