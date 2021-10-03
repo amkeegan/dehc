@@ -40,10 +40,11 @@ class EMS():
         self.root.title(f"EMS ({self.db.db.data['url']})")
         self.root.state('zoomed')
         self.root.configure(background="#D9D9D9")
-        self.root.bind("<Escape>", lambda *_: self.root.destroy())
+        #self.root.bind("<Escape>", lambda *_: self.root.destroy())
 
         self.style = ttk.Style(self.root)
         self.style.theme_use("clam")
+        self.style.map('TEntry', foreground=[('readonly', 'black')])
         self.style.map('TCombobox', fieldbackground=[('readonly', 'white')])
         self.style.configure("top.Treeview", fieldbackground="white", background="white", foreground="black")
         self.style.map('top.Treeview', background=[('selected', 'blue')], foreground=[('selected', 'white')])

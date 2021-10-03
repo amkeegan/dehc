@@ -906,6 +906,7 @@ class SearchTree(SuperWidget):
             id, *_ = self.db.ids_find(physid=physid)
             self.tree_focus(goal=id, rebase=True)
 
+        window.bind("<Enter>", lambda *_: find())
         input_var = tk.StringVar()
         input_box = ttk.Entry(master=window, textvariable=input_var)
         scan_button = ttk.Button(master=window, text="Scan", command=scan)

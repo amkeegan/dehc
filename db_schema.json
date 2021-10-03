@@ -54,7 +54,7 @@
             "Priority":           {"index": 5, "type": "option", "options": ["", "High", "Medium", "Low"], "required": false},
             "Consignment Number": {"index": 6, "type": "text", "regex": ".*", "required": false},
             "Weight (KG)":        {"index": 7, "type": "read", "source": "WEIGHT", "default": 8, "required": false},
-            "DG Class":           {"index": 8, "type": "option", "options": ["", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "2.1", "2.2", "2.3", "3", "4.1", "4.2", "4.3", "5.1", "5.2", "6.1", "6.2", "7", "8", "9.I", "9.II", "9.III"]},
+            "DG Class":           {"index": 8, "type": "option", "options": ["", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "2.1", "2.2", "2.3", "3", "4.1", "4.2", "4.3", "5.1", "5.2", "6.1", "6.2", "7", "8", "9.I", "9.II", "9.III"], "required": false},
             "Notes":              {"index": 9, "type": "text", "regex": ".*", "required": false}
         },
         "flags": ["Dangerous", "Prohibited", "Screened", "Searched"],
