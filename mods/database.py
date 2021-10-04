@@ -452,7 +452,19 @@ class DEHCDatabase:
         for db in self.db_list:
             if lazy == False or self.db.database_exists(db) == False:
                 self.db.database_create(db)
-    
+
+
+    def databases_clear(self, lazy: bool = False):
+        '''Removes all files from DEHC databases.
+        
+        lazy: If true, won't error if database doesn't exist.
+        '''
+        for db in self.db_list:
+            if lazy == False or self.db.database_exists(db) == True:
+                items = self.db.documents_list(dbname=db, limit=self.limit)
+                items = [item["_id"] for item in items]
+                self.db.documents_delete(dbname=db, ids=items)
+
     
     def databases_delete(self, lazy: bool = False):
         '''Deletes DEHC databases.

@@ -11,18 +11,20 @@ import mods.database as md
 parser = argparse.ArgumentParser(description='Inserts data into the DEHC database.')
 parser.add_argument('persons', type=int, help="number of persons to add to the database", metavar="PERSONS")
 parser.add_argument('vessels', type=int, help="number of vessels to add to the database", metavar="VESSELS")
-parser.add_argument('-a','-auth', type=str, default="db_auth.json", help="relative path to database authentication file", metavar="PATH")
-parser.add_argument('-n','-name', type=str, default="dehc", help="which database namespace to use", metavar="NAME")
-parser.add_argument('-s','-sche', type=str, default="db_schema.json", help="relative path to database schema file", metavar="PATH")
+parser.add_argument('-d','--drop', help="if included, drops databases instead of deleting files from them", action='store_true')
+parser.add_argument('-a','--auth', type=str, default="db_auth.json", help="relative path to database authentication file", metavar="PATH")
+parser.add_argument('-n','--name', type=str, default="dehc", help="which database namespace to use", metavar="NAME")
+parser.add_argument('-s','--sche', type=str, default="db_schema.json", help="relative path to database schema file", metavar="PATH")
 args = parser.parse_args()
 
-np = args.persons # Number of persons to insert
-nv = args.vessels # Number of vessels to insert
+db = md.DEHCDatabase(config=args.auth, level="INFO", namespace=args.name, quickstart=False, schema=args.sche)
 
-db = md.DEHCDatabase(config=args.a, level="INFO", namespace=args.n, quickstart=False, schema=args.s)
-db.databases_delete(lazy=True)
+if args.drop == True:
+    db.databases_delete(lazy=True)
+else:
+    db.databases_clear(lazy=True)
 db.databases_create(lazy=True)
-db.schema_load(schema=args.s, forcelocal=True)
+db.schema_load(schema=args.sche, forcelocal=True)
 db.schema_save()
 
 # ----------------------------------------------------------------------------
@@ -133,19 +135,6 @@ def create_vessel(**kwargs):
 
 # ----------------------------------------------------------------------------
 
-'''
-items = db.db.documents_list(dbname="items", limit=1000000)
-items = [item["_id"] for item in items]
-db.db.documents_delete(dbname="items", ids=items)
-containers = db.db.documents_list(dbname="containers", limit=1000000)
-containers = [container["_id"] for container in containers]
-db.db.documents_delete(dbname="containers", ids=containers)
-physids = db.db.documents_list(dbname="ids", limit=1000000)
-physids = [physid["_id"] for physid in physids]
-db.db.documents_delete(dbname="ids", ids=physids)
-'''
-# Don't forget to add files and config to this.
-
 evac = {"Display Name": "DEHC"}
 stat = [
     {"Display Name": "1. Ingest"},
@@ -164,8 +153,8 @@ lane = [
     {"Display Name": "Lane 4"},
     {"Display Name": "Lane 5"}
 ]
-pers = [create_person() for _ in range(0, np)]
-vess = [create_vessel() for _ in range(0, nv)]
+pers = [create_person() for _ in range(0, args.persons)]
+vess = [create_vessel() for _ in range(0, args.vessels)]
 
 evac = db.item_create("Evacuation", evac)
 stat = db.items_create("Station", stat)
