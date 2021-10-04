@@ -19,11 +19,11 @@ args = parser.parse_args()
 
 # ----------------------------------------------------------------------------
 
-logger = ml.get(name="Main", level=args.l)
+logger = ml.get(name="Main", level=args.logg)
 logger.debug("Application has started.")
 
-db = md.DEHCDatabase(config=args.a, level=args.l, namespace=args.n, schema=args.s, quickstart=True)
-app = ae.EMS(db=db, bookmarks=args.b, level=args.l, autorun=True)
+db = md.DEHCDatabase(config=args.auth, level=args.logg, namespace=args.name, schema=args.sche, quickstart=True)
+app = ae.EMS(db=db, bookmarks=args.book, level=args.logg, autorun=True)
 
 logger.debug("Application is ending.")
 sys.exit(0)

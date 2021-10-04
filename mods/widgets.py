@@ -1209,7 +1209,6 @@ class ContainerManager(SuperWidget):
         '''Constructs the frames and widgets of the ContainerManager.'''
         # Frames
         self.w_fr_bookmarks = ttk.Frame(master=self.w_fr)
-        self.w_fr_treeops = ttk.Frame(master=self.w_fr)
         
         # Widgets
         self.w_bu_bm1 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["1"]["name"], command=lambda *_: self.bookmark(preset="1"))
@@ -1218,20 +1217,20 @@ class ContainerManager(SuperWidget):
         self.w_bu_bm4 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["4"]["name"], command=lambda *_: self.bookmark(preset="4"))
         self.w_la_top = ttk.Label(master=self.w_fr, text="Source")
         self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, cats=self.cats, level=self.level, prepare=True, select=self.select, style="top.Treeview")
-        self.w_la_bottom = ttk.Label(master=self.w_fr, text="Destination")
-        self.w_se_bottom = SearchTree(master=self.w_fr, db=self.db, base=self.botbase, cats=self.cats, level=self.level, prepare=True, style="bottom.Treeview")
         self.w_bu_move_item = ttk.Button(master=self.w_fr, text="Move Item", command=self.move)
         self.w_bu_move_subs = ttk.Button(master=self.w_fr, text="Move Sub-Items", command=self.submove)
+        self.w_la_bottom = ttk.Label(master=self.w_fr, text="Destination")
+        self.w_se_bottom = SearchTree(master=self.w_fr, db=self.db, base=self.botbase, cats=self.cats, level=self.level, prepare=True, style="bottom.Treeview")
 
         self.w_fr.columnconfigure(0, weight=1000)
         self.w_fr.columnconfigure(1, weight=1000)
         self.w_fr.rowconfigure(0, weight=1, minsize=17)
         self.w_fr.rowconfigure(1, weight=1, minsize=17)
         self.w_fr.rowconfigure(2, weight=1000)
-        self.w_fr.rowconfigure(3, weight=1, minsize=17) # For tree operations later, like cloning/swapping
+        self.w_fr.rowconfigure(3, weight=1, minsize=25)
         self.w_fr.rowconfigure(4, weight=1, minsize=17)
         self.w_fr.rowconfigure(5, weight=1000)
-        self.w_fr.rowconfigure(6, weight=1, minsize=25)
+        self.w_fr.rowconfigure(6, weight=1) # Currently unused, but reserved for things below both trees
 
         self.w_fr_bookmarks.columnconfigure(0, weight=1000)
         self.w_fr_bookmarks.columnconfigure(1, weight=1000)
@@ -1247,13 +1246,13 @@ class ContainerManager(SuperWidget):
         self.w_bu_bm2.grid(column=1, row=0, sticky="nsew", padx=2, pady=2)
         self.w_bu_bm3.grid(column=2, row=0, sticky="nsew", padx=2, pady=2)
         self.w_bu_bm4.grid(column=3, row=0, sticky="nsew", padx=2, pady=2)
-        self.w_la_top.grid(column=0, row=1, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_la_top.grid(column=0, row=1, columnspan=2, sticky="nsew", padx=2, pady=1)
         self.w_se_top.grid(column=0, row=2, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_fr_treeops.grid(column=0, row=3, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_la_bottom.grid(column=0, row=4, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_bu_move_item.grid(column=0, row=3, sticky="nsew", padx=2, pady=4)
+        self.w_bu_move_subs.grid(column=1, row=3, sticky="nsew", padx=2, pady=4)
+        self.w_la_bottom.grid(column=0, row=4, columnspan=2, sticky="nsew", padx=2, pady=1)
         self.w_se_bottom.grid(column=0, row=5, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_bu_move_item.grid(column=0, row=6, sticky="nsew", padx=2, pady=2)
-        self.w_bu_move_subs.grid(column=1, row=6, sticky="nsew", padx=2, pady=2)
+
 
 
     def base(self, newbase: str = None):
