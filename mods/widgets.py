@@ -120,23 +120,11 @@ class DataEntry(SuperWidget):
         if prepare == True:
             self.prepare()
 
-    def read_scales(self):
-        if self.scales is not None:
-            if self.scales.in_waiting > 0:
-                line = self.scales.readline()
-                self.last_weight = float(line.decode().strip('\r\n').strip('KG'))
-        else:
-            #TODO: Remove random weight generation
-            import random
-            self.last_weight = round(90+random.random()*5, 2)
-    
-    def close_scales(self):
-        if self.scales is not None:
-            self.scales.close()
-            self.scales = None
 
     def prepare(self):
         '''Constructs the frames and widgets of the DataEntry.'''
+        self.w_fr_head = ttk.Frame(master=self.w_fr)
+        self.w_fr_photo = ttk.Frame(master=self.w_fr)
         self.w_fr_flags = ttk.Frame(master=self.w_fr)
         self.w_fr_body = ttk.Frame(master=self.w_fr)
         self.w_fr_data = ttk.Frame(master=self.w_fr_body)
@@ -144,13 +132,20 @@ class DataEntry(SuperWidget):
 
         self.w_fr.columnconfigure(index=0, weight=1000)
         self.w_fr.columnconfigure(index=1, weight=1000)
-        self.w_fr.columnconfigure(index=2, weight=1000)
-        self.w_fr.columnconfigure(index=3, weight=1000)
-        self.w_fr.columnconfigure(index=4, weight=1, minsize=16)
+        self.w_fr.columnconfigure(index=2, weight=1, minsize=16)
         self.w_fr.rowconfigure(index=0, weight=1, minsize=25)
         self.w_fr.rowconfigure(index=1, weight=500)
         self.w_fr.rowconfigure(index=2, weight=1000)
         self.w_fr.rowconfigure(index=3, weight=1, minsize=25)
+
+        self.w_fr_head.columnconfigure(index=0, weight=1000)
+        self.w_fr_head.columnconfigure(index=1, weight=1, minsize=48)
+        self.w_fr_head.columnconfigure(index=2, weight=1, minsize=48)
+        self.w_fr_head.columnconfigure(index=3, weight=1, minsize=48)
+        self.w_fr_head.rowconfigure(index=0, weight=1000)
+
+        self.w_fr_photo.columnconfigure(index=0, weight=1000)
+        self.w_fr_photo.rowconfigure(index=0, weight=1000)
 
         self.w_fr_flags.columnconfigure(index=0, weight=1000)
         self.w_fr_flags.columnconfigure(index=1, weight=1000)
@@ -177,13 +172,11 @@ class DataEntry(SuperWidget):
         self.w_var_flags = tk.StringVar()
 
         # Widgets
-        self.w_la_title = ttk.Label(master=self.w_fr, text="Title", font="Arial 12 bold")
-
-        self.w_bu_generate_id = ttk.Button(master=self.w_fr, text="Generate ID", command=self.generate_id_card)
-        
-        self.w_bu_copyid = ttk.Button(master=self.w_fr, text="Copy ID", command=self.copyid)
-        self.w_bu_back = ttk.Button(master=self.w_fr, text="Back", command=self.back)
-        self.w_bu_photo = ttk.Button(master=self.w_fr, text="Photo", command=self.photo)
+        self.w_la_title = ttk.Label(master=self.w_fr_head, text="Title", font="Arial 12 bold")
+        self.w_bu_generate_id = ttk.Button(master=self.w_fr_head, text="Print ID", command=self.generate_id_card)
+        self.w_bu_copyid = ttk.Button(master=self.w_fr_head, text="Copy ID", command=self.copyid)
+        self.w_bu_back = ttk.Button(master=self.w_fr_head, text="Back", command=self.back)
+        self.w_bu_photo = ttk.Button(master=self.w_fr_photo, text="Photo", command=self.photo)
         self.w_la_flags = ttk.Label(master=self.w_fr_flags, text="Flags")
         self.w_li_flags = tk.Listbox(master=self.w_fr_flags, selectmode=tk.SINGLE, relief=tk.GROOVE, exportselection=False)
         self.w_co_flags = ttk.Combobox(master=self.w_fr_flags, textvariable=self.w_var_flags, state="readonly")
@@ -207,15 +200,19 @@ class DataEntry(SuperWidget):
 
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the DataEntry.'''
+        self.w_fr_head.grid(column=0, row=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        self.w_fr_photo.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
+        self.w_fr_flags.grid(column=1, row=1, sticky="nsew", padx=2, pady=2)
+        self.w_fr_body.grid(column=0, row=2, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_fr_data.grid(column=0, row=0, sticky="nsew")
+        self.w_fr_foot.grid(column=0, row=3, columnspan=3, sticky="nsew", padx=2, pady=1)
+
         self.w_la_title.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
         self.w_bu_generate_id.grid(column=1,row=0,sticky="nsew",padx=2,pady=2)
         self.w_bu_copyid.grid(column=2, row=0, sticky="nsew", padx=2, pady=2)
         self.w_bu_back.grid(column=3, row=0, sticky="nsew", padx=2, pady=2)
-        self.w_bu_photo.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
-        self.w_fr_flags.grid(column=1, row=1, columnspan=4, sticky="nsew", padx=2, pady=2)
-        self.w_fr_body.grid(column=0, row=2, columnspan=4, sticky="nsew", padx=2, pady=2)
-        self.w_fr_data.grid(column=0, row=0, sticky="nsew")
-        self.w_fr_foot.grid(column=0, row=3, columnspan=4, sticky="nsew", padx=2, pady=1)
+
+        self.w_bu_photo.grid(column=0, row=0, sticky="nsew", padx=2, pady=2)
 
         self.w_la_flags.grid(column=0, row=0, columnspan=4, sticky="nsew", padx=1, pady=1)
         self.w_li_flags.grid(column=0, row=1, columnspan=3, sticky="nsew", padx=1, pady=1)
@@ -232,6 +229,23 @@ class DataEntry(SuperWidget):
         self.w_bu_delete.grid(column=5, row=0, sticky="nsew", padx=1, pady=1)
 
 
+    def read_scales(self):
+        if self.scales is not None:
+            if self.scales.in_waiting > 0:
+                line = self.scales.readline()
+                self.last_weight = float(line.decode().strip('\r\n').strip('KG'))
+        else:
+            #TODO: Remove random weight generation
+            import random
+            self.last_weight = round(90+random.random()*5, 2)
+
+
+    def close_scales(self):
+        if self.scales is not None:
+            self.scales.close()
+            self.scales = None
+
+
     def add(self, *args):
         '''Callback for when the flag add button is pressed.'''
         flag = self.w_var_flags.get()
@@ -245,9 +259,11 @@ class DataEntry(SuperWidget):
             self.last_doc, self.back_doc = self.back_doc, self.last_doc
             self._show(self.last_doc["_id"])
 
+
     def cancel(self, *args):
         '''Callback for when the cancel button is pressed.'''
         self.show()
+
 
     def show_id_window(self):
         button = self.w_bu_generate_id
@@ -256,6 +272,8 @@ class DataEntry(SuperWidget):
             for child in button.winfo_children():
                 child.destroy()
             window = tk.Toplevel(master=button)
+            window.attributes("-topmost", True)
+            window.focus_force()
             window.title("ID Generation")
 
             msg = ttk.Label(master=window)
@@ -283,7 +301,8 @@ class DataEntry(SuperWidget):
     def generate_id_card(self, *args):
         #TODO Get active evacuee details and MAKE id card, store to self.current_id_card?
         self.show_id_window()
-    
+
+
     def copyid(self, *args):
         '''Call back for when the copy id button is pressed.'''
         root = self.w_fr.winfo_toplevel()
@@ -340,7 +359,11 @@ class DataEntry(SuperWidget):
 
     def photo(self, *args):
         '''Callback for when the photo is pressed.'''
+        for child in self.w_bu_photo.winfo_children():
+            child.destroy()
         window = tk.Toplevel(master=self.w_bu_photo)
+        window.attributes("-topmost", True)
+        window.focus_force()
         window.title("Photo")
         photomanager = mp.PhotoManager(level=self.level)
 
@@ -404,6 +427,8 @@ class DataEntry(SuperWidget):
             for child in button.winfo_children():
                 child.destroy()
             window = tk.Toplevel(master=button)
+            window.attributes("-topmost", True)
+            window.focus_force()
             window.title(field.cget("text"))
 
             if source == "WEIGHT":
@@ -444,6 +469,8 @@ class DataEntry(SuperWidget):
             for child in button.winfo_children():
                 child.destroy()
             window = tk.Toplevel(master=button)
+            window.attributes("-topmost", True)
+            window.focus_force()
             window.title(field.cget("text"))
 
             if source == "IDS":
@@ -789,12 +816,19 @@ class DataEntry(SuperWidget):
 
             flags = self.last_doc.get("flags", [])
             flags.sort()
-            
             for index, flag in enumerate(flags):
                 self.w_li_flags.insert(index, flag)
-            
             if len(flags) > 0:
                 self.w_li_flags.selection_set(0)
+            
+            # Correct tab order
+            for entry, buttona, buttonb in zip(self.w_input_data, self.w_buttona_data, self.w_buttonb_data):
+                if entry != None:
+                    entry.rise()
+                if buttona != None:
+                    buttona.rise()
+                if buttonb != None:
+                    buttonb.rise()
 
 
     def showlist(self, event: tk.Event, source: str):
@@ -966,7 +1000,11 @@ class SearchTree(SuperWidget):
 
     def scan(self, *args):
         '''Callback for when the scan button is pressed.'''
+        for child in self.w_bu_scan.winfo_children():
+            child.destroy()
         window = tk.Toplevel(master=self.w_bu_scan)
+        window.attributes("-topmost", True)
+        window.focus_force()
         window.title("Scan")
         
         def scan():
@@ -974,14 +1012,17 @@ class SearchTree(SuperWidget):
 
         def find():
             physid = input_var.get()
-            id, *_ = self.db.ids_find(physid=physid)
-            self.tree_focus(goal=id, rebase=True)
+            ids = self.db.ids_find(physid=physid)
+            if len(ids) > 0:
+                id, *_ = ids
+                self.tree_focus(goal=id, rebase=True)
 
         window.bind("<Return>", lambda *_: find())
         input_var = tk.StringVar()
         input_box = ttk.Entry(master=window, textvariable=input_var)
         scan_button = ttk.Button(master=window, text="Scan", command=scan)
         find_button = ttk.Button(master=window, text="Find", command=find)
+        input_box.focus_set()
 
         window.columnconfigure(0, weight=1000)
         window.columnconfigure(1, weight=1000)

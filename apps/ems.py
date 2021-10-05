@@ -79,6 +79,11 @@ class EMS():
         self.sb.grid(column=0, row=1, columnspan=2, sticky="nsew", padx=2)
 
 
+    def refresh(self):
+        '''Refreshes '''
+        pass
+
+
     def run(self):
         '''Enters the root's main loop, drawing the app screen.'''
         self.root.mainloop()
