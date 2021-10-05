@@ -824,11 +824,11 @@ class DataEntry(SuperWidget):
             # Correct tab order
             for entry, buttona, buttonb in zip(self.w_input_data, self.w_buttona_data, self.w_buttonb_data):
                 if entry != None:
-                    entry.rise()
+                    entry.lift()
                 if buttona != None:
-                    buttona.rise()
+                    buttona.lift()
                 if buttonb != None:
-                    buttonb.rise()
+                    buttonb.lift()
 
 
     def showlist(self, event: tk.Event, source: str):
@@ -1110,6 +1110,8 @@ class SearchTree(SuperWidget):
             if self.w_tr_tree.exists(item=goal):
                 self.w_tr_tree.selection_set(goal)
                 self.w_tr_tree.see(item=goal)
+                self.w_tr_tree.focus_set()
+                self.w_tr_tree.focus(item=goal)
             elif rebase == True and len(path) > 0:
                 if self.base != path[0]:
                     self.base = self.db.item_get(id=path[0])
@@ -1350,6 +1352,11 @@ class ContainerManager(SuperWidget):
         self.w_fr_bookmarks.columnconfigure(3, weight=1000)
         self.w_fr_bookmarks.rowconfigure(0, weight=1000)
 
+        root = self.w_fr.winfo_toplevel()
+        root.bind("<s>", lambda *_: self.w_se_top.w_tr_tree.focus_set(), add="+")
+        root.bind("<d>", lambda *_: self.w_se_bottom.w_tr_tree.focus_set(), add="+")
+        root.bind("<Control-Down>", self.move, add="+")
+
 
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the ContainerManager.'''
@@ -1417,15 +1424,20 @@ class ContainerManager(SuperWidget):
 
     def move(self, *args):
         '''Callback for when the item move button is pressed.'''
+        print("Yum")
         target, *_ = self.w_se_top.selection
+        print(target)
         source, *_ = self.db.item_parents(item=target)
+        print(source)
         destination, *_ = self.w_se_bottom.selection
+        print(destination)
         self.db.container_move(from_con=source, to_con=destination, item=target)
-        self.highlight(item=source)
         self.refresh()
         self.highlight(botitem=destination)
-        self.open()
+        self.highlight(item=source)
         self.botopen()
+        self.open()
+
 
 
     def submove(self, *args):

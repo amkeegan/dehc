@@ -42,7 +42,6 @@ class EMS():
         self.root.title(f"EMS ({self.db.db.data['url']})")
         self.root.state('zoomed')
         self.root.configure(background="#D9D9D9")
-        #self.root.bind("<Escape>", lambda *_: self.root.destroy())
 
         self.style = ttk.Style(self.root)
         self.style.theme_use("clam")
@@ -65,23 +64,26 @@ class EMS():
         base, *_ = self.db.items_query(cat="Evacuation", fields=["_id", "Display Name"])
         self.cm = mw.ContainerManager(master=self.root, db=self.db, topbase=base, botbase=base, bookmarks=self.bookmarks, cats=self.cats, level=self.level, prepare=True, select=self.item_select)
         self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, delete=self.delete, level=self.level, prepare=True, save=self.save, show=self.show, hardware=self.hardware)
+        self.bu_refresh = ttk.Button(master=self.root, text="Refresh", command=self.refresh)
         self.sb = mw.StatusBar(master=self.root, db=self.db, level=self.level, prepare=True)
         self.root.rowconfigure(0, weight=1000)
         self.root.rowconfigure(1, weight=1, minsize=16)
-        self.root.columnconfigure(0, weight=1000)
+        self.root.columnconfigure(0, weight=1, minsize=48)
         self.root.columnconfigure(1, weight=1000)
 
 
     def pack(self):
         '''Packs & grids children frames and widgets of the EMS.'''
-        self.de.grid(column=1, row=0, sticky="nsew", padx=2, pady=2)
-        self.cm.grid(column=0, row=0, sticky="nsew", padx=2, pady=2)
-        self.sb.grid(column=0, row=1, columnspan=2, sticky="nsew", padx=2)
+        self.cm.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.de.grid(column=2, row=0, sticky="nsew", padx=2, pady=2)
+        self.bu_refresh.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
+        self.sb.grid(column=1, row=1, columnspan=2, sticky="nsew", padx=2, pady=2)
 
 
     def refresh(self):
-        '''Refreshes '''
-        pass
+        '''Refreshes the trees and data pane.'''
+        self.cm.refresh()
+        #self.de.show()
 
 
     def run(self):
