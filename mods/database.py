@@ -1110,6 +1110,16 @@ class DEHCDatabase:
         if self.db.document_exists(dbname="files", id=name) == True:
             self.db.document_delete(dbname="files", id=name)
 
+    def photo_load_base64(self, item: str):
+        '''Loads the photo, associated with an item, from the database, leaves it in base64
+        
+        item: The item to load the photo of.
+        '''
+        name = "photo-"+item
+        if self.db.document_exists(dbname="files", id=name) == True:
+            return self.db.document_get(dbname="files", id=name)['photo']            
+        else:
+            return None
 
     def photo_load(self, item: str):
         '''Loads the photo, associated with an item, from the database.
