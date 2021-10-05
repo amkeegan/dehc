@@ -415,8 +415,13 @@ class DataEntry(SuperWidget):
 
                 def read_weight(*args):
                     '''Reads the current weight from another device.'''
-                    reading = round(80+random.random()*10, 2)
-                    msg.config(text=str(reading))
+                    result = ''
+                    if self.hardware is not None and self.hardware.SCALES_EXIST:
+                        result = self.hardware.getCurrentWeight()
+                    else:
+                        result = round(80+random.random()*10, 2) 
+                    if result != '':
+                        msg.config(text=str(result))
                     window.after(500, read_weight)
 
                 def commit_weight(*args):

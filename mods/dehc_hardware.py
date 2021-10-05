@@ -111,13 +111,15 @@ class Hardware:
 
     def getCurrentWeight(self):
         if not self.SCALES_EXIST:
-            return {}
-        currentWeight = {}
-        try:
-            currentWeight = self.inQueueScales.get(block=False)
-        except queue.Empty:
-            currentWeight = {"message": "error", "error": "No Data"}
-        return currentWeight
+            self.lastWeight = ''
+        else:
+            try:
+                tmpData = self.inQueueScales.get(block=False)
+                if 'weight' in tmpData:
+                    self.lastWeight = tmpData['weight']
+            except queue.Empty:
+                self.lastWeight = ''
+        return self.lastWeight
 
     def getCurrentNFCUID(self):
         if not self.NFCREADER_EXIST:
