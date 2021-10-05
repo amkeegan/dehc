@@ -121,6 +121,20 @@ class DataEntry(SuperWidget):
         if prepare == True:
             self.prepare()
 
+    def read_scales(self):
+        if self.scales is not None:
+            if self.scales.in_waiting > 0:
+                line = self.scales.readline()
+                self.last_weight = float(line.decode().strip('\r\n').strip('KG'))
+        else:
+            #TODO: Remove random weight generation
+            import random
+            self.last_weight = round(90+random.random()*5, 2)
+    
+    def close_scales(self):
+        if self.scales is not None:
+            self.scales.close()
+            self.scales = None
 
     def prepare(self):
         '''Constructs the frames and widgets of the DataEntry.'''
