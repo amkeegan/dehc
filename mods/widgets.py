@@ -524,16 +524,15 @@ class DataEntry(SuperWidget):
                     if self.hardware is not None:
                         nfcResult = self.hardware.getCurrentNFCUID()
                         barcodeResult = self.hardware.getCurrentBarcode()
-                        print(f'Barcode result: {barcodeResult}')
                         if nfcResult == '':
                             if barcodeResult != '':
                                 result = barcodeResult
                         if barcodeResult == '':
                             if nfcResult != '':
                                 result = nfcResult
-                    else:
-                        print('Hardware is None')
-                    idvar.set(result)
+                    if result != '':
+                        idvar.set(result)
+                    window.after(250, getNFCorBarcode)
 
                 def submit():
                     '''Callback when submit button is pressed.'''
@@ -550,7 +549,7 @@ class DataEntry(SuperWidget):
                 identry = ttk.Entry(master=window, textvariable=idvar)
                 addbut = ttk.Button(master=window, text="Add", command=addid)
                 removebut = ttk.Button(master=window, text="Remove", command=removeid)
-                scanbut = ttk.Button(master=window, text="Scan", command=getNFCorBarcode)
+                scanbut = ttk.Button(master=window, text="Scan")
                 submitbut = ttk.Button(master=window, text="Update", command=submit)
 
                 window.columnconfigure(0, weight=1000)
@@ -569,6 +568,7 @@ class DataEntry(SuperWidget):
                 scanbut.grid(column=2, row=2, sticky="nsew", padx=2, pady=2)
                 submitbut.grid(column=2, row=3, sticky="nsew", padx=2, pady=2)
 
+                getNFCorBarcode()
 
     def remove(self, *args):
         '''Callback for when the flag remove button is pressed'''

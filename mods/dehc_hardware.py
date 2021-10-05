@@ -131,7 +131,6 @@ class Hardware:
             except queue.Empty:
                 print('Queue empty')
                 self.lastNFCUID = ''
-        print(f'Sending NFC UID: {self.lastNFCUID}')
         return self.lastNFCUID
     
     def getCurrentBarcode(self):
@@ -140,7 +139,6 @@ class Hardware:
         else:
             try:
                 tmpData = self.inQueueBarcode.get(timeout=0.01)
-                print(f'Barcode queue in: {tmpData}')
                 if 'barcode' in tmpData:
                     self.lastBarcode = tmpData['barcode']
             except queue.Empty:
