@@ -9,9 +9,10 @@ import mods.log as ml
 
 import mods.dehc_hardware as hw
 
-if __name__ == "__main__": # Multiprocessing library complains if this guard isn't used
-    # ----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
+if __name__ == "__main__": # Multiprocessing library complains if this guard isn't used
+    
     parser = argparse.ArgumentParser(description='Starts the Digital Evacuation Handling Center')
     parser.add_argument('-a','--auth', type=str, default="db_auth.json", help="relative path to database authentication file", metavar="PATH")
     parser.add_argument('-b','--book', type=str, default="bookmarks.json", help="relative path to EMS screen bookmarks", metavar="PATH")
