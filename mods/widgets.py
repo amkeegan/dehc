@@ -4,6 +4,7 @@ import json
 import time
 
 from PIL import ImageTk
+from PIL import Image
 import tkinter as tk
 from tkinter import ttk
 from typing import Callable
@@ -11,6 +12,7 @@ from typing import Callable
 import mods.database as md
 import mods.log as ml
 import mods.photo as mp
+import mods.dehc_hardware as hw
 
 # ----------------------------------------------------------------------------
 
@@ -92,7 +94,7 @@ class DataEntry(SuperWidget):
     _save: If present, a callback function that triggers when an item is saved.
     '''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, level: str = "NOTSET", prepare: bool = True, save: Callable = None, show: Callable = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, level: str = "NOTSET", prepare: bool = True, save: Callable = None, show: Callable = None, hardware: hw.Hardware = None):
         '''Constructs a DataEntry object.
         
         master: The widget that the DataEntry's component widgets will be instantiated under.
@@ -114,9 +116,25 @@ class DataEntry(SuperWidget):
         self._save = save
         self._show = show
 
+        self.hardware = hardware
+
         if prepare == True:
             self.prepare()
 
+    def read_scales(self):
+        if self.scales is not None:
+            if self.scales.in_waiting > 0:
+                line = self.scales.readline()
+                self.last_weight = float(line.decode().strip('\r\n').strip('KG'))
+        else:
+            #TODO: Remove random weight generation
+            import random
+            self.last_weight = round(90+random.random()*5, 2)
+    
+    def close_scales(self):
+        if self.scales is not None:
+            self.scales.close()
+            self.scales = None
 
     def prepare(self):
         '''Constructs the frames and widgets of the DataEntry.'''
@@ -161,6 +179,9 @@ class DataEntry(SuperWidget):
 
         # Widgets
         self.w_la_title = ttk.Label(master=self.w_fr, text="Title", font="Arial 12 bold")
+
+        self.w_bu_generate_id = ttk.Button(master=self.w_fr, text="Generate ID", command=self.generate_id_card)
+        
         self.w_bu_copyid = ttk.Button(master=self.w_fr, text="Copy ID", command=self.copyid)
         self.w_bu_back = ttk.Button(master=self.w_fr, text="Back", command=self.back)
         self.w_bu_photo = ttk.Button(master=self.w_fr, text="Photo", command=self.photo)
@@ -188,6 +209,7 @@ class DataEntry(SuperWidget):
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the DataEntry.'''
         self.w_la_title.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_bu_generate_id.grid(column=1,row=0,sticky="nsew",padx=2,pady=2)
         self.w_bu_copyid.grid(column=2, row=0, sticky="nsew", padx=2, pady=2)
         self.w_bu_back.grid(column=3, row=0, sticky="nsew", padx=2, pady=2)
         self.w_bu_photo.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
@@ -228,7 +250,41 @@ class DataEntry(SuperWidget):
         '''Callback for when the cancel button is pressed.'''
         self.show()
 
+    def show_id_window(self):
+        button = self.w_bu_generate_id
+        state = str(button.cget("state"))
+        if state != "disabled":
+            for child in button.winfo_children():
+                child.destroy()
+            window = tk.Toplevel(master=button)
+            window.title("ID Generation")
 
+            msg = ttk.Label(master=window)
+            print_button = ttk.Button(master=window, text="Print")
+
+            def show_image(image: Image):
+                
+                panel = tk.Label(window, image=image)
+                panel.grid(column=0,row=0)
+
+            def print_id_card():
+                #TODO Link to self.hw.Hardware and print
+                print('Printing ID Card..')
+
+            #TODO: Add / get generated ID Card bitmap etc
+            self.id_card_image = ImageTk.PhotoImage(Image.new('RGB', (400,640), (128,0,238)))
+
+            show_image(self.id_card_image)
+
+            print_button.config(command=print_id_card)
+            msg.grid(column=0, row=0, sticky="nsew", padx=10, pady=10)
+            print_button.grid(column=0, row=1, sticky="nsew", padx=10, pady=10)
+
+
+    def generate_id_card(self, *args):
+        #TODO Get active evacuee details and MAKE id card, store to self.current_id_card?
+        self.show_id_window()
+    
     def copyid(self, *args):
         '''Call back for when the copy id button is pressed.'''
         root = self.w_fr.winfo_toplevel()
@@ -463,6 +519,22 @@ class DataEntry(SuperWidget):
                         index, *_ = indexes
                         idlist.delete(index)
 
+                def getNFCorBarcode():
+                    result = ''
+                    if self.hardware is not None:
+                        nfcResult = self.hardware.getCurrentNFCUID()
+                        barcodeResult = self.hardware.getCurrentBarcode()
+                        print(f'Barcode result: {barcodeResult}')
+                        if nfcResult == '':
+                            if barcodeResult != '':
+                                result = barcodeResult
+                        if barcodeResult == '':
+                            if nfcResult != '':
+                                result = nfcResult
+                    else:
+                        print('Hardware is None')
+                    idvar.set(result)
+
                 def submit():
                     '''Callback when submit button is pressed.'''
                     values = idlist.get(0,"end")
@@ -478,7 +550,7 @@ class DataEntry(SuperWidget):
                 identry = ttk.Entry(master=window, textvariable=idvar)
                 addbut = ttk.Button(master=window, text="Add", command=addid)
                 removebut = ttk.Button(master=window, text="Remove", command=removeid)
-                scanbut = ttk.Button(master=window, text="Scan")
+                scanbut = ttk.Button(master=window, text="Scan", command=getNFCorBarcode)
                 submitbut = ttk.Button(master=window, text="Update", command=submit)
 
                 window.columnconfigure(0, weight=1000)

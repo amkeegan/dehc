@@ -6,7 +6,7 @@ from tkinter import ttk
 import mods.log as ml
 import mods.database as md
 import mods.widgets as mw
-
+import mods.dehc_hardware as hw
 # ----------------------------------------------------------------------------
 
 class EMS():
@@ -20,7 +20,7 @@ class EMS():
     root: The root of the application, a tk.Tk object.
     '''
 
-    def __init__(self, db: md.DEHCDatabase, *, bookmarks: str = "bookmarks.json", level: str = "NOTSET", autorun: bool = False):
+    def __init__(self, db: md.DEHCDatabase, *, bookmarks: str = "bookmarks.json", level: str = "NOTSET", autorun: bool = False, hardware: hw.Hardware = None):
         '''Constructs an EMS object.
         
         db: The database object which the app uses for database transactions.
@@ -32,6 +32,8 @@ class EMS():
         self.level = level
         self.logger = ml.get("EMS", level=self.level)
         self.logger.debug("EMS object instantiated")
+
+        self.hardware = hardware
 
         self.db = db
         self.cats = self.db.schema_cats()
@@ -62,7 +64,7 @@ class EMS():
         '''Constructs the frames and widgets of the EMS.'''
         base, *_ = self.db.items_query(cat="Evacuation", fields=["_id", "Display Name"])
         self.cm = mw.ContainerManager(master=self.root, db=self.db, topbase=base, botbase=base, bookmarks=self.bookmarks, cats=self.cats, level=self.level, prepare=True, select=self.item_select)
-        self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, delete=self.delete, level=self.level, prepare=True, save=self.save, show=self.show)
+        self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, delete=self.delete, level=self.level, prepare=True, save=self.save, show=self.show, hardware=self.hardware)
         self.sb = mw.StatusBar(master=self.root, db=self.db, level=self.level, prepare=True)
         self.root.rowconfigure(0, weight=1000)
         self.root.rowconfigure(1, weight=1, minsize=16)
