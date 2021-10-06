@@ -3,81 +3,74 @@ import queue
 import time
 
 import serial
+import serial.tools.list_ports
 
-class Scales:
+from mods.dehc_worker import Hardware_Worker
 
-    inQueue = None
-    outQueue = None
-    currentWeight = 0.0
-    port = 'COM3'
-    unit = "KG" # Default measurement units
+class Scales_Worker(Hardware_Worker):
 
-    def __init__(self, inQueue : Queue = None, outQueue : Queue = None):
-        self.inQueue = inQueue
-        self.outQueue = outQueue
-        self.detectDevice()
-        self.openDevice(self.port)
-        if inQueue is not None and outQueue is not None:
-            self.run()
+    serialDevice = None
+    port = None
+    units = None
 
+    def __init__(self, inQueue: Queue = None, outQueue: Queue = None):
+        super().__init__(inQueue=inQueue, outQueue=outQueue)
+    
     def detectDevice(self):
-        #TODO: Add port selection logic (based on USB <-> Serial PID,VID?)
-        #self.port = 'COM3'
-        pass
-        
-    def openDevice(self, port):
+        ports = serial.tools.list_ports.comports()
+        for port, desc, hwid in sorted(ports):    
+            if hwid == 0x1234: #TODO Confirm HWID of FDTI / UART converter
+                self.port = port
+                print('Selected COM Port for scales:')
+                print(f'\t{port}: {desc} [{hwid}]')
+        return super().detectDevice()
+    
+    def openDevice(self):
         try:
-            self.serial = serial.Serial(self.port, 19200, timeout=1)
-        except: #TODO: Add actual error checking
-            self.serial = None
-            return
-        print(f'Device opened on {port}')
-
+            self.serialDevice = serial.Serial(self.port, 19200, timeout=1)
+        except Exception as err: #TODO: Actual error checking
+            print(f'Error opening {self.port}: {err}')
+        print(f'Successfully opened Serial device on {self.port}')
+    
     def closeDevice(self):
-        print('Closing Scales hardware connection')
-        if self.serial is not None:
-            self.serial.close()
-            self.serial = None
-        
+        if self.serialDevice is not None:
+            self.serialDevice.close()
+            self.serialDevice = None
+            print(f'Closed Serial device on {self.port}')
+
+    def parseWeightBytes(self, line: str):
+        #TODO: Error checking, not a number
+        result = float(line.decode().strip('\r\n').strip(self.units))
+        return result
+    
     def readCurrentWeight(self):
         self.currentWeight = None
-        if self.serial is not None:
-            line = self.serial.readline()
+        if self.serialDevice is not None:
+            line = self.serialDevice.readline()
             if len(line) > 0:
-                line = float(line.decode().strip('\r\n').strip(self.unit))
-                self.currentWeight = line
-    
-    def sendCurrentWeight(self):
+                result = self.parseWeightBytes(line)
+                self.currentWeight = result
+
+    def sendCurrentWeight(self):    
         if self.currentWeight is not None:
-            msg = {"message": "data", "weight": self.currentWeight, "unit": self.unit}
+            msg = {"message": "data", "weight": self.currentWeight, "units": self.units}
             if self.outQueue is not None:
-                self.outQueue.put(msg)
+                try:
+                    self.outQueue.put(msg, block=False)
+                except queue.Full:
+                    time.sleep(0.1)
             else:
                 print(msg)
-        #else:
-        #    self.outQueue.put({"message": "error", "error": "No connections"})
 
-    def processMsg(self, msg):
-        if "message" in msg:
-            if msg["message"] == "close":
-                self.closeDevice()
-
-    def run(self):
-        while(True):
-            inMsg = None
-            try:
-                if self.inQueue is not None:
-                    inMsg = self.inQueue.get(block=False)
-            except queue.Empty:
-                time.sleep(0.1)
-            if inMsg is not None:
-                self.processMsg(inMsg)
-            self.readCurrentWeight()
-            self.sendCurrentWeight()
+    def readNewData(self, type=None):
+        self.readCurrentWeight()
+    
+    def sendNewData(self):
+        self.sendCurrentWeight()
 
 if __name__ == "__main__":
 
-    scales = Scales()
+    scales = Scales_Worker()
 
     data_updated = True
     

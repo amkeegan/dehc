@@ -2,6 +2,7 @@
 
 import json
 import time
+from tkinter.constants import S
 
 from PIL import Image, ImageTk
 import tkinter as tk
@@ -12,6 +13,7 @@ import mods.database as md
 import mods.log as ml
 import mods.photo as mp
 import mods.dehc_hardware as hw
+import mods.id_card_generation as card_gen
 
 # ----------------------------------------------------------------------------
 
@@ -258,6 +260,10 @@ class DataEntry(SuperWidget):
 
 
     def show_id_window(self):
+
+        printers = hw.listPrinters()
+        printers = [printer[2] for printer in printers]
+
         button = self.w_bu_generate_id
         state = str(button.cget("state"))
         if state != "disabled":
@@ -269,7 +275,11 @@ class DataEntry(SuperWidget):
             window.title("ID Generation")
 
             msg = ttk.Label(master=window)
-            print_button = ttk.Button(master=window, text="Print")
+            if len(printers) > 0:
+                variable = tk.StringVar(window)
+                variable.set(hw.getDefaultPrinter())
+                printer_list = tk.OptionMenu(window, variable, printers[0], *printers[1:])
+                print_button = ttk.Button(master=window, text="Print")
 
             def show_image(image: Image):
                 
@@ -277,21 +287,45 @@ class DataEntry(SuperWidget):
                 panel.grid(column=0,row=0)
 
             def print_id_card():
+                if len(printers) == 0:
+                    return
                 #TODO Link to self.hw.Hardware and print
                 print('Printing ID Card..')
-
-            #TODO: Add / get generated ID Card bitmap etc
-            self.id_card_image = ImageTk.PhotoImage(Image.new('RGB', (400,640), (128,0,238)))
+                print(f'Printing to: {variable.get()}')
+                self.hardware.sendNewIDCard(self.id_card_printable, variable.get())
 
             show_image(self.id_card_image)
 
-            print_button.config(command=print_id_card)
             msg.grid(column=0, row=0, sticky="nsew", padx=10, pady=10)
-            print_button.grid(column=0, row=1, sticky="nsew", padx=10, pady=10)
 
+            if len(printers) > 0:
+                print_button.config(command=print_id_card)
+                printer_list.grid(column=0, row=1, sticky='nsew', padx=10, pady=10)
+                print_button.grid(column=0, row=2, sticky="nsew", padx=10, pady=10)
 
     def generate_id_card(self, *args):
-        #TODO Get active evacuee details and MAKE id card, store to self.current_id_card?
+
+        card_builder = card_gen.IDCardBuilder()
+
+        self.id_card_printable = card_builder.generateIDCard(
+            qrcode_id=self.last_doc['_id'] if '_id' in self.last_doc else 'NILQRCODE',
+            embedded_logo_path='assets/embedded-logo.png',
+            barcode_id=self.last_doc['_id'] if '_id' in self.last_doc else 'NILBARCODE',
+            name=self.last_doc['Display Name'] if 'Display Name' in self.last_doc else 'UNKNOWN NAME',
+            secondary_texts=(
+                'SEX: ' + (self.last_doc['Sex'] if 'Sex' in self.last_doc else 'UNKNOWN'),
+                'DOB: ' + (self.last_doc['Date Of Birth'] if 'Date Of Birth' in self.last_doc else 'NIL'),
+                'PASSPORT: ' + (self.last_doc['Passport Number'] if 'Passport Number' in self.last_doc else 'NIL'),
+                'NATIONALITY: ' + (self.last_doc['Nationality'] if 'Nationality' in self.last_doc else 'UNKNOWN'),
+            ),
+            tag_text='DEHC 2021',
+            logo=Image.open('assets/logo.png'),
+            portrait=self.last_photo if self.last_photo is not None else Image.new('RGB', (150,200), (0,0,0)),
+            save_path='data/'+ self.last_doc['_id'] + '.png'
+        )
+        
+        self.id_card_image = ImageTk.PhotoImage(self.id_card_printable)
+
         self.show_id_window()
 
 
@@ -458,8 +492,13 @@ class DataEntry(SuperWidget):
 
                 def read_weight(*args):
                     '''Reads the current weight from another device.'''
-                    reading = round(80+random.random()*10, 2)
-                    msg.config(text=str(reading))
+                    result = ''
+                    if self.hardware is not None and self.hardware.SCALES_EXIST:
+                        result = self.hardware.getCurrentWeight()
+                    else:
+                        result = round(80+random.random()*10, 2) 
+                    if result != '':
+                        msg.config(text=str(result))
                     window.after(500, read_weight)
 
                 def commit_weight(*args):
@@ -569,16 +608,15 @@ class DataEntry(SuperWidget):
                     if self.hardware is not None:
                         nfcResult = self.hardware.getCurrentNFCUID()
                         barcodeResult = self.hardware.getCurrentBarcode()
-                        print(f'Barcode result: {barcodeResult}')
                         if nfcResult == '':
                             if barcodeResult != '':
                                 result = barcodeResult
                         if barcodeResult == '':
                             if nfcResult != '':
                                 result = nfcResult
-                    else:
-                        print('Hardware is None')
-                    idvar.set(result)
+                    if result != '':
+                        idvar.set(result)
+                    window.after(250, getNFCorBarcode)
 
                 def submit():
                     '''Callback when submit button is pressed.'''
@@ -595,7 +633,7 @@ class DataEntry(SuperWidget):
                 identry = ttk.Entry(master=window, textvariable=idvar)
                 addbut = ttk.Button(master=window, text="Add", command=addid)
                 removebut = ttk.Button(master=window, text="Remove", command=removeid)
-                scanbut = ttk.Button(master=window, text="Scan", command=getNFCorBarcode)
+                scanbut = ttk.Button(master=window, text="Scan")
                 submitbut = ttk.Button(master=window, text="Update", command=submit)
 
                 window.columnconfigure(0, weight=1000)
@@ -614,6 +652,7 @@ class DataEntry(SuperWidget):
                 scanbut.grid(column=2, row=2, sticky="nsew", padx=2, pady=2)
                 submitbut.grid(column=2, row=3, sticky="nsew", padx=2, pady=2)
 
+                getNFCorBarcode()
 
     def remove(self, *args):
         '''Callback for when the flag remove button is pressed'''
@@ -675,6 +714,7 @@ class DataEntry(SuperWidget):
 
         for child in self.w_fr_data.winfo_children():
             child.destroy()
+
         self.w_bu_photo.config(image="")
         self.current_photo = self.last_photo
         self.w_li_flags.delete(0, "end")
@@ -852,7 +892,8 @@ class DataEntry(SuperWidget):
                 self.w_li_flags.insert(index, flag)
             if len(flags) > 0:
                 self.w_li_flags.selection_set(0)
-            
+
+
             # Correct tab order
             for entry, buttona, buttonb, buttonc in zip(self.w_input_data, self.w_buttona_data, self.w_buttonb_data, self.w_buttonc_data):
                 if entry != None:

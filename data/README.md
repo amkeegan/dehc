@@ -1,0 +1,1 @@
+Folder used to store data such as Generated ID Card Images
