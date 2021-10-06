@@ -1,0 +1,23 @@
+<html>
+    <head>
+        <title>EMS Evacuation Gate Check Screen</title>        
+    </head>
+    <body style="background-color:#bgcol#">
+        <H1> Boarding Vessel #vessel#</H1>        
+    </body>   
+<table width=100%>
+    <tr><td>#photo#</td><td>
+        <table>
+            <tr><h2>#display name#</h2></tr>
+        </table>
+
+    </td></tr>    
+</table>
+<p><h1>#cleared#</h1></p>
+<audio autoplay src="#audio#"></audio>
+<form  method="get" action="gatecheck">
+    <input type="text" id="physid" name="physid" tabindex=0 autofocus>
+    <input type="hidden" id="contid"  name="contid" value="Vessel/637775ab2055">
+    <input type="submit" tabindex=1>
+</form>
+</html>

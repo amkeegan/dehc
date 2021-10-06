@@ -109,7 +109,11 @@ class Database:
         '''
         if lazy == False or self.document_exists(dbname=dbname, id=id) == True:
             doc = self.client.get_document(db=dbname, doc_id=id).get_result()
-            self.client.delete_document(db=dbname, doc_id=id, rev=doc["_rev"])
+            if id.startswith('_design/'):
+                _, ddoc = id.split('_design/')
+                self.client.delete_design_document(db=dbname, ddoc=ddoc, rev=doc["_rev"])
+            else:
+                self.client.delete_document(db=dbname, doc_id=id, rev=doc["_rev"])
             self.logger.info(f"Deleted document {dbname} {id}")
         else:
             self.logger.debug(f"Could not lazy delete document {dbname} {id}")
@@ -204,7 +208,11 @@ class Database:
             id = remote_doc["key"]
             if lazy == False or self.document_exists(dbname=dbname, id=id) == True:
                 rev = remote_doc["value"]["rev"]
-                self.client.delete_document(db=dbname, doc_id=id, rev=rev)
+                if id.startswith("_design/"):
+                    _, ddoc = id.split("_design/")
+                    self.client.delete_design_document(db=dbname, ddoc=ddoc, rev=rev)
+                else:
+                    self.client.delete_document(db=dbname, doc_id=id, rev=rev)
                 self.logger.info(f"Bulk deleted document {dbname} {id}")
             else:
                 self.logger.debug(f"Could not bulk lazy delete document {dbname} {id}")
@@ -1138,6 +1146,16 @@ class DEHCDatabase:
         if self.db.document_exists(dbname=self.db_files, id=name) == True:
             self.db.document_delete(dbname=self.db_files, id=name)
 
+    def photo_load_base64(self, item: str):
+        '''Loads the photo, associated with an item, from the database, leaves it in base64
+        
+        item: The item to load the photo of.
+        '''
+        name = "photo-"+item
+        if self.db.document_exists(dbname="files", id=name) == True:
+            return self.db.document_get(dbname="files", id=name)['photo']            
+        else:
+            return None
 
     def photo_load(self, item: str):
         '''Loads the photo, associated with an item, from the database.

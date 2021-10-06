@@ -4,8 +4,7 @@ import json
 import time
 from tkinter.constants import S
 
-from PIL import ImageTk
-from PIL import Image
+from PIL import Image, ImageTk
 import tkinter as tk
 from tkinter import ttk
 from typing import Callable
@@ -82,25 +81,15 @@ class SuperWidget:
 # ----------------------------------------------------------------------------
 
 class DataEntry(SuperWidget):
-    '''A SuperWidget representing a data entry pane.
-    
-    cats: The categories for which new items can be created using this DataEntry.
-    current_photo: The PIL data of the photo currently shown in the data pane.
-    db: The database object which the widget uses for database transactions.
-    last_doc: The last doc that was shown in the data pane.
-    last_photo: The PIL data of the photo last loaded into the data pane.
-    level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
-    logger: The logger object used for logging.
-    master: The widget that the DataEntry's component widgets will be instantiated under.
-    _delete: If present, a callback function that triggers when an item is deleted.
-    _save: If present, a callback function that triggers when an item is saved.
-    '''
+    '''A SuperWidget representing a data entry pane.'''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, level: str = "NOTSET", prepare: bool = True, save: Callable = None, show: Callable = None, hardware: hw.Hardware = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, level: str = "NOTSET", newchild: Callable = None, prepare: bool = True, save: Callable = None, show: Callable = None, hardware: hw.Hardware = None):
         '''Constructs a DataEntry object.
         
         master: The widget that the DataEntry's component widgets will be instantiated under.
         cats: The categories of items that can be created using the New button.
+        delete: If present, a callback function that triggers when an item is deleted.
+        hardware: The hardware manager associated with this DataEntry.
         level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         save: If present, a callback function that triggers when an item is saved.
         show: If present, a callback function that triggers when 'show' or 'back' is pressed in the data pane.
@@ -108,38 +97,28 @@ class DataEntry(SuperWidget):
         '''
         super().__init__(master=master, db=db, level=level)
 
-        self.cats = cats
-        self.back_doc = {}
-        self.last_doc = {}
-        self.current_photo = None
-        self.last_photo = None
-        self.level = level
-        self._delete = delete
-        self._save = save
-        self._show = show
-
-        self.hardware = hardware
+        self.cats = cats          # Stores the list of item categories this DataEntry can select and work with.
+        self.back_doc = {}        # Stores the document to return to when the back button is pressed.
+        self.last_doc = {}        # Stores the most recently selected and retrieved document from the database.
+        self.guardian_doc = {}    # Stores the guardian's document when 'new child' is pressed.
+        self.child_doc = {}       # Stores information for child document when 'new child' is pressed.
+        self.current_photo = None # Stores the currently slown photo.
+        self.last_photo = None    # Stores the most recently retrieved photo from the database.
+        self.level = level        # Stores the logging level
+        self._delete = delete     # Stores the parent object's callback to run when delete is pressed.
+        self._newchild = newchild # Stores the parent object's callback to run when new child is pressed.
+        self._save = save         # Stores the parent object's callback to run when save is pressed.
+        self._show = show         # Stores the parent object's callback to run when show is pressed.
+        self.hardware = hardware  # Stores the hardware manager object associated with this DataEntry
 
         if prepare == True:
             self.prepare()
 
-    def read_scales(self):
-        if self.scales is not None:
-            if self.scales.in_waiting > 0:
-                line = self.scales.readline()
-                self.last_weight = float(line.decode().strip('\r\n').strip('KG'))
-        else:
-            #TODO: Remove random weight generation
-            import random
-            self.last_weight = round(90+random.random()*5, 2)
-    
-    def close_scales(self):
-        if self.scales is not None:
-            self.scales.close()
-            self.scales = None
 
     def prepare(self):
         '''Constructs the frames and widgets of the DataEntry.'''
+        self.w_fr_head = ttk.Frame(master=self.w_fr)
+        self.w_fr_photo = ttk.Frame(master=self.w_fr)
         self.w_fr_flags = ttk.Frame(master=self.w_fr)
         self.w_fr_body = ttk.Frame(master=self.w_fr)
         self.w_fr_data = ttk.Frame(master=self.w_fr_body)
@@ -147,13 +126,20 @@ class DataEntry(SuperWidget):
 
         self.w_fr.columnconfigure(index=0, weight=1000)
         self.w_fr.columnconfigure(index=1, weight=1000)
-        self.w_fr.columnconfigure(index=2, weight=1000)
-        self.w_fr.columnconfigure(index=3, weight=1000)
-        self.w_fr.columnconfigure(index=4, weight=1, minsize=16)
+        self.w_fr.columnconfigure(index=2, weight=1, minsize=16)
         self.w_fr.rowconfigure(index=0, weight=1, minsize=25)
         self.w_fr.rowconfigure(index=1, weight=500)
         self.w_fr.rowconfigure(index=2, weight=1000)
         self.w_fr.rowconfigure(index=3, weight=1, minsize=25)
+
+        self.w_fr_head.columnconfigure(index=0, weight=1000)
+        self.w_fr_head.columnconfigure(index=1, weight=1, minsize=48)
+        self.w_fr_head.columnconfigure(index=2, weight=1, minsize=48)
+        self.w_fr_head.columnconfigure(index=3, weight=1, minsize=48)
+        self.w_fr_head.rowconfigure(index=0, weight=1000)
+
+        self.w_fr_photo.columnconfigure(index=0, weight=1000)
+        self.w_fr_photo.rowconfigure(index=0, weight=1000)
 
         self.w_fr_flags.columnconfigure(index=0, weight=1000)
         self.w_fr_flags.columnconfigure(index=1, weight=1000)
@@ -180,13 +166,11 @@ class DataEntry(SuperWidget):
         self.w_var_flags = tk.StringVar()
 
         # Widgets
-        self.w_la_title = ttk.Label(master=self.w_fr, text="Title", font="Arial 12 bold")
-
-        self.w_bu_generate_id = ttk.Button(master=self.w_fr, text="Generate ID", command=self.generate_id_card)
-        
-        self.w_bu_copyid = ttk.Button(master=self.w_fr, text="Copy ID", command=self.copyid)
-        self.w_bu_back = ttk.Button(master=self.w_fr, text="Back", command=self.back)
-        self.w_bu_photo = ttk.Button(master=self.w_fr, text="Photo", command=self.photo)
+        self.w_la_title = ttk.Label(master=self.w_fr_head, text="Title", font="Arial 12 bold")
+        self.w_bu_generate_id = ttk.Button(master=self.w_fr_head, text="Print ID", command=self.generate_id_card)
+        self.w_bu_copyid = ttk.Button(master=self.w_fr_head, text="Copy ID", command=self.copyid)
+        self.w_bu_back = ttk.Button(master=self.w_fr_head, text="Back", command=self.back)
+        self.w_bu_photo = ttk.Button(master=self.w_fr_photo, text="Photo", command=self.photo)
         self.w_la_flags = ttk.Label(master=self.w_fr_flags, text="Flags")
         self.w_li_flags = tk.Listbox(master=self.w_fr_flags, selectmode=tk.SINGLE, relief=tk.GROOVE, exportselection=False)
         self.w_co_flags = ttk.Combobox(master=self.w_fr_flags, textvariable=self.w_var_flags, state="readonly")
@@ -210,15 +194,19 @@ class DataEntry(SuperWidget):
 
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the DataEntry.'''
+        self.w_fr_head.grid(column=0, row=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        self.w_fr_photo.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
+        self.w_fr_flags.grid(column=1, row=1, sticky="nsew", padx=2, pady=2)
+        self.w_fr_body.grid(column=0, row=2, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.w_fr_data.grid(column=0, row=0, sticky="nsew")
+        self.w_fr_foot.grid(column=0, row=3, columnspan=3, sticky="nsew", padx=2, pady=1)
+
         self.w_la_title.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
         self.w_bu_generate_id.grid(column=1,row=0,sticky="nsew",padx=2,pady=2)
         self.w_bu_copyid.grid(column=2, row=0, sticky="nsew", padx=2, pady=2)
         self.w_bu_back.grid(column=3, row=0, sticky="nsew", padx=2, pady=2)
-        self.w_bu_photo.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
-        self.w_fr_flags.grid(column=1, row=1, columnspan=4, sticky="nsew", padx=2, pady=2)
-        self.w_fr_body.grid(column=0, row=2, columnspan=4, sticky="nsew", padx=2, pady=2)
-        self.w_fr_data.grid(column=0, row=0, sticky="nsew")
-        self.w_fr_foot.grid(column=0, row=3, columnspan=4, sticky="nsew", padx=2, pady=1)
+
+        self.w_bu_photo.grid(column=0, row=0, sticky="nsew", padx=2, pady=2)
 
         self.w_la_flags.grid(column=0, row=0, columnspan=4, sticky="nsew", padx=1, pady=1)
         self.w_li_flags.grid(column=0, row=1, columnspan=3, sticky="nsew", padx=1, pady=1)
@@ -235,6 +223,23 @@ class DataEntry(SuperWidget):
         self.w_bu_delete.grid(column=5, row=0, sticky="nsew", padx=1, pady=1)
 
 
+    def read_scales(self):
+        if self.scales is not None:
+            if self.scales.in_waiting > 0:
+                line = self.scales.readline()
+                self.last_weight = float(line.decode().strip('\r\n').strip('KG'))
+        else:
+            #TODO: Remove random weight generation
+            import random
+            self.last_weight = round(90+random.random()*5, 2)
+
+
+    def close_scales(self):
+        if self.scales is not None:
+            self.scales.close()
+            self.scales = None
+
+
     def add(self, *args):
         '''Callback for when the flag add button is pressed.'''
         flag = self.w_var_flags.get()
@@ -248,9 +253,11 @@ class DataEntry(SuperWidget):
             self.last_doc, self.back_doc = self.back_doc, self.last_doc
             self._show(self.last_doc["_id"])
 
+
     def cancel(self, *args):
         '''Callback for when the cancel button is pressed.'''
         self.show()
+
 
     def show_id_window(self):
 
@@ -263,6 +270,8 @@ class DataEntry(SuperWidget):
             for child in button.winfo_children():
                 child.destroy()
             window = tk.Toplevel(master=button)
+            window.attributes("-topmost", True)
+            window.focus_force()
             window.title("ID Generation")
 
             msg = ttk.Label(master=window)
@@ -318,7 +327,8 @@ class DataEntry(SuperWidget):
         self.id_card_image = ImageTk.PhotoImage(self.id_card_printable)
 
         self.show_id_window()
-    
+
+
     def copyid(self, *args):
         '''Call back for when the copy id button is pressed.'''
         root = self.w_fr.winfo_toplevel()
@@ -342,13 +352,15 @@ class DataEntry(SuperWidget):
 
     def edit(self, *args):
         '''Callback for when the edit button is pressed'''
-        for entry, buttona, buttonb, hidden in zip(self.w_input_data, self.w_buttona_data, self.w_buttonb_data, self.w_hidden_data):
+        for entry, buttona, buttonb, buttonc, hidden in zip(self.w_input_data, self.w_buttona_data, self.w_buttonb_data, self.w_buttonc_data, self.w_hidden_data):
             if hidden == None:
                 entry.config(state="normal")
             if buttona != None:
                 buttona.config(state="normal")
             if buttonb != None:
                 buttonb.config(state="normal")
+            if buttonc != None:
+                buttonc.config(state="normal")
         self.w_bu_photo.config(command=self.photo)
         self.w_bu_edit.config(state="disabled")
         self.w_bu_cancel.config(state="normal")
@@ -366,16 +378,45 @@ class DataEntry(SuperWidget):
 
     def new(self, *args):
         '''Callback for when the new button is pressed.'''
-        self.back_doc = self.last_doc
-        self.last_doc = {"category": self.w_var_cat.get()}
+        if len(self.guardian_doc) > 0:
+            self.back_doc = self.guardian_doc
+            self.last_doc = {"category": self.child_doc["category"], self.child_doc["field"]: [self.child_doc["value"]]}
+            self.child_doc = {}
+            self.guardian_doc = {}
+        else:
+            self.back_doc = self.last_doc
+            self.last_doc = {"category": self.w_var_cat.get()}
         self.show()
         self.edit()
         self.w_bu_delete.config(state="disabled")
 
 
+    def newchild(self, event: tk.Event):
+        '''Callback for when the new child button is pressed.'''
+        id = self.last_doc.get("_id", "")
+        if id != "":
+            button = event.widget
+            row = self.w_buttonc_data.index(button)
+            field = self.w_la_data[row].cget("text")
+            guardian_schema = self.db.schema_schema(id=id)
+            self.guardian_doc = self.last_doc
+            self.child_doc = {
+                "category": guardian_schema[field]["childcat"], 
+                "field": guardian_schema[field]["childfield"],
+                "value": self.guardian_doc["_id"]
+            }
+            if self._newchild != None:
+                self._newchild(target=id)
+            self.w_fr.after(ms=1, func=self.new) # .after is required to make self.new trigger after <<TreeviewSelect>>
+
+
     def photo(self, *args):
         '''Callback for when the photo is pressed.'''
+        for child in self.w_bu_photo.winfo_children():
+            child.destroy()
         window = tk.Toplevel(master=self.w_bu_photo)
+        window.attributes("-topmost", True)
+        window.focus_force()
         window.title("Photo")
         photomanager = mp.PhotoManager(level=self.level)
 
@@ -439,6 +480,8 @@ class DataEntry(SuperWidget):
             for child in button.winfo_children():
                 child.destroy()
             window = tk.Toplevel(master=button)
+            window.attributes("-topmost", True)
+            window.focus_force()
             window.title(field.cget("text"))
 
             if source == "WEIGHT":
@@ -484,6 +527,8 @@ class DataEntry(SuperWidget):
             for child in button.winfo_children():
                 child.destroy()
             window = tk.Toplevel(master=button)
+            window.attributes("-topmost", True)
+            window.focus_force()
             window.title(field.cget("text"))
 
             if source == "IDS":
@@ -681,6 +726,7 @@ class DataEntry(SuperWidget):
         self.w_input_data = []
         self.w_buttona_data = []
         self.w_buttonb_data = []
+        self.w_buttonc_data = []
         self.w_hidden_data = []
 
         self.w_bu_photo.config(command="")
@@ -702,6 +748,7 @@ class DataEntry(SuperWidget):
             self.w_fr_data.columnconfigure(index=1, weight=1000)
             self.w_fr_data.columnconfigure(index=2, weight=1000)
             self.w_fr_data.columnconfigure(index=3, weight=1000)
+            self.w_fr_data.columnconfigure(index=4, weight=1000)
 
             for index, (field, info) in enumerate(schema.items()):
                 value = self.last_doc.get(field, "")
@@ -715,12 +762,14 @@ class DataEntry(SuperWidget):
                     entry = ttk.Entry(master=self.w_fr_data, textvariable=var, state="disabled")
                     buttona = None
                     buttonb = None
+                    buttonc = None
                     hidden = None
 
                 elif w_type == "option":
                     entry = ttk.Combobox(master=self.w_fr_data, textvariable=var, values=info['options'], state="disabled")
                     buttona = None
                     buttonb = None
+                    buttonc = None
                     hidden = None
 
                 elif w_type == "read":
@@ -730,6 +779,7 @@ class DataEntry(SuperWidget):
                     if source == "WEIGHT":
                         buttona.bind("<Button-1>", lambda e: self.read(event=e, source="WEIGHT"))
                     buttonb = None
+                    buttonc = None
                     hidden = None
 
                 elif w_type == "list":
@@ -753,10 +803,14 @@ class DataEntry(SuperWidget):
                         buttonb.bind("<Button-1>", lambda e: self.readlist(event=e, source="IDS"))
                         buttona = ttk.Button(master=self.w_fr_data, text="Show", state="normal")
                         buttona.bind("<Button-1>", lambda e: self.showlist(event=e, source="IDS"))
+                        buttonc = ttk.Button(master=self.w_fr_data, text="New Child", state="normal")
+                        buttonc.bind("<Button-1>", self.newchild)
                     elif source == "PHYSIDS":
                         buttonb.bind("<Button-1>", lambda e: self.readlist(event=e, source="PHYSIDS"))
+                        buttonc = None
                     else:
                         buttona = None
+                        buttonc = None
                     hidden = value
 
                 elif w_type == "sum":
@@ -780,6 +834,7 @@ class DataEntry(SuperWidget):
                     entry.config(state="disabled")
                     buttona = None
                     buttonb = None
+                    buttonc = None
                     hidden = ""
                 
                 elif w_type == "count":
@@ -791,36 +846,39 @@ class DataEntry(SuperWidget):
                     entry.config(state="disabled")
                     buttona = None
                     buttonb = None
+                    buttonc = None
                     hidden = ""
 
                 else:
                     entry = ttk.Label(master=self.w_fr_data)
                     buttona = None
                     buttonb = None
+                    buttonc = None
                     hidden = None
 
+                missing = 0
+                for button in [buttona, buttonb, buttonc]:
+                    if button == None:
+                        missing += 1
+                
                 label.grid(column=0, row=index, sticky="nsew", padx=1, pady=1)
-
+                entry.grid(column=1, row=index, columnspan=missing+1, sticky="nsew", padx=1, pady=1)
                 if buttona != None:
-                    if buttonb != None:
-                        entry.grid(column=1, row=index, sticky="nsew", padx=1, pady=1)
-                        buttona.grid(column=2, row=index, sticky="nsew", padx=1, pady=1)
-                        buttonb.grid(column=3, row=index, sticky="nsew", padx=1, pady=1)
+                    buttona.grid(column=missing+2, row=index, sticky="nsew", padx=1, pady=1)
+                if buttonb != None:
+                    if buttonc == None:
+                        buttonb.grid(column=4, row=index, sticky="nsew", padx=1, pady=1)
                     else:
-                        entry.grid(column=1, row=index, columnspan=2, sticky="nsew", padx=1, pady=1)
-                        buttona.grid(column=3, row=index, sticky="nsew", padx=1, pady=1)
-                else:
-                    if buttonb != None:
-                        entry.grid(column=1, row=index, columnspan=2, sticky="nsew", padx=1, pady=1)
                         buttonb.grid(column=3, row=index, sticky="nsew", padx=1, pady=1)
-                    else:
-                        entry.grid(column=1, row=index, columnspan=3, sticky="nsew", padx=1, pady=1)
+                if buttonc != None:
+                    buttonc.grid(column=4, row=index, sticky="nsew", padx=1, pady=1)
 
                 self.w_var_data.append(var)
                 self.w_la_data.append(label)
                 self.w_input_data.append(entry)
                 self.w_buttona_data.append(buttona)
                 self.w_buttonb_data.append(buttonb)
+                self.w_buttonc_data.append(buttonc)
                 self.w_hidden_data.append(hidden)
             
             if self.current_photo != None:
@@ -830,14 +888,22 @@ class DataEntry(SuperWidget):
 
             flags = self.last_doc.get("flags", [])
             flags.sort()
-            
             for index, flag in enumerate(flags):
                 self.w_li_flags.insert(index, flag)
-            
             if len(flags) > 0:
                 self.w_li_flags.selection_set(0)
-            
 
+
+            # Correct tab order
+            for entry, buttona, buttonb, buttonc in zip(self.w_input_data, self.w_buttona_data, self.w_buttonb_data, self.w_buttonc_data):
+                if entry != None:
+                    entry.lift()
+                if buttona != None:
+                    buttona.lift()
+                if buttonb != None:
+                    buttonb.lift()
+                if buttonc != None:
+                    buttonc.lift()
 
 
     def showlist(self, event: tk.Event, source: str):
@@ -960,7 +1026,8 @@ class SearchTree(SuperWidget):
         self.w_li_search.bind("<<ListboxSelect>>", self.search_select)
         self.w_tr_tree.bind("<<TreeviewSelect>>", self.tree_select)
         self.w_tr_tree.bind("<<TreeviewOpen>>", lambda *_: self.tree_open())
-        self.w_tr_tree.bind("<Button-3>", self.tree_rebase)
+        self.w_tr_tree.bind("<Button-3>", self.tree_rebase_mouse)
+        self.w_tr_tree.bind("<Control-r>", self.tree_rebase_keyboard)
 
         self.w_co_cat.current(0)
         self.w_co_field.current(1)
@@ -1009,7 +1076,11 @@ class SearchTree(SuperWidget):
 
     def scan(self, *args):
         '''Callback for when the scan button is pressed.'''
+        for child in self.w_bu_scan.winfo_children():
+            child.destroy()
         window = tk.Toplevel(master=self.w_bu_scan)
+        window.attributes("-topmost", True)
+        window.focus_force()
         window.title("Scan")
         
         def scan():
@@ -1017,14 +1088,17 @@ class SearchTree(SuperWidget):
 
         def find():
             physid = input_var.get()
-            id, *_ = self.db.ids_find(physid=physid)
-            self.tree_focus(goal=id, rebase=True)
+            ids = self.db.ids_find(physid=physid)
+            if len(ids) > 0:
+                id, *_ = ids
+                self.tree_focus(goal=id, rebase=True)
 
-        window.bind("<Enter>", lambda *_: find())
+        window.bind("<Return>", lambda *_: find())
         input_var = tk.StringVar()
         input_box = ttk.Entry(master=window, textvariable=input_var)
         scan_button = ttk.Button(master=window, text="Scan", command=scan)
         find_button = ttk.Button(master=window, text="Find", command=find)
+        input_box.focus_set()
 
         window.columnconfigure(0, weight=1000)
         window.columnconfigure(1, weight=1000)
@@ -1112,6 +1186,8 @@ class SearchTree(SuperWidget):
             if self.w_tr_tree.exists(item=goal):
                 self.w_tr_tree.selection_set(goal)
                 self.w_tr_tree.see(item=goal)
+                self.w_tr_tree.focus_set()
+                self.w_tr_tree.focus(item=goal)
             elif rebase == True and len(path) > 0:
                 if self.base != path[0]:
                     self.base = self.db.item_get(id=path[0])
@@ -1143,10 +1219,28 @@ class SearchTree(SuperWidget):
             self.w_tr_tree.insert(parent=iid, index=1000000, iid=iid+"_stub")
 
 
-    def tree_rebase(self, *args):
+    def tree_rebase_keyboard(self, *args):
+        '''Callback for when the tree is rebased using the keyboard.'''
+        targets = self.w_tr_tree.selection()
+        if len(targets) >= 1:
+            target, *_ = targets
+        self.tree_rebase(target=target)
+
+
+    def tree_rebase_mouse(self, *args):
         '''Callback for when the tree is rebased using right-click.'''
         event, = args
         target = event.widget.identify_row(event.y)
+        self.tree_rebase(target=target)
+
+
+    def tree_rebase(self, target: str):
+        '''Rebase the tree to be based on the target.
+        
+        The target must be present on the tree.
+
+        target: The item to make the new base.
+        '''
         self.w_tr_tree.selection_set(target)
         if self.w_tr_tree.parent(target) == "":
             parents = self.db.item_parents(item=target, result="DOC")
@@ -1352,6 +1446,11 @@ class ContainerManager(SuperWidget):
         self.w_fr_bookmarks.columnconfigure(3, weight=1000)
         self.w_fr_bookmarks.rowconfigure(0, weight=1000)
 
+        root = self.w_fr.winfo_toplevel()
+        root.bind("<Control-s>", lambda *_: self.w_se_top.w_tr_tree.focus_set(), add="+")
+        root.bind("<Control-d>", lambda *_: self.w_se_bottom.w_tr_tree.focus_set(), add="+")
+        root.bind("<Control-Down>", self.move, add="+")
+
 
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the ContainerManager.'''
@@ -1366,7 +1465,6 @@ class ContainerManager(SuperWidget):
         self.w_bu_move_subs.grid(column=1, row=3, sticky="nsew", padx=2, pady=4)
         self.w_la_bottom.grid(column=0, row=4, columnspan=2, sticky="nsew", padx=2, pady=1)
         self.w_se_bottom.grid(column=0, row=5, columnspan=2, sticky="nsew", padx=2, pady=2)
-
 
 
     def base(self, newbase: str = None):
@@ -1404,7 +1502,7 @@ class ContainerManager(SuperWidget):
         self.highlight(item=top["_id"], botitem=bottom["_id"])
         self.open()
         self.botopen()
-        
+
 
     def highlight(self, item: str = None, botitem: str = None):
         '''Selects an item in the top and/or bottom tree with the matching id.
@@ -1423,11 +1521,11 @@ class ContainerManager(SuperWidget):
         source, *_ = self.db.item_parents(item=target)
         destination, *_ = self.w_se_bottom.selection
         self.db.container_move(from_con=source, to_con=destination, item=target)
-        self.highlight(item=source)
         self.refresh()
         self.highlight(botitem=destination)
-        self.open()
+        self.highlight(item=source)
         self.botopen()
+        self.open()
 
 
     def submove(self, *args):
