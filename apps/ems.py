@@ -63,13 +63,22 @@ class EMS():
         '''Constructs the frames and widgets of the EMS.'''
         base, *_ = self.db.items_query(cat="Evacuation", fields=["_id", "Display Name"])
         self.cm = mw.ContainerManager(master=self.root, db=self.db, topbase=base, botbase=base, bookmarks=self.bookmarks, cats=self.cats, level=self.level, prepare=True, select=self.item_select)
-        self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, delete=self.delete, level=self.level, prepare=True, save=self.save, show=self.show, hardware=self.hardware)
+        self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, delete=self.delete, level=self.level, newchild=self.newchild, prepare=True, save=self.save, show=self.show, hardware=self.hardware)
         self.bu_refresh = ttk.Button(master=self.root, text="Refresh", command=self.refresh)
         self.sb = mw.StatusBar(master=self.root, db=self.db, level=self.level, prepare=True)
         self.root.rowconfigure(0, weight=1000)
         self.root.rowconfigure(1, weight=1, minsize=16)
         self.root.columnconfigure(0, weight=1, minsize=48)
         self.root.columnconfigure(1, weight=1000)
+
+
+    def newchild(self, target: str):
+        '''Callback for when new child is pressed in the data pane.'''
+        parent = self.cm.w_se_top.w_tr_tree.parent(target)
+        if parent == "":
+            self.cm.w_se_top.tree_rebase(target=target)
+            parent = self.cm.w_se_top.w_tr_tree.parent(target)
+        self.cm.highlight(item=parent)
 
 
     def pack(self):
@@ -83,7 +92,6 @@ class EMS():
     def refresh(self):
         '''Refreshes the trees and data pane.'''
         self.cm.refresh()
-        #self.de.show()
 
 
     def run(self):
