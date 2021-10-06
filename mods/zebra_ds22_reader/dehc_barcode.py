@@ -24,13 +24,14 @@ class Barcode_Worker(Hardware_Worker):
     
     def openDevice(self):
         #TODO: Do exception handling
-        print(f'USB Device opened with Vendor: {self.idVendor}, Product: {self.idProduct}')
         self.usbDevice = usb.core.find(idVendor=self.idVendor, idProduct=self.idProduct)
         if self.usbDevice is None:
+            print(f"USB Device could not be opened. Vendor {self.idVendor}, Product: {self.idProduct}")
             return
         self.usbDevice.set_configuration() # TODO: Work out what this does..
         self.usbEndpoint = self.usbDevice[0][(0,0)][0] # TODO: Documentation
         self.connection = True
+        print(f'USB Device opened with Vendor: {self.idVendor}, Product: {self.idProduct}')
 
     def closeDevice(self):
         self.usbDevice = None
