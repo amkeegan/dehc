@@ -254,8 +254,6 @@ class DataEntry(SuperWidget):
 
     def show_id_window(self):
 
-        print(f'Current doc: {self.last_doc}')
-
         printers = hw.listPrinters()
         printers = [printer[2] for printer in printers]
 
@@ -306,15 +304,15 @@ class DataEntry(SuperWidget):
             barcode_id=self.last_doc['_id'] if '_id' in self.last_doc else 'NILBARCODE',
             name=self.last_doc['Display Name'] if 'Display Name' in self.last_doc else 'UNKNOWN NAME',
             secondary_texts=(
-                self.last_doc['Date Of Birth'] if 'Date Of Birth' in self.last_doc else 'NIL DOB',
-                self.last_doc['Passport Number'] if 'Passport Number' in self.last_doc else 'NIL PASSPORT',
-                self.last_doc['Nationality'] if 'Nationality' in self.last_doc else 'UNKNOWN NATIONALITY',
-                self.last_doc['Guardians'] if 'Guardians' in self.last_doc else 'No Guardians'
+                'SEX: ' + (self.last_doc['Sex'] if 'Sex' in self.last_doc else 'UNKNOWN'),
+                'DOB: ' + (self.last_doc['Date Of Birth'] if 'Date Of Birth' in self.last_doc else 'NIL'),
+                'PASSPORT: ' + (self.last_doc['Passport Number'] if 'Passport Number' in self.last_doc else 'NIL'),
+                'NATIONALITY: ' + (self.last_doc['Nationality'] if 'Nationality' in self.last_doc else 'UNKNOWN'),
             ),
             tag_text='DEHC 2021',
             logo=Image.open('assets/logo.png'),
-            portrait=self.last_photo if self.last_photo is not None else Image.new('RGB', (100,200), (0,0,0)),
-            save_path='data/tmp.png'
+            portrait=self.last_photo if self.last_photo is not None else Image.new('RGB', (150,200), (0,0,0)),
+            save_path='data/'+ self.last_doc['_id'] + '.png'
         )
         
         self.id_card_image = ImageTk.PhotoImage(self.id_card_printable)

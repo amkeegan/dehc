@@ -42,10 +42,6 @@ class Printer_Worker(Hardware_Worker):
 
     def printIDCard(self, idCard: Image):
 
-        idCard.show()
-        idCard.save('tmp.png')
-        print(f'Got image: {idCard.size}, count: {self.count}, length: {len(self.barcodesToPrint)}')
-
         hdc = win32ui.CreateDC()
         hdc.CreatePrinterDC(self.selectedPrinter)
 

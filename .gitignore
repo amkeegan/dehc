@@ -8,3 +8,6 @@ pycache/
 # Ignore text documents except requirements.txt
 *.txt
 !requirements.txt
+
+# Don't track 'temporary' generated images stored locally
+/data/*

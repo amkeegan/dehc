@@ -366,7 +366,8 @@ class IDCardBuilder:
         # Outlines only useful for debug / adjusting element positions
         #self.addOutlines(id_card)
 
-        id_card.show()
+        # Only needed for debugging
+        #id_card.show()
 
         id_card.save(save_path)    
 
