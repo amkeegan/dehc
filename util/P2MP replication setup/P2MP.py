@@ -21,7 +21,7 @@ localusername = "admin"
 localpass = "Creative"
 localserver = "http://127.0.0.1:5984/"
 remoteserver ="http://10.8.0.1:5984/"
-dblist = ["items", "containers", "config", "ids", "files"]
+dblist = ["items", "containers", "configs", "ids", "files"]
 
 def add_replication(dbcon,source_host,destination_host,db):
     print(f"Replicating from {source_host} to {destination_host} database '{db}'")
