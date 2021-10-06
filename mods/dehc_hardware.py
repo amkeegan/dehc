@@ -3,25 +3,10 @@ from multiprocessing.spawn import freeze_support
 import queue
 import time
 
-try:
-    import mods.acr122u.dehc_nfc as NFC
-except ImportError:
-    pass
-
-try: 
-    import wedderburn_di_166.dehc_scales as Scales
-except ImportError:
-    pass
-
-try:
-    import mods.zebra_ds22_reader.dehc_barcode as Barcode
-except ImportError:
-    pass
-
-try:
-    import zebra_zc300_printer.dehc_printer as Printer
-except ImportError:
-    pass
+import mods.acr122u.dehc_nfc as NFC
+import mods.wedderburn_di_166.dehc_scales as Scales
+import mods.zebra_ds22_reader.dehc_barcode as Barcode
+import mods.zebra_zc300_printer.dehc_printer as Printer
 
 from PIL import Image
 
@@ -29,6 +14,12 @@ import random
 
 #WORKER_MESSAGE_NODATA = 'No Data'
 #WORKER_MESSAGE_BROKEN_HARDWARE_CONNECTION = 'No Connection'
+
+def listPrinters():
+    return Printer.listPrinters()
+
+def  getDefaultPrinter():
+    return Printer.getDefaultPrinter()
 
 class Hardware:
 
@@ -72,7 +63,7 @@ class Hardware:
         if makePrinter:
             self.inQueuePrinter = Queue(maxsize=1) # Only store the most recent value
             self.outQueuePrinter = Queue(maxsize=1000) # For now, we don't need to stack up C2 messages
-            self.processPrinter = Process(target=Printer, args=(self.outQueuePrinter, self.inQueuePrinter))
+            self.processPrinter = Process(target=Printer.Printer_Worker, args=(self.outQueuePrinter, self.inQueuePrinter))
             self.processes.append(self.processPrinter)
             
         self.startProcesses()
@@ -129,9 +120,7 @@ class Hardware:
                 tmpData = self.inQueueNFC.get(timeout=0.01)
                 if 'uid' in tmpData:
                     self.lastNFCUID = tmpData['uid']
-                    #TODO: Should handle not sending duplicates??
             except queue.Empty:
-                print('Queue empty')
                 self.lastNFCUID = ''
         return self.lastNFCUID
     
@@ -147,8 +136,8 @@ class Hardware:
                 self.lastBarcode = ''
         return self.lastBarcode
 
-    def sendNewIDCard(self, idCardImage: Image):
-        self.outQueuePrinter.put({"message": "idcard", "idcard": idCardImage})
+    def sendNewIDCard(self, idCardImage: Image, printer: str):
+        self.outQueuePrinter.put({"message": "idcard", "idcard": idCardImage, "printer": printer})
 
 if __name__ == "__main__":
 

@@ -2,6 +2,7 @@
 
 import json
 import time
+from tkinter.constants import S
 
 from PIL import ImageTk
 from PIL import Image
@@ -13,6 +14,7 @@ import mods.database as md
 import mods.log as ml
 import mods.photo as mp
 import mods.dehc_hardware as hw
+import mods.id_card_generation as card_gen
 
 # ----------------------------------------------------------------------------
 
@@ -251,6 +253,12 @@ class DataEntry(SuperWidget):
         self.show()
 
     def show_id_window(self):
+
+        print(f'Current doc: {self.last_doc}')
+
+        printers = hw.listPrinters()
+        printers = [printer[2] for printer in printers]
+
         button = self.w_bu_generate_id
         state = str(button.cget("state"))
         if state != "disabled":
@@ -260,7 +268,11 @@ class DataEntry(SuperWidget):
             window.title("ID Generation")
 
             msg = ttk.Label(master=window)
-            print_button = ttk.Button(master=window, text="Print")
+            if len(printers) > 0:
+                variable = tk.StringVar(window)
+                variable.set(hw.getDefaultPrinter())
+                printer_list = tk.OptionMenu(window, variable, printers[0], *printers[1:])
+                print_button = ttk.Button(master=window, text="Print")
 
             def show_image(image: Image):
                 
@@ -268,21 +280,45 @@ class DataEntry(SuperWidget):
                 panel.grid(column=0,row=0)
 
             def print_id_card():
+                if len(printers) == 0:
+                    return
                 #TODO Link to self.hw.Hardware and print
                 print('Printing ID Card..')
-
-            #TODO: Add / get generated ID Card bitmap etc
-            self.id_card_image = ImageTk.PhotoImage(Image.new('RGB', (400,640), (128,0,238)))
+                print(f'Printing to: {variable.get()}')
+                self.hardware.sendNewIDCard(self.id_card_printable, variable.get())
 
             show_image(self.id_card_image)
 
-            print_button.config(command=print_id_card)
             msg.grid(column=0, row=0, sticky="nsew", padx=10, pady=10)
-            print_button.grid(column=0, row=1, sticky="nsew", padx=10, pady=10)
 
+            if len(printers) > 0:
+                print_button.config(command=print_id_card)
+                printer_list.grid(column=0, row=1, sticky='nsew', padx=10, pady=10)
+                print_button.grid(column=0, row=2, sticky="nsew", padx=10, pady=10)
 
     def generate_id_card(self, *args):
-        #TODO Get active evacuee details and MAKE id card, store to self.current_id_card?
+
+        card_builder = card_gen.IDCardBuilder()
+
+        self.id_card_printable = card_builder.generateIDCard(
+            qrcode_id=self.last_doc['_id'] if '_id' in self.last_doc else 'NILQRCODE',
+            embedded_logo_path='assets/embedded-logo.png',
+            barcode_id=self.last_doc['_id'] if '_id' in self.last_doc else 'NILBARCODE',
+            name=self.last_doc['Display Name'] if 'Display Name' in self.last_doc else 'UNKNOWN NAME',
+            secondary_texts=(
+                self.last_doc['Date Of Birth'] if 'Date Of Birth' in self.last_doc else 'NIL DOB',
+                self.last_doc['Passport Number'] if 'Passport Number' in self.last_doc else 'NIL PASSPORT',
+                self.last_doc['Nationality'] if 'Nationality' in self.last_doc else 'UNKNOWN NATIONALITY',
+                self.last_doc['Guardians'] if 'Guardians' in self.last_doc else 'No Guardians'
+            ),
+            tag_text='DEHC 2021',
+            logo=Image.open('assets/logo.png'),
+            portrait=self.last_photo if self.last_photo is not None else Image.new('RGB', (100,200), (0,0,0)),
+            save_path='data/tmp.png'
+        )
+        
+        self.id_card_image = ImageTk.PhotoImage(self.id_card_printable)
+
         self.show_id_window()
     
     def copyid(self, *args):
@@ -635,6 +671,7 @@ class DataEntry(SuperWidget):
 
         for child in self.w_fr_data.winfo_children():
             child.destroy()
+
         self.w_bu_photo.config(image="")
         self.current_photo = self.last_photo
         self.w_li_flags.delete(0, "end")
@@ -801,6 +838,8 @@ class DataEntry(SuperWidget):
             
             if len(flags) > 0:
                 self.w_li_flags.selection_set(0)
+            
+
 
 
     def showlist(self, event: tk.Event, source: str):

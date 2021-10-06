@@ -27,7 +27,7 @@ if __name__ == "__main__": # Multiprocessing library complains if this guard isn
 
     hardware = None
     try:
-        hardware = hw.Hardware(makeNFCReader=True, makeBarcodeReader=True)
+        hardware = hw.Hardware(makeNFCReader=True, makeBarcodeReader=True, makePrinter=True)
     except RuntimeError: #TODO: determine if this is still valid, since __main__ check
         pass
 

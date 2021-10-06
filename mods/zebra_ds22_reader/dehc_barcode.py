@@ -67,7 +67,6 @@ class Barcode_Worker(Hardware_Worker):
                 data = None
                 data = self.usbDevice.read(self.usbEndpoint.bEndpointAddress, self.usbEndpoint.wMaxPacketSize)
                 recontructedData = self.parseBarcodeResponse(data)
-                print(f'Reconstructed data: {recontructedData}')
                 self.currentBarcode = recontructedData
             except usb.core.USBError as err:
                 if err.args == ('Operation timed out',):
@@ -81,7 +80,6 @@ class Barcode_Worker(Hardware_Worker):
             if self.outQueue is not None:
                 try:
                     self.outQueue.put(msg, block=False)
-                    print(f'Sent msg: {msg}')
                 except queue.Full:
                     time.sleep(0.1)
             else:
