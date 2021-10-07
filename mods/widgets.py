@@ -6,7 +6,7 @@ from tkinter.constants import S
 
 from PIL import Image, ImageTk
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 from typing import Callable
 
 import mods.database as md
@@ -98,6 +98,7 @@ class DataEntry(SuperWidget):
         super().__init__(master=master, db=db, level=level)
 
         self.cats = cats          # Stores the list of item categories this DataEntry can select and work with.
+        self.editing = False      # Stores whether or not the user is currently editing a document.
         self.back_doc = {}        # Stores the document to return to when the back button is pressed.
         self.last_doc = {}        # Stores the most recently selected and retrieved document from the database.
         self.guardian_doc = {}    # Stores the guardian's document when 'new child' is pressed.
@@ -225,6 +226,25 @@ class DataEntry(SuperWidget):
         self.w_bu_delete.grid(column=5, row=0, sticky="nsew", padx=1, pady=1)
 
 
+    def yes_no(self, title: str, message: str, always: bool = False):
+        '''Shows the user an "are you sure?" dialog and returns their answer.
+        
+        title: Title of the dialog window.
+        message: The message inside the dialog  window.
+        always: If true, it'll always ask, even if not in "edit mode".
+        '''
+        if self.editing == True or always == True:
+            answer = messagebox.askyesno(title=title, message=message)
+            if answer == True:
+                if always == False:
+                    self.editing = False
+                return True
+            else:
+                return False
+        else:
+            return True
+
+
     def read_scales(self):
         if self.scales is not None:
             if self.scales.in_waiting > 0:
@@ -251,14 +271,22 @@ class DataEntry(SuperWidget):
 
     def back(self, *args):
         '''Callback for when the back button is pressed.'''
-        if "_id" in self.back_doc:
-            self.last_doc, self.back_doc = self.back_doc, self.last_doc
-            self._show(self.last_doc["_id"])
+        if self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to open a different item?"):
+            if "_id" in self.back_doc:
+                last, back = self.back_doc, self.last_doc
+                self._show(last["_id"])
+
+                def restore_history():
+                    '''Prevents intermediate actions from _show() messing up the history'''
+                    self.last_doc, self.back_doc = last, back
+                
+                self.w_fr.after(ms=1, func=restore_history) # Required to ensure it triggers after <<TreeboxSelect>>
 
 
     def cancel(self, *args):
         '''Callback for when the cancel button is pressed.'''
-        self.show()
+        if self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to cancel?"):
+            self.show()
 
 
     def show_id_window(self):
@@ -342,20 +370,22 @@ class DataEntry(SuperWidget):
 
     def delete(self, *args):
         '''Callback for when the delete button is pressed'''
-        id = self.last_doc["_id"]
-        parents = self.db.item_parents(item=id)
-        if len(parents) > 0:
-            self.db.item_delete(id=id, all=True, recur=True)
-            self.last_doc = {}
-            self.show()
-            if self._delete != None:
-                self._delete(id, parents)
-        else:
-            self.logger.error("Could not delete top level item")
+        if self.yes_no("Delete Item","Are you sure you want to delete this item and all of its children?", always=True):
+            id = self.last_doc["_id"]
+            parents = self.db.item_parents(item=id)
+            if len(parents) > 0:
+                self.db.item_delete(id=id, all=True, recur=True)
+                self.last_doc = {}
+                self.show()
+                if self._delete != None:
+                    self._delete(id, parents)
+            else:
+                self.logger.error("Cannot delete top level item")
 
 
     def edit(self, *args):
         '''Callback for when the edit button is pressed'''
+        self.editing = True
         for entry, buttona, buttonb, buttonc, hidden in zip(self.w_input_data, self.w_buttona_data, self.w_buttonb_data, self.w_buttonc_data, self.w_hidden_data):
             if hidden == None:
                 entry.config(state="normal")
@@ -382,36 +412,38 @@ class DataEntry(SuperWidget):
 
     def new(self, *args):
         '''Callback for when the new button is pressed.'''
-        if len(self.guardian_doc) > 0:
-            self.back_doc = self.guardian_doc
-            self.last_doc = {"category": self.child_doc["category"], self.child_doc["field"]: [self.child_doc["value"]]}
-            self.child_doc = {}
-            self.guardian_doc = {}
-        else:
-            self.back_doc = self.last_doc
-            self.last_doc = {"category": self.w_var_cat.get()}
-        self.show()
-        self.edit()
-        self.w_bu_delete.config(state="disabled")
+        if self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to create a new item?"):
+            if len(self.guardian_doc) > 0:
+                self.back_doc = self.guardian_doc
+                self.last_doc = {"category": self.child_doc["category"], self.child_doc["field"]: [self.child_doc["value"]]}
+                self.child_doc = {}
+                self.guardian_doc = {}
+            else:
+                self.back_doc = self.last_doc
+                self.last_doc = {"category": self.w_var_cat.get()}
+            self.show()
+            self.edit()
+            self.w_bu_delete.config(state="disabled")
 
 
     def newchild(self, event: tk.Event):
         '''Callback for when the new child button is pressed.'''
-        id = self.last_doc.get("_id", "")
-        if id != "":
-            button = event.widget
-            row = self.w_buttonc_data.index(button)
-            field = self.w_la_data[row].cget("text")
-            guardian_schema = self.db.schema_schema(id=id)
-            self.guardian_doc = self.last_doc
-            self.child_doc = {
-                "category": guardian_schema[field]["childcat"], 
-                "field": guardian_schema[field]["childfield"],
-                "value": self.guardian_doc["_id"]
-            }
-            if self._newchild != None:
-                self._newchild(target=id)
-            self.w_fr.after(ms=1, func=self.new) # .after is required to make self.new trigger after <<TreeviewSelect>>
+        if self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to create a new item?"):
+            id = self.last_doc.get("_id", "")
+            if id != "":
+                button = event.widget
+                row = self.w_buttonc_data.index(button)
+                field = self.w_la_data[row].cget("text")
+                guardian_schema = self.db.schema_schema(id=id)
+                self.guardian_doc = self.last_doc
+                self.child_doc = {
+                    "category": guardian_schema[field]["childcat"], 
+                    "field": guardian_schema[field]["childfield"],
+                    "value": self.guardian_doc["_id"]
+                }
+                if self._newchild != None:
+                    self._newchild(target=id)
+                self.w_fr.after(ms=1, func=self.new) # .after is required to make self.new trigger after <<TreeviewSelect>>
 
 
     def photo(self, *args):
@@ -737,6 +769,7 @@ class DataEntry(SuperWidget):
         self.w_buttonc_data = []
         self.w_hidden_data = []
 
+        self.editing = False
         self.w_bu_photo.config(command="")
         self.w_bu_edit.config(state="disabled")
         self.w_bu_cancel.config(state="disabled")
@@ -923,13 +956,14 @@ class DataEntry(SuperWidget):
         button = event.widget
         state = str(button.cget("state"))
         if state != "disabled":
-            row = self.w_buttona_data.index(button)
-            entry = self.w_input_data[row]
-            hidden = self.w_hidden_data[row]
-            if source == "IDS":
-                if len(entry['values']) > 0:
-                    id = hidden[entry.current()]
-                    self._show(id)
+            if self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to open a different item?"):
+                row = self.w_buttona_data.index(button)
+                entry = self.w_input_data[row]
+                hidden = self.w_hidden_data[row]
+                if source == "IDS":
+                    if len(entry['values']) > 0:
+                        id = hidden[entry.current()]
+                        self._show(id)
 
 
     def __del__(self):
@@ -958,7 +992,7 @@ class SearchTree(SuperWidget):
     _select: If present, a callback function that triggers when a tree item is selected.
     '''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, yesno: Callable = None):
         '''Constructs a SearchTree object.
         
         master: The widget that the SearchTree's component widgets will be instantiated under.
@@ -968,6 +1002,7 @@ class SearchTree(SuperWidget):
         level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         prepare: If true, automatically prepares widgets for packing.
         select: If present, a callback function that triggers when a tree item is selected.
+        yesno: If present, a callback function that handles prompting the user with yes/no to proceed.
         '''
         super().__init__(master=master, db=db, level=level)
 
@@ -982,6 +1017,7 @@ class SearchTree(SuperWidget):
         self.search_result = None
         self.summables = self.db.schema_sums()
         self.summation = False
+        self.yes_no = yesno
 
         if prepare == True:
             self.prepare()
@@ -1180,7 +1216,7 @@ class SearchTree(SuperWidget):
 
 
     def search_select(self, *args):
-        '''Callback for when an item in the search is clicked.'''
+        '''Callback for when an item in the search is selected.'''
         event, = args
         selected = event.widget.curselection()
         if len(selected) == 1:
@@ -1305,11 +1341,15 @@ class SearchTree(SuperWidget):
         event, = args
         self.selection = event.widget.selection()
         if self._select != None and self.w_var_autoopen.get() == 1:
-            if len(self.selection) == 1:
-                id, = self.selection
-                doc = self.db.item_get(id=id, lazy=True)
-                tree = self.w_tr_tree
-                self._select(doc, self)
+            if self.yes_no == None:
+                permitted = True
+            else:
+                permitted = self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to open an item?")
+            if permitted == True:
+                if len(self.selection) == 1:
+                    id, = self.selection
+                    doc = self.db.item_get(id=id, lazy=True)
+                    self._select(doc, self)
 
 
     def tree_open(self, node: str = None):
@@ -1420,7 +1460,7 @@ class ContainerManager(SuperWidget):
     select: If present, a callback function that triggers when a tree item is selected.
     '''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, topbase: dict, botbase: dict,  *, bookmarks: str = "bookmarks.json", cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, topbase: dict, botbase: dict,  *, bookmarks: str = "bookmarks.json", cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, yesno: Callable = None):
         '''Constructs a ContainerManager object.
         
         master: The widget that the ContainerManager's component widgets will be instantiated under.
@@ -1433,6 +1473,7 @@ class ContainerManager(SuperWidget):
         ops: The operations that can be used in seraches.
         prepare: If true, automatically prepares widgets for packing.
         select: If present, a callback function that triggers when a tree item is selected.
+        yesno: If present, a callback function that handles prompting the user with yes/no to proceed.
         '''
         super().__init__(master=master, db=db, level=level)
 
@@ -1441,6 +1482,8 @@ class ContainerManager(SuperWidget):
         self.cats = cats
         self.level = level
         self.select = select
+        
+        self.yes_no = yesno
 
         self.bookmarks_path = bookmarks
         with open(self.bookmarks_path, "r") as f:
@@ -1464,10 +1507,10 @@ class ContainerManager(SuperWidget):
         self.w_bu_bm2.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="2"), add="+")
         self.w_bu_bm3.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="3"), add="+")
         self.w_bu_bm4.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="4"), add="+")
-        self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, cats=self.cats, level=self.level, prepare=True, select=self.select)
+        self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, cats=self.cats, level=self.level, prepare=True, select=self.select, yesno=self.yes_no)
         self.w_bu_move_item = ttk.Button(master=self.w_fr, text="⇓ ⇓ ⇓", command=lambda *_: self.move(), style="large.TButton")
         self.w_bu_move_subs = ttk.Button(master=self.w_fr, text="⇑ ⇑ ⇑", command=lambda *_: self.move(reverse=True), style="large.TButton")
-        self.w_se_bottom = SearchTree(master=self.w_fr, db=self.db, base=self.botbase, cats=self.cats, level=self.level, prepare=True, select=self.select)
+        self.w_se_bottom = SearchTree(master=self.w_fr, db=self.db, base=self.botbase, cats=self.cats, level=self.level, prepare=True, select=self.select, yesno=self.yes_no)
 
         self.w_fr.columnconfigure(0, weight=1000)
         self.w_fr.columnconfigure(1, weight=1000)
@@ -1537,21 +1580,27 @@ class ContainerManager(SuperWidget):
         
         preset: Which bookmark to use.
         '''
-        guide = self.bookmarks.get(preset, None)
-        top, bottom = guide.get("top", None), guide.get("bottom", None)
-        try:
-            items = self.db.items_get(ids=[top, bottom], lazy=True)
-            top, bottom = items
-            topid, bottomid = top["_id"], bottom["_id"]
-            self.basebot(newbase=bottom)
-            self.base(newbase=top)
-            self.refresh(topselection=topid, bottomselection=bottomid)
-            self.highlight(item=topid, botitem=bottomid)
-            self.botopen()
-            self.open()
-        except:
-            self.logger.exception(f"Could not open Bookmark {preset}.")
-            self.refresh()
+        if self.yes_no == None or (self.w_se_top.w_var_autoopen.get() == 0 and self.w_se_bottom.w_var_autoopen.get() == 0):
+            permitted = True
+        else:
+            permitted = self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to open a bookmark?")
+
+        if permitted == True:
+            guide = self.bookmarks.get(preset, None)
+            top, bottom = guide.get("top", None), guide.get("bottom", None)
+            try:
+                items = self.db.items_get(ids=[top, bottom], lazy=True)
+                top, bottom = items
+                topid, bottomid = top["_id"], bottom["_id"]
+                self.basebot(newbase=bottom)
+                self.base(newbase=top)
+                self.refresh(topselection=topid, bottomselection=bottomid)
+                self.highlight(item=topid, botitem=bottomid)
+                self.botopen()
+                self.open()
+            except:
+                self.logger.exception(f"Could not open Bookmark {preset}.")
+                self.refresh()
 
 
     def bookmark_change(self, preset: str):
@@ -1594,24 +1643,30 @@ class ContainerManager(SuperWidget):
         
         reverse: If true, container movement is bottom to top.
         '''
-        if reverse == False:
-            target, *_ = self.w_se_top.selection
-            source, *_ = self.db.item_parents(item=target)
-            destination, *_ = self.w_se_bottom.selection
-            self.db.container_move(from_con=source, to_con=destination, item=target)
-            self.refresh(topselection=source, bottomselection=destination)
-            self.highlight(botitem=destination)
-            self.highlight(item=source)
+        if self.yes_no == None or (self.w_se_top.w_var_autoopen.get() == 0 and self.w_se_bottom.w_var_autoopen.get() == 0):
+            permitted = True
         else:
-            target, *_ = self.w_se_bottom.selection
-            source, *_ = self.db.item_parents(item=target)
-            destination, *_ = self.w_se_top.selection
-            self.db.container_move(from_con=source, to_con=destination, item=target)
-            self.refresh(topselection=destination, bottomselection=source)
-            self.highlight(botitem=source)
-            self.highlight(item=destination)
-        self.botopen()
-        self.open()
+            permitted = self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to move an item?")
+
+        if permitted == True:
+            if reverse == False:
+                target, *_ = self.w_se_top.selection
+                source, *_ = self.db.item_parents(item=target)
+                destination, *_ = self.w_se_bottom.selection
+                self.db.container_move(from_con=source, to_con=destination, item=target)
+                self.refresh(topselection=source, bottomselection=destination)
+                self.highlight(botitem=destination)
+                self.highlight(item=source)
+            else:
+                target, *_ = self.w_se_bottom.selection
+                source, *_ = self.db.item_parents(item=target)
+                destination, *_ = self.w_se_top.selection
+                self.db.container_move(from_con=source, to_con=destination, item=target)
+                self.refresh(topselection=destination, bottomselection=source)
+                self.highlight(botitem=source)
+                self.highlight(item=destination)
+            self.botopen()
+            self.open()
 
 
     # This functionality is currently inaccessible since there's no button tied to it

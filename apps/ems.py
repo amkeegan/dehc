@@ -59,9 +59,9 @@ class EMS():
         self.root.bind_class("TButton", "<Return>", lambda event: event.widget.invoke(), add="+")
         self.root.bind_class("TCheckbutton", "<Return>", lambda event: event.widget.invoke(), add="+")
 
-        self.cm = mw.ContainerManager(master=self.root, db=self.db, topbase=base, botbase=base, bookmarks=self.bookmarks, cats=self.cats, level=self.level, prepare=True, select=self.item_select)
-        self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, delete=self.delete, level=self.level, newchild=self.newchild, prepare=True, save=self.save, show=self.show, hardware=self.hardware)
-        self.bu_refresh = ttk.Button(master=self.root, text="Refresh", command=self.refresh)
+        self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, delete=self.delete, level=self.level, newchild=self.new_child, prepare=True, save=self.save, show=self.show, hardware=self.hardware)
+        self.cm = mw.ContainerManager(master=self.root, db=self.db, topbase=base, botbase=base, bookmarks=self.bookmarks, cats=self.cats, level=self.level, prepare=True, select=self.item_select, yesno=self.de.yes_no)
+        self.bu_refresh = ttk.Button(master=self.root, text="Refresh", command=self.refresh_button)
         self.sb = mw.StatusBar(master=self.root, db=self.db, level=self.level, prepare=True)
         self.root.rowconfigure(0, weight=1000)
         self.root.rowconfigure(1, weight=1, minsize=16)
@@ -69,7 +69,7 @@ class EMS():
         self.root.columnconfigure(1, weight=1000)
 
 
-    def newchild(self, target: str):
+    def new_child(self, target: str):
         '''Callback for when new child is pressed in the data pane.'''
         parents = self.db.item_parents(item=target)
         if len(parents) == 1:
@@ -89,8 +89,18 @@ class EMS():
         self.sb.grid(column=1, row=1, columnspan=2, sticky="nsew", padx=2, pady=2)
 
 
+    def refresh_button(self, *args):
+        '''Callback for when the refresh button is pressed.'''
+        if self.de.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to refresh?"):
+            autoopen = self.active.w_var_autoopen.get()
+            if autoopen == 0:
+                self.active.w_var_autoopen.set(1)
+            self.refresh()
+            self.root.after(ms=1, func=lambda *_: self.active.w_var_autoopen.set(autoopen)) # .after is required to make this trigger after <<TreeviewSelect>>
+
+
     def refresh(self):
-        '''Refreshes the trees and data pane.'''
+        '''Refreshes the trees.'''
         self.cm.refresh(active=self.active)
 
 
@@ -141,8 +151,12 @@ class EMS():
         '''Callback for when the show button is pressed in the data pane.'''
         id, *_ = args
         if id != None:
+            autoopen = self.active.w_var_autoopen.get()
+            if autoopen == 0:
+                self.active.w_var_autoopen.set(1)
             self.refresh()
             self.active.tree_focus(goal=id, rebase=True)
+            self.root.after(ms=1, func=lambda *_: self.active.w_var_autoopen.set(autoopen)) # .after is required to make this trigger after <<TreeviewSelect>>
 
 
     def __del__(self):
