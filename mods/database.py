@@ -433,11 +433,12 @@ class DEHCDatabase:
         self.logger.debug("DEHCDatabase object instantiated")
         self.db = Database(config=config, level=level)
 
-        self.db_items = namespace+"-items"
-        self.db_containers = namespace+"-containers"
-        self.db_ids = namespace+"-ids"
-        self.db_files = namespace+"-files"
-        self.db_configs = namespace+"-configs"
+        self.namespace = namespace
+        self.db_items = self.namespace+"-items"
+        self.db_containers = self.namespace+"-containers"
+        self.db_ids = self.namespace+"-ids"
+        self.db_files = self.namespace+"-files"
+        self.db_configs = self.namespace+"-configs"
         self.db_list = [self.db_items, self.db_containers, self.db_ids, self.db_files, self.db_configs]
 
         self.id_len = 12

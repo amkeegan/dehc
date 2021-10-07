@@ -10,15 +10,7 @@ import mods.dehc_hardware as hw
 # ----------------------------------------------------------------------------
 
 class EMS():
-    '''A class which represents the EMS application.
-    
-    bookmarks: Relative filepath to the bookmark definition file.
-    cats: The categories which can be searched and created on the EMS screen.
-    flags: The flags which can be assigned on the EMS screen.
-    db: The database object which the app uses for database transactions.
-    logger: The logger object used for logging.
-    root: The root of the application, a tk.Tk object.
-    '''
+    '''A class which represents the EMS application.'''
 
     def __init__(self, db: md.DEHCDatabase, *, bookmarks: str = "bookmarks.json", level: str = "NOTSET", autorun: bool = False, hardware: hw.Hardware = None):
         '''Constructs an EMS object.
@@ -28,30 +20,20 @@ class EMS():
         level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         prepare: If true, automatically prepares widgets for packing.
         '''
-        self.bookmarks = bookmarks
-        self.level = level
+        self.level = level                # The minimum level of logging messages to report
         self.logger = ml.get("EMS", level=self.level)
         self.logger.debug("EMS object instantiated")
 
-        self.hardware = hardware
+        self.active = None                # The source of the last selected data pane item.
+        self.bookmarks = bookmarks        # The filepath to the bookmarks.json file
+        self.db = db                      # The associated DEHCDatabase object
+        self.cats = self.db.schema_cats() # The item categories available to the EMS application
+        self.hardware = hardware          # The associated hardware manager
+        self.root = tk.Tk()               # The root Tkinter widget of the application
 
-        self.db = db
-        self.cats = self.db.schema_cats()
-
-        self.root = tk.Tk()
-        self.root.title(f"EMS ({self.db.db.data['url']})")
+        self.root.title(f"EMS ({self.db.namespace} @ {self.db.db.data['url']})")
         self.root.state('zoomed')
         self.root.configure(background="#D9D9D9")
-
-        self.style = ttk.Style(self.root)
-        self.style.theme_use("clam")
-        self.style.map('TEntry', foreground=[('readonly', 'black')])
-        self.style.map('TCombobox', fieldbackground=[('readonly', 'white')])
-        self.style.configure("top.Treeview", fieldbackground="white", background="white", foreground="black")
-        self.style.map('top.Treeview', background=[('selected', 'blue')], foreground=[('selected', 'white')])
-        self.style.configure("bottom.Treeview", fieldbackground="#fcf0cf", background="#fcf0cf", foreground="black")
-        self.style.map('bottom.Treeview', background=[('selected', 'blue')], foreground=[('selected', '#fcf0cf')])
-        
 
         if autorun == True:
             self.prepare()
@@ -62,6 +44,21 @@ class EMS():
     def prepare(self):
         '''Constructs the frames and widgets of the EMS.'''
         base, *_ = self.db.items_query(cat="Evacuation", fields=["_id", "Display Name"])
+
+        self.style = ttk.Style(self.root)
+        self.style.theme_use("clam")
+        self.style.configure('.', font=('Arial', 9))
+        self.style.map('TEntry', foreground=[('readonly', 'black')])
+        self.style.map('TCombobox', fieldbackground=[('readonly', 'white')])
+        self.style.configure("unactive.Treeview", fieldbackground="white", background="white", foreground="black")
+        self.style.map('unactive.Treeview', background=[('selected', 'blue')], foreground=[('selected', 'white')])
+        self.style.configure("active.Treeview", fieldbackground="#fcf0cf", background="#fcf0cf", foreground="black")
+        self.style.map('active.Treeview', background=[('selected', 'blue')], foreground=[('selected', '#fcf0cf')])
+        self.style.configure('large.TButton', font=('Arial', 14))
+
+        self.root.bind_class("TButton", "<Return>", lambda event: event.widget.invoke(), add="+")
+        self.root.bind_class("TCheckbutton", "<Return>", lambda event: event.widget.invoke(), add="+")
+
         self.cm = mw.ContainerManager(master=self.root, db=self.db, topbase=base, botbase=base, bookmarks=self.bookmarks, cats=self.cats, level=self.level, prepare=True, select=self.item_select)
         self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, delete=self.delete, level=self.level, newchild=self.newchild, prepare=True, save=self.save, show=self.show, hardware=self.hardware)
         self.bu_refresh = ttk.Button(master=self.root, text="Refresh", command=self.refresh)
@@ -74,11 +71,14 @@ class EMS():
 
     def newchild(self, target: str):
         '''Callback for when new child is pressed in the data pane.'''
-        parent = self.cm.w_se_top.w_tr_tree.parent(target)
-        if parent == "":
-            self.cm.w_se_top.tree_rebase(target=target)
-            parent = self.cm.w_se_top.w_tr_tree.parent(target)
-        self.cm.highlight(item=parent)
+        parents = self.db.item_parents(item=target)
+        if len(parents) == 1:
+            parent, = parents
+            if target == self.active.base:
+                self.active.tree_rebase(target=target)
+                parent = self.active.w_tr_tree.parent(target)
+            self.active.tree_focus(goal=parent, rebase=True)
+            self.active.tree_open()
 
 
     def pack(self):
@@ -91,7 +91,7 @@ class EMS():
 
     def refresh(self):
         '''Refreshes the trees and data pane.'''
-        self.cm.refresh()
+        self.cm.refresh(active=self.active)
 
 
     def run(self):
@@ -100,8 +100,12 @@ class EMS():
 
 
     def item_select(self, *args):
-        '''Callback for when an item is selected on the top tree.'''
-        doc, = args
+        '''Callback for when an item is selected in a tree.'''
+        doc, tree = args
+        if self.active != None:
+            self.active.w_tr_tree.configure(style="unactive.Treeview")
+        self.active = tree
+        self.active.w_tr_tree.configure(style="active.Treeview")
         self.de.show(doc)
 
 
@@ -110,33 +114,35 @@ class EMS():
         id, parents, *_ = args
         if len(parents) > 0:
             parent, *_ = parents
-            if id == self.cm.base()["_id"]:
-                self.cm.base(newbase=self.db.item_get(id=parent, fields=["_id", "Display Name"]))
-            self.cm.refresh()
-            self.cm.highlight(item=parent)
-            self.cm.open()
+            if id == self.cm.w_se_top.base["_id"]:
+                self.cm.w_se_top.base = self.db.item_get(id=parent, fields=["_id", "Display Name"])
+            if id == self.cm.w_se_bottom.base["_id"]:
+                self.cm.w_se_bottom.base = self.db.item_get(id=parent, fields=["_id", "Display Name"])
+            self.refresh()
+            self.active.tree_focus(goal=parent, rebase=True)
+            self.active.tree_open()
         else:
-            self.cm.refresh()
+            self.refresh()
 
 
     def save(self, *args):
         '''Callback for when the save button is pressed in the data pane.'''
         id, *_ = args
         if id != None:
-            container, *_ = self.cm.selections()
+            container, *_ = self.active.selection
             self.db.container_add(container=container, item=id)
-        self.cm.refresh()
+        self.refresh()
         if id != None:
-            self.cm.highlight(item=container)
-            self.cm.open()
+            self.active.tree_focus(goal=container, rebase=True)
+            self.active.tree_open()
 
 
     def show(self, *args):
         '''Callback for when the show button is pressed in the data pane.'''
         id, *_ = args
         if id != None:
-            self.cm.refresh()
-            self.cm.highlight(item=id)
+            self.refresh()
+            self.active.tree_focus(goal=id, rebase=True)
 
 
     def __del__(self):
