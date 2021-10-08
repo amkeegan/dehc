@@ -1681,8 +1681,7 @@ class ContainerManager(SuperWidget):
         
         preset: Which bookmark to change.
         '''
-        topselect = self.w_se_top.base
-        botselect = self.w_se_bottom.base
+        topselect, botselect = self.selections()
         toptext = self.w_se_top.w_tr_tree.item(topselect)['text'][:10]
         bottext = self.w_se_bottom.w_tr_tree.item(botselect)['text'][:10]
         fulltext = f"{toptext}/{bottext}"
