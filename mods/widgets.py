@@ -601,7 +601,7 @@ class DataEntry(SuperWidget):
                     self.w_hidden_data[row] = listids
                     window.destroy()
 
-                tree = SearchTree(master=window, db=self.db, base=base, cats=self.cats, level=self.level, prepare=True)
+                tree = SearchTree(master=window, db=self.db, base=base, cats=self.cats, level=self.level, prepare=True, simple=True)
                 namelistlb = ttk.Label(master=window, text="Guardians")
                 namelist = tk.Listbox(master=window, selectmode=tk.SINGLE)
                 for name in entry['values']:
@@ -992,16 +992,20 @@ class SearchTree(SuperWidget):
     _select: If present, a callback function that triggers when a tree item is selected.
     '''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, yesno: Callable = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, simple: bool = False, yesno: Callable = None):
         '''Constructs a SearchTree object.
         
         master: The widget that the SearchTree's component widgets will be instantiated under.
         db: The database object which the widget uses for database transactions.
         base: The document of the item upon which the tree is initially based.
         cats: The categories of items that can be searched.
+        dragstarttree: Stores the origin tree when clicking and dragging.
+        dragstartid: Stores the id of the origin item when clicking and dragging between trees.
+        last_selector: The most recently used selector for a database search.
         level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         prepare: If true, automatically prepares widgets for packing.
         select: If present, a callback function that triggers when a tree item is selected.
+        simple: If true, the tree is "simplified", removing drag & drop functionality and hiding some controls.
         yesno: If present, a callback function that handles prompting the user with yes/no to proceed.
         '''
         super().__init__(master=master, db=db, level=level)
@@ -1012,9 +1016,13 @@ class SearchTree(SuperWidget):
         self._select = select
 
         self.base = base
+        self.dragstarttree = None
+        self.dragstartid = None
         self.headings = {}
+        self.last_selector = {}
         self.selection = None
         self.search_result = None
+        self.simple = simple
         self.summables = self.db.schema_sums()
         self.summation = False
         self.yes_no = yesno
@@ -1053,7 +1061,6 @@ class SearchTree(SuperWidget):
         self.w_var_op = tk.StringVar()
         self.w_var_value = tk.StringVar()
         self.w_var_autoopen = tk.IntVar()
-        self.w_var_autoopen.set(1)
         self.w_var_summation = tk.IntVar()
         self.w_var_summation.trace("w", self.summation_toggle)
 
@@ -1062,20 +1069,26 @@ class SearchTree(SuperWidget):
         self.w_co_field = ttk.Combobox(master=self.w_fr_search, textvariable=self.w_var_field, state="readonly")
         self.w_co_op = ttk.Combobox(master=self.w_fr_search, value=self.ops, textvariable=self.w_var_op, state="readonly")
         self.w_en_value = ttk.Entry(master=self.w_fr_search, textvariable=self.w_var_value)
-        self.w_bu_search = ttk.Button(master=self.w_fr_search, text="Search", command=self.search)
+        self.w_bu_search = ttk.Button(master=self.w_fr_search, text="Search", command=lambda *_: self.search())
         self.w_bu_narrow = ttk.Button(master=self.w_fr_search, text="Narrow", command=self.narrow)
         self.w_bu_scan = ttk.Button(master=self.w_fr_search, text="Phys ID Search", command=self.scan)
         self.w_li_search = tk.Listbox(master=self.w_fr, selectmode=tk.SINGLE, relief=tk.GROOVE, exportselection=False)
         self.w_tr_tree = ttk.Treeview(master=self.w_fr, columns=list(range(1,len(self.summables)+2)), show="tree", selectmode="browse", style="unactive.Treeview")
+        self.w_tr_tree.SearchTree = self
         self.w_ch_autoopen = ttk.Checkbutton(master=self.w_fr, variable=self.w_var_autoopen, text="Auto Open?")
         self.w_ch_summation = ttk.Checkbutton(master=self.w_fr, variable=self.w_var_summation, text="Show Sums?")
 
         self.w_en_value.bind("<Return>", self.search, add="+")
         self.w_li_search.bind("<<ListboxSelect>>", self.search_select)
+
         self.w_tr_tree.bind("<<TreeviewSelect>>", self.tree_select)
         self.w_tr_tree.bind("<<TreeviewOpen>>", lambda *_: self.tree_open())
         self.w_tr_tree.bind("<Button-3>", self.tree_rebase_mouse)
         self.w_tr_tree.bind("<Control-r>", self.tree_rebase_keyboard)
+
+        if self.simple == False:
+            self.w_tr_tree.bind("<ButtonPress-1>", self.dragstart)
+            self.w_tr_tree.bind("<ButtonRelease-1>", self.dragstop)
 
         self.w_co_cat.current(0)
         self.w_co_field.current(1)
@@ -1120,13 +1133,54 @@ class SearchTree(SuperWidget):
         self.w_sc_search.grid(column=1, row=1, rowspan=2, sticky="nse", padx=1, pady=1)
         self.w_tr_tree.grid(column=2, row=1, columnspan=2, sticky="nsew", padx=1, pady=1)
         self.w_sc_tree.grid(column=4, row=1, sticky="nse", padx=1, pady=1)
-        self.w_ch_autoopen.grid(column=2, row=2, sticky="nsew", padx=1, pady=1)
-        self.w_ch_summation.grid(column=3, row=2, columnspan=2, sticky="nsew", padx=1, pady=1)
+
+        if self.simple == False:
+            self.w_ch_autoopen.grid(column=2, row=2, sticky="nsew", padx=1, pady=1)
+            self.w_ch_summation.grid(column=3, row=2, columnspan=2, sticky="nsew", padx=1, pady=1)
+
+
+    def dragstart(self, *args):
+        '''Callback for when the mouse is clicked down on the tree.'''
+        event, = args
+        tree = event.widget
+        self.dragstartid = tree.identify_row(event.y)
+        self.dragstarttree = tree.SearchTree
+    
+
+    def dragstop(self, *args):
+        '''Callback for when the mouse is released after clicking down on the tree.'''
+        event, = args
+        mx, my = event.widget.winfo_pointerxy()
+        tree = self.w_fr.winfo_containing(mx, my)
+
+        if tree != None and tree.winfo_class() == "Treeview" and self.dragstartid != None:
+            dragendtree = tree.SearchTree
+            dragendid = tree.identify_row(my - tree.winfo_rooty())
+            
+            if self.dragstartid != dragendid:
+                if self.yes_no == None or (self.dragstarttree.w_var_autoopen.get() == 0 and dragendtree.w_var_autoopen.get() == 0):
+                    permitted = True
+                else:
+                    permitted = self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to move an item?")
+                
+                if permitted == True:
+                    target = self.dragstartid
+                    source, *_ = self.db.item_parents(item=target)
+                    destination = dragendid
+                    self.db.container_move(from_con=source, to_con=destination, item=target)
+                    
+                    dragendtree.tree_refresh(selection=destination)
+                    self.dragstarttree.tree_refresh(selection=source)
+                    dragendtree.tree_focus(goal=destination, rebase=True)
+                    self.dragstarttree.tree_focus(goal=source, rebase=True)
+                    dragendtree.tree_open(node=destination)
+                    self.dragstarttree.tree_open(node=source)
+        self.dragstartid = None
 
 
     def narrow(self, *args):
         '''Callback for when the narrow button is pressed.'''
-        self.logger.info("You pressed NARROW.")
+        self.search(preselector=self.last_selector)
 
 
     def scan(self, *args):
@@ -1171,7 +1225,7 @@ class SearchTree(SuperWidget):
         find_button.grid(column=0, row=3, sticky="nsew", padx=2, pady=2)
 
 
-    def search(self, *args):
+    def search(self, preselector: dict = {}):
         '''Callback for when the search button is pressed.'''
         cat = self.w_var_cat.get()
         field = self.w_var_field.get()
@@ -1185,12 +1239,17 @@ class SearchTree(SuperWidget):
             "≠": {"$ne": value},
             "≈": {"$regex": value}
             }[self.w_var_op.get()]
-        selector = {field: opvalue}
+
+        selector = preselector.copy()
+        selector[field] = opvalue
+        self.last_selector = selector
+        
         name = self.db.schema_name(cat=cat)
         fields = ["_id", name]
         sort = [{key: 'asc'} for key in self.db.schema_keys(cat=cat)]
         self.search_result = self.db.items_query(cat=cat, selector=selector, fields=fields, sort=sort)
         self.w_li_search.delete(0, "end")
+        
         if len(self.search_result) > 0:
             self.w_li_search.config(state="normal")
             for index, result in enumerate(self.search_result):
@@ -1438,7 +1497,6 @@ class SearchTree(SuperWidget):
             self.w_tr_tree.item(item=node, values=values)
 
 
-
     def __del__(self):
         '''Runs when SearchTree object is deleted.'''
         self.logger.debug("SearchTree object destroyed")
@@ -1654,6 +1712,7 @@ class ContainerManager(SuperWidget):
                 source, *_ = self.db.item_parents(item=target)
                 destination, *_ = self.w_se_bottom.selection
                 self.db.container_move(from_con=source, to_con=destination, item=target)
+                
                 self.refresh(topselection=source, bottomselection=destination)
                 self.highlight(botitem=destination)
                 self.highlight(item=source)
@@ -1662,11 +1721,12 @@ class ContainerManager(SuperWidget):
                 source, *_ = self.db.item_parents(item=target)
                 destination, *_ = self.w_se_top.selection
                 self.db.container_move(from_con=source, to_con=destination, item=target)
+                
                 self.refresh(topselection=destination, bottomselection=source)
                 self.highlight(botitem=source)
                 self.highlight(item=destination)
-            self.botopen()
             self.open()
+            self.botopen()
 
 
     # This functionality is currently inaccessible since there's no button tied to it
