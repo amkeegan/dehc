@@ -732,6 +732,7 @@ class DataEntry(SuperWidget):
                 if self.last_photo != None:
                     self.db.photo_delete(item=doc["_id"])
             if self._save != None:
+                #self.editing = False
                 self._save(id)
             self.back_doc = self.last_doc
             self.last_doc = doc
@@ -844,7 +845,7 @@ class DataEntry(SuperWidget):
                         buttonb.bind("<Button-1>", lambda e: self.readlist(event=e, source="IDS"))
                         buttona = ttk.Button(master=self.w_fr_data, text="Show", state="normal")
                         buttona.bind("<Button-1>", lambda e: self.showlist(event=e, source="IDS"))
-                        buttonc = ttk.Button(master=self.w_fr_data, text="New Child", state="normal")
+                        buttonc = ttk.Button(master=self.w_fr_data, text="Create", state="normal")
                         buttonc.bind("<Button-1>", self.newchild)
                     elif source == "PHYSIDS":
                         buttonb.bind("<Button-1>", lambda e: self.readlist(event=e, source="PHYSIDS"))

@@ -3,13 +3,13 @@
 import argparse
 import sys
 
-if sys.version_info.major == 3 and sys.version_info.minor == 9 and sys.platform in ("win32", "cygwin"):
+if sys.version_info.major == 3 and sys.version_info.minor == 9:
     import apps.ems as ae
     import mods.database as md
     import mods.log as ml
     import mods.dehc_hardware as hw
 else:
-    print("This application must be run on Windows using Python 3.9.X.")
+    print("This application must be run using Python 3.9.X.")
     sys.exit(1)
 
 # ----------------------------------------------------------------------------
