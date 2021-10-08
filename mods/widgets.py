@@ -1083,6 +1083,7 @@ class SearchTree(SuperWidget):
 
         self.w_tr_tree.bind("<<TreeviewSelect>>", self.tree_select)
         self.w_tr_tree.bind("<<TreeviewOpen>>", lambda *_: self.tree_open())
+        self.w_tr_tree.bind("<<TreeviewClose>>", lambda *_: self.tree_close())
         self.w_tr_tree.bind("<Button-3>", self.tree_rebase_mouse)
         self.w_tr_tree.bind("<Control-r>", self.tree_rebase_keyboard)
 
@@ -1167,14 +1168,20 @@ class SearchTree(SuperWidget):
                     target = self.dragstartid
                     source, *_ = self.db.item_parents(item=target)
                     destination = dragendid
-                    self.db.container_move(from_con=source, to_con=destination, item=target)
-                    
-                    dragendtree.tree_refresh(selection=destination)
-                    self.dragstarttree.tree_refresh(selection=source)
-                    dragendtree.tree_focus(goal=destination, rebase=True)
-                    self.dragstarttree.tree_focus(goal=source, rebase=True)
-                    dragendtree.tree_open(node=destination)
-                    self.dragstarttree.tree_open(node=source)
+
+                    recur_risk_list = self.db.item_parents(item=destination)
+                    if target not in recur_risk_list:
+                        self.db.container_move(from_con=source, to_con=destination, item=target)
+                        dragendtree.tree_refresh(selection=destination)
+                        self.dragstarttree.tree_refresh(selection=source)
+                        dragendtree.tree_focus(goal=destination, rebase=True)
+                        self.dragstarttree.tree_focus(goal=source, rebase=True)
+                        dragendtree.tree_open(node=destination)
+                        self.dragstarttree.tree_open(node=source)
+                    else:
+                        self.logger.error("Could not perform move, as it would create an infinite loop.")
+        
+        self.dragstarttree = None
         self.dragstartid = None
 
 
@@ -1411,6 +1418,12 @@ class SearchTree(SuperWidget):
                     self._select(doc, self)
 
 
+    def tree_close(self, *args):
+        '''Callback which triggers when a tree node is closed.'''
+        self.dragstarttree = None
+        self.dragstartid = None
+
+
     def tree_open(self, node: str = None):
         '''Open a node on the tree view.
         
@@ -1441,6 +1454,8 @@ class SearchTree(SuperWidget):
             self.tree_sum(node=child_id)
         self.w_tr_tree.item(item=id, open=True)
         self.logger.debug("Tree open finished in %.5f" % (time.perf_counter() - start_time)  )
+        self.dragstarttree = None
+        self.dragstartid = None
 
 
     def tree_sum(self, node: str):
@@ -1666,7 +1681,8 @@ class ContainerManager(SuperWidget):
         
         preset: Which bookmark to change.
         '''
-        topselect, botselect = self.selections()
+        topselect = self.w_se_top.base
+        botselect = self.w_se_bottom.base
         toptext = self.w_se_top.w_tr_tree.item(topselect)['text'][:10]
         bottext = self.w_se_bottom.w_tr_tree.item(botselect)['text'][:10]
         fulltext = f"{toptext}/{bottext}"
@@ -1711,22 +1727,27 @@ class ContainerManager(SuperWidget):
                 target, *_ = self.w_se_top.selection
                 source, *_ = self.db.item_parents(item=target)
                 destination, *_ = self.w_se_bottom.selection
-                self.db.container_move(from_con=source, to_con=destination, item=target)
-                
-                self.refresh(topselection=source, bottomselection=destination)
-                self.highlight(botitem=destination)
-                self.highlight(item=source)
             else:
                 target, *_ = self.w_se_bottom.selection
                 source, *_ = self.db.item_parents(item=target)
                 destination, *_ = self.w_se_top.selection
+
+            recur_risk_list = [destination]+self.db.item_parents(item=destination)
+            if target not in recur_risk_list:
                 self.db.container_move(from_con=source, to_con=destination, item=target)
-                
-                self.refresh(topselection=destination, bottomselection=source)
-                self.highlight(botitem=source)
-                self.highlight(item=destination)
-            self.open()
-            self.botopen()
+
+                if reverse == False:
+                    self.refresh(topselection=source, bottomselection=destination)
+                    self.highlight(botitem=destination)
+                    self.highlight(item=source)
+                else:
+                    self.refresh(topselection=destination, bottomselection=source)
+                    self.highlight(botitem=source)
+                    self.highlight(item=destination)
+                self.open()
+                self.botopen()
+            else:
+                self.logger.error("Could not perform move, as it would create an infinite loop.")
 
 
     # This functionality is currently inaccessible since there's no button tied to it

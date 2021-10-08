@@ -511,17 +511,19 @@ class DEHCDatabase:
         return ids_list
 
 
-    def container_children(self, container: str, cat: list = None, result: str = "ITEM"):
+    def container_children(self, container: str, cat: list = None, result: str = "ITEM", limit: int = None):
         '''Returns flat list, listing items contained by a container.
 
         container: Container to return containing items of.
         cat: If included, only returns children of these categories.
         result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
+        fast: If true, the function only returns the first child (by UUID) instead of all children.
         '''
+        limit = limit if limit != None else self.limit
         selector = {'container': {'$eq': container}}
         fields = ['_id', 'child']
         sort = [{'container': 'asc'}, {'child': 'asc'}]
-        query = self.containers_query(selector=selector, fields=fields, sort=sort)
+        query = self.containers_query(selector=selector, fields=fields, sort=sort, limit=limit)
         if result == "CON":
             children = [row['_id'] for row in query if cat == None or self.id_cat(row['child']) in cat]
         elif result == "ITEM" or result == "DOC":
@@ -732,7 +734,7 @@ class DEHCDatabase:
         return docs
 
 
-    def containers_query(self, selector: dict = {}, fields: list = None, sort: list = None):
+    def containers_query(self, selector: dict = {}, fields: list = None, sort: list = None, limit: int = None):
         '''Queries the container database and returns the results.
 
         For selector operators, see https://docs.mongodb.com/manual/reference/operator/query/
@@ -740,7 +742,9 @@ class DEHCDatabase:
         selector = A MongoDB style selector: {"FIELDNAME" : {"OPERATOR": "VALUE"}, ... }. If omitted, returns all items.
         fields = List of fields to return: ["FIELD1", "FIELD2", ...]. If omitted, returns all fields.
         sort = List defining sort order: [{"FIELD1": "ASC"}, {"FIELD2": "DESC"}, ...]. If omitted, returns in ascending UUID order.
+        limit = If specified, overrides the internally defined limit of for how many rows can be returned.
         '''
+        limit = limit if limit != None else self.limit
         if sort != None:
             index_name = "idx"
             for field in sort:
@@ -748,7 +752,7 @@ class DEHCDatabase:
                 index_name += f"-{key}"
             if self.db.index_exists(dbname=self.db_containers, name=index_name) == False:
                 self.db.index_create(dbname=self.db_containers, name=index_name, fields=sort)
-        res = self.db.query(dbname=self.db_containers, selector=selector, fields=fields, sort=sort, limit=self.limit)
+        res = self.db.query(dbname=self.db_containers, selector=selector, fields=fields, sort=sort, limit=limit)
         return res
 
 
