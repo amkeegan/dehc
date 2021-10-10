@@ -36,6 +36,7 @@ class EMS():
         self.root.configure(background="#D9D9D9")
 
         if autorun == True:
+            self.logger.debug(f"Performing autorun")
             self.prepare()
             self.pack()
             self.run()
@@ -43,6 +44,7 @@ class EMS():
 
     def prepare(self):
         '''Constructs the frames and widgets of the EMS.'''
+        self.logger.debug(f"Preparing widgets")
         base, *_ = self.db.items_query(cat="Evacuation", fields=["_id", "Display Name"])
 
         self.style = ttk.Style(self.root)
@@ -83,6 +85,7 @@ class EMS():
 
     def pack(self):
         '''Packs & grids children frames and widgets of the EMS.'''
+        self.logger.debug(f"Packing and gridding widgets")
         self.cm.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
         self.de.grid(column=2, row=0, sticky="nsew", padx=2, pady=2)
         self.bu_refresh.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
@@ -106,7 +109,9 @@ class EMS():
 
     def run(self):
         '''Enters the root's main loop, drawing the app screen.'''
+        self.logger.debug(f"Starting main loop")
         self.root.mainloop()
+        self.logger.debug(f"Ending main loop")
 
 
     def item_select(self, *args):

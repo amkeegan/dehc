@@ -57,6 +57,7 @@ class SuperWidget:
         
         Arguments are the same as tkinter's .pack() methods.
         '''
+        self.logger.debug(f"Packing self ({self.w_fr})")
         self.w_fr.pack(*args, **kwargs)
         self._pack_children()
 
@@ -66,6 +67,7 @@ class SuperWidget:
         
         Arguments are the same as tkinter's .grid() methods.
         '''
+        self.logger.debug(f"Gridding self ({self.w_fr})")
         self.w_fr.grid(*args, **kwargs)
         self._pack_children()
     
@@ -120,6 +122,7 @@ class DataEntry(SuperWidget):
 
     def prepare(self):
         '''Constructs the frames and widgets of the DataEntry.'''
+        self.logger.debug(f"Preparing widgets")
         self.w_fr_head = ttk.Frame(master=self.w_fr)
         self.w_fr_photo = ttk.Frame(master=self.w_fr)
         self.w_fr_flags = ttk.Frame(master=self.w_fr)
@@ -197,6 +200,7 @@ class DataEntry(SuperWidget):
 
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the DataEntry.'''
+        self.logger.debug(f"Packing and gridding widgets")
         self.w_fr_head.grid(column=0, row=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         self.w_fr_photo.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
         self.w_fr_flags.grid(column=1, row=1, sticky="nsew", padx=2, pady=2)
@@ -208,7 +212,6 @@ class DataEntry(SuperWidget):
         self.w_bu_generate_id.grid(column=1,row=0,sticky="nsew",padx=2,pady=2)
         self.w_bu_copyid.grid(column=2, row=0, sticky="nsew", padx=2, pady=2)
         self.w_bu_back.grid(column=3, row=0, sticky="nsew", padx=2, pady=2)
-
         self.w_bu_photo.grid(column=0, row=0, sticky="nsew", padx=2, pady=2)
 
         self.w_la_flags.grid(column=0, row=0, columnspan=4, sticky="nsew", padx=1, pady=1)
@@ -233,15 +236,19 @@ class DataEntry(SuperWidget):
         message: The message inside the dialog  window.
         always: If true, it'll always ask, even if not in "edit mode".
         '''
+        self.logger.debug(f"Asked {repr(message)} ...")
         if self.editing == True or always == True:
             answer = messagebox.askyesno(title=title, message=message)
             if answer == True:
                 if always == False:
                     self.editing = False
+                self.logger.debug(f"... user selected yes, setting edit mode to {self.editing}")
                 return True
             else:
+                self.logger.debug(f"... user selected no")
                 return False
         else:
+            self.logger.debug(f"... automatically selected yes, as edit mode is {self.editing}")
             return True
 
 
@@ -264,29 +271,45 @@ class DataEntry(SuperWidget):
 
     def add(self, *args):
         '''Callback for when the flag add button is pressed.'''
+        self.logger.debug(f"Add flag button activated")
         flag = self.w_var_flags.get()
         if flag not in self.w_li_flags.get(0, "end"):
             self.w_li_flags.insert("end", flag)
+            self.logger.debug(f"Inserted {flag} into flag list")
+        else:
+            self.logger.debug(f"Did not insert {flag} into flag list, as it was already there")
 
 
     def back(self, *args):
         '''Callback for when the back button is pressed.'''
+        self.logger.debug(f"Back button activated")
         if self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to open a different item?"):
             if "_id" in self.back_doc:
                 last, back = self.back_doc, self.last_doc
+                self.logger.debug(f"Going back to {last['_id']}")
                 self._show(last["_id"])
 
                 def restore_history():
                     '''Prevents intermediate actions from _show() messing up the history'''
                     self.last_doc, self.back_doc = last, back
+                    self.logger.debug(f"Back doc is now {self.back_doc.get('_id','_')}")
                 
                 self.w_fr.after(ms=1, func=restore_history) # Required to ensure it triggers after <<TreeboxSelect>>
+            else:
+                self.logger.debug(f"Didn't go back, as previous document had no id")
+        else:
+            self.logger.debug(f"Didn't go back, as user declined")
 
 
     def cancel(self, *args):
         '''Callback for when the cancel button is pressed.'''
+        self.logger.debug(f"Cancel button activated")
         if self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to cancel?"):
+            self.logger.debug(f"Reverting data pane to last doc {self.last_doc.get('_id','_')}")
             self.show()
+        else:
+            self.logger.debug(f"Not reverting data pane, as user declined")
+
 
 
     def show_id_window(self):
@@ -321,8 +344,8 @@ class DataEntry(SuperWidget):
                 if len(printers) == 0:
                     return
                 #TODO Link to self.hw.Hardware and print
-                print('Printing ID Card..')
-                print(f'Printing to: {variable.get()}')
+                self.logger.debug('Printing ID Card')
+                self.logger.debug(f'Printing to: {variable.get()}')
                 self.hardware.sendNewIDCard(self.id_card_printable, variable.get())
 
             show_image(self.id_card_image)
@@ -363,29 +386,37 @@ class DataEntry(SuperWidget):
 
     def copyid(self, *args):
         '''Call back for when the copy id button is pressed.'''
+        self.logger.debug(f"Copy id button activated")
         root = self.w_fr.winfo_toplevel()
         root.clipboard_clear()
-        root.clipboard_append(self.last_doc.get("_id", ""))
+        id = self.last_doc.get("_id", "")
+        root.clipboard_append(id)
+        self.logger.debug(f"{repr(id)} copied to clipboard")
 
 
     def delete(self, *args):
         '''Callback for when the delete button is pressed'''
+        self.logger.debug(f"Delete item button activated")
         if self.yes_no("Delete Item","Are you sure you want to delete this item and all of its children?", always=True):
             id = self.last_doc["_id"]
             parents = self.db.item_parents(item=id)
             if len(parents) > 0:
+                self.logger.debug(f"Deleting item {id} and all its children")
                 self.db.item_delete(id=id, all=True, recur=True)
                 self.last_doc = {}
                 self.show()
                 if self._delete != None:
                     self._delete(id, parents)
             else:
-                self.logger.error("Cannot delete top level item")
+                self.logger.error("Can't delete top level item")
+        else:
+            self.logger.debug(f"Not deleting item, as user declined")
 
 
     def edit(self, *args):
         '''Callback for when the edit button is pressed'''
         self.editing = True
+        self.logger.debug(f"Edit button activated, setting edit mode to {self.editing}")
         for entry, buttona, buttonb, buttonc, hidden in zip(self.w_input_data, self.w_buttona_data, self.w_buttonb_data, self.w_buttonc_data, self.w_hidden_data):
             if hidden == None:
                 entry.config(state="normal")
@@ -408,29 +439,41 @@ class DataEntry(SuperWidget):
             if len(flags) > 0:
                 self.w_co_flags['values'] = flags
                 self.w_co_flags.current(0)
+        self.logger.debug(f"Data pane buttons are now active")
 
 
     def new(self, *args):
         '''Callback for when the new button is pressed.'''
+        self.logger.debug(f"New item button activated")
         if self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to create a new item?"):
             if len(self.guardian_doc) > 0:
+                self.logger.debug(f"Using prespecified guardian {self.guardian_doc.get('_id','_')}")
                 self.back_doc = self.guardian_doc
                 self.last_doc = {"category": self.child_doc["category"], self.child_doc["field"]: [self.child_doc["value"]]}
                 self.child_doc = {}
                 self.guardian_doc = {}
             else:
                 self.back_doc = self.last_doc
+                self.logger.debug(f"No prespecified guardian for new item")
                 self.last_doc = {"category": self.w_var_cat.get()}
+            self.logger.debug(f"Back doc is now {self.back_doc.get('_id','_')}")
+            self.logger.debug(f"Showing new item of category {self.last_doc['category']}")
             self.show()
+            self.logger.debug(f"Activating edit as part of the new item process")
             self.edit()
             self.w_bu_delete.config(state="disabled")
+            self.logger.debug(f"New {self.last_doc['category']} ready to be edited")
+        else:
+            self.logger.debug(f"Did not open a new item, as user declined")
 
 
     def newchild(self, event: tk.Event):
         '''Callback for when the new child button is pressed.'''
-        if self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to create a new item?"):
-            id = self.last_doc.get("_id", "")
-            if id != "":
+        self.logger.debug(f"Create child button activated")
+        id = self.last_doc.get("_id", "")
+        if id != "":
+            if self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to create a new item?"):
+                self.logger.debug(f"Creating new child of {id}")
                 button = event.widget
                 row = self.w_buttonc_data.index(button)
                 field = self.w_la_data[row].cget("text")
@@ -441,16 +484,24 @@ class DataEntry(SuperWidget):
                     "field": guardian_schema[field]["childfield"],
                     "value": self.guardian_doc["_id"]
                 }
+                self.logger.debug(f"New child information: {self.child_doc}")
                 if self._newchild != None:
                     self._newchild(target=id)
                 self.w_fr.after(ms=1, func=self.new) # .after is required to make self.new trigger after <<TreeviewSelect>>
+                self.logger.debug(f"Data pane set to new child of {id}")
+            else:
+                self.logger.debug(f"Did not create new child, as user declined")
+        else:
+            self.logger.debug(f"Did not create new child, as parent has no id")
 
 
     def photo(self, *args):
         '''Callback for when the photo is pressed.'''
+        self.logger.debug(f"Photo button activated")
         for child in self.w_bu_photo.winfo_children():
             child.destroy()
         window = tk.Toplevel(master=self.w_bu_photo)
+        self.logger.debug(f"Photo window opened")
         window.attributes("-topmost", True)
         window.focus_force()
         window.title("Photo")
@@ -458,9 +509,11 @@ class DataEntry(SuperWidget):
 
         def clear():
             '''Removes current photo from data pane.'''
+            self.logger.debug(f"Photo clear button activated")
             self.current_photo = None
             self.w_bu_photo.config(image="")
             self.w_bu_photo.image = ""
+            self.logger.debug(f"Photo cleared from data pane")
 
         def fetch_photo():
             '''Updates the photoframe with a new photo.'''
@@ -470,19 +523,23 @@ class DataEntry(SuperWidget):
                 photoframe.image = img
                 window.after(200, fetch_photo)
             except:
-                self.logger.error("Could not take photo. Webcam may be unavailable.")
+                self.logger.error("Could not take photo. Webcam may be unavailable")
 
         def update(*args):
             '''Pushes current photo to data pane. Can function as a callback.'''
+            self.logger.debug(f"Photo update button activated")
             self.current_photo = self.photomanager.take_photo()
             try:
                 img = ImageTk.PhotoImage(self.current_photo)
                 self.w_bu_photo.config(image=img)
                 self.w_bu_photo.image = img
+                self.logger.debug(f"Photo pushed to data pane")
             except:
-                self.logger.error("Could not take photo. Webcam may be unavailable.")
+                self.logger.error("Could not take photo. Webcam may be unavailable")
             window.destroy()
+            self.logger.debug(f"Closed photo window")
 
+        self.logger.debug(f"Preparing photo window widgets")
         photoframe = ttk.Label(master=window)
         clearbut = ttk.Button(master=window, text="Clear", command=clear)
         updatebut = ttk.Button(master=window, text="Update", command=update)
@@ -493,10 +550,10 @@ class DataEntry(SuperWidget):
         window.rowconfigure(index=0, weight=1000)
         window.rowconfigure(index=1, weight=1000)
 
+        self.logger.debug(f"Packing and gridding photo window widgets")
         photoframe.grid(column=0, row=0, columnspan=2, sticky='nsew', padx=2, pady=2)
         clearbut.grid(column=0, row=1, sticky='nsew', padx=2, pady=2)
         updatebut.grid(column=1, row=1, sticky='nsew', padx=2, pady=2)
-
         fetch_photo()
 
 
@@ -506,15 +563,19 @@ class DataEntry(SuperWidget):
         event: The tkinter event object associated with the callback.
         source: The source to read from.
         '''
+        self.logger.debug(f"Read button activated")
         button = event.widget
         state = str(button.cget("state"))
         if state != "disabled":
             row = self.w_buttona_data.index(button)
             entry = self.w_input_data[row]
             field = self.w_la_data[row]
+            self.logger.debug(f"Activated read button corresponds to {field['text']} field")
+
             for child in button.winfo_children():
                 child.destroy()
             window = tk.Toplevel(master=button)
+            self.logger.debug(f"Read window opened")
             window.attributes("-topmost", True)
             window.focus_force()
             window.title(field.cget("text"))
@@ -522,6 +583,7 @@ class DataEntry(SuperWidget):
 
             if source == "WEIGHT":
                 import random
+                self.logger.debug(f"Read source is WEIGHT")
 
                 def read_weight(*args):
                     '''Reads the current weight from another device.'''
@@ -536,18 +598,28 @@ class DataEntry(SuperWidget):
 
                 def commit_weight(*args):
                     '''Inserts current weight into data pane.'''
+                    self.logger.debug(f"Push weight to data pane")
                     entry.delete(0, "end")
                     entry.insert(0, msg.cget('text'))
                     window.destroy()
+                    self.logger.debug(f"Close read window")
 
+                self.logger.debug(f"Prepare read window widgets")
                 msg = ttk.Label(master=window)
                 getbutton = ttk.Button(master=window, text="Update")
                 window.bind("<Return>", commit_weight, add="+")
 
-                read_weight()
+                self.logger.debug(f"Pack and grid read window widgets")
                 getbutton.config(command=commit_weight)
                 msg.grid(column=0, row=0, sticky="nsew", padx=10, pady=10)
                 getbutton.grid(column=0, row=1, sticky="nsew", padx=10, pady=10)
+                read_weight()
+            
+            else:
+                self.logger.debug(f"Could not display read window contents, as read source is unknown.")
+
+        else:
+            self.logger.debug(f"Did not open read window, as button is disabled")
 
 
     def readlist(self, event: tk.Event, source: str):
@@ -556,51 +628,71 @@ class DataEntry(SuperWidget):
         event: The tkinter event object associated with the callback.
         source: The source to read from.
         '''
+        self.logger.debug(f"List field's read button activated")
         button = event.widget
         state = str(button.cget("state"))
         if state != "disabled":
             row = self.w_buttonb_data.index(button)
             entry = self.w_input_data[row]
             field = self.w_la_data[row]
+            self.logger.debug(f"Activated read button corresponds to {field['text']} field")
+
             for child in button.winfo_children():
                 child.destroy()
             window = tk.Toplevel(master=button)
+            self.logger.debug(f"Read window opened")
             window.attributes("-topmost", True)
             window.focus_force()
             window.title(field.cget("text"))
             window.configure(background="#D9D9D9")
 
             if source == "IDS":
+                self.logger.debug(f"Read source is IDS")
                 cur_id = self.last_doc.get("_id","")
                 parents = self.db.item_parents(item=cur_id)
                 base = self.db.item_get(id=parents[0]) if len(parents) > 0 else self.db.items_query(cat="Evacuation", selector={"Display Name":{"$eq":"DEHC"}}, fields=["_id", "Display Name"])[0]
 
                 listids = [] if self.w_hidden_data[row] == "" else self.w_hidden_data[row]
+                self.logger.debug(f"Existing ids for read window: {listids} / {entry['values']}")
 
                 def addname():
                     '''Callback when tree -> list button is pressed.'''
+                    self.logger.debug(f"Add button activated in ID name list window")
                     id, name = tree.tree_get()
                     if name not in namelist.get(0, "end"):
                         listids.append(id)
                         namelist.insert("end", name)
+                        self.logger.debug(f"Added {id} / {name} to ID name list")
+                    else:
+                        self.logger.debug(f"Did not add {id} / {name} to ID name list, as it was already there")
+
 
                 def removename():
                     '''Callback when tree <- list button is pressed.'''
+                    self.logger.debug(f"Remove button activated in ID name list window")
                     indexes = namelist.curselection()
                     if len(indexes) > 0:
                         index, *_ = indexes
-                        listids.pop(index)
+                        id = listids.pop(index)
                         namelist.delete(index)
+                        self.logger.debug(f"Removed {id} from ID name list")
+                    else:
+                        self.logger.debug(f"Did not remove any IDs from name list, as nothing was selected")
+
 
                 def submit(*args):
                     '''Submits current list to the data pane.'''
+                    self.logger.debug(f"Submit button activated in ID name list window")
                     values = namelist.get(0,"end")
                     entry.config(values=values)
                     if len(values) > 0:
                         entry.current(0)
                     self.w_hidden_data[row] = listids
+                    self.logger.debug(f"Pushed ids to date pane: {listids} / {values}")
                     window.destroy()
+                    self.logger.debug(f"List field's read window closed")
 
+                self.logger.debug(f"Prepare read window widgets")
                 tree = SearchTree(master=window, db=self.db, base=base, cats=self.cats, level=self.level, prepare=True, simple=True)
                 namelistlb = ttk.Label(master=window, text="Guardians")
                 namelist = tk.Listbox(master=window, selectmode=tk.SINGLE)
@@ -619,6 +711,7 @@ class DataEntry(SuperWidget):
                 window.rowconfigure(2, weight=1000)
                 window.rowconfigure(3, weight=1000)
 
+                self.logger.debug(f"Pack and grid read window widgets")
                 tree.grid(column=0, row=0, rowspan=4, sticky="nsew", padx=2, pady=2)
                 namelistlb.grid(column=1, row=0, sticky="nsew", padx=2, pady=2)
                 namelist.grid(column=1, row=1, rowspan=3, sticky="nsew", padx=2, pady=2)
@@ -627,19 +720,30 @@ class DataEntry(SuperWidget):
                 submitbut.grid(column=2, row=3, sticky="nsew", padx=2, pady=2)
             
             elif source == "PHYSIDS":
+                self.logger.debug(f"Read source is PHYSIDS")
+                
                 def addid():
                     '''Callback when add button is pressed.'''
+                    self.logger.debug(f"Add button activated in physical ID list window")
                     id = idvar.get()
                     if id not in idlist.get(0, "end") and len(id) > 0:
                         idlist.insert("end", id)
                         identry.delete(0, "end")
+                        self.logger.debug(f"Added {id} to physical ID list")
+                    else:
+                        self.logger.debug(f"Did not add to physical ID list, as id was blank or already existed")
 
                 def removeid():
                     '''Callback when remove button is pressed.'''
+                    self.logger.debug(f"Remove button activated in physical ID list window")
                     indexes = idlist.curselection()
                     if len(indexes) > 0:
                         index, *_ = indexes
                         idlist.delete(index)
+                        self.logger.debug(f"Deleted physical ID at index {index}")
+                    else:
+                        self.logger.debug(f"Did not delete physical ID, as none were selected")
+
 
                 def getNFCorBarcode():
                     result = ''
@@ -658,13 +762,17 @@ class DataEntry(SuperWidget):
 
                 def submit(*args):
                     '''Callback when submit button is pressed.'''
+                    self.logger.debug(f"Submit button activated in physical ID list window")
                     values = idlist.get(0,"end")
                     entry.config(values=values)
                     if len(values) > 0:
                         entry.current(0)
                     self.w_hidden_data[row] = values
+                    self.logger.debug(f"Pushed physical ids to date pane: {values}")
                     window.destroy()
+                    self.logger.debug(f"List field's read window closed")
 
+                self.logger.debug(f"Prepare read window widgets")
                 idvar = tk.StringVar()
                 idlistlb = ttk.Label(master=window, text="Physical IDs")
                 idlist = tk.Listbox(master=window, selectmode=tk.SINGLE)
@@ -684,6 +792,7 @@ class DataEntry(SuperWidget):
                 window.rowconfigure(3, weight=1000)
                 window.rowconfigure(4, weight=1000)
 
+                self.logger.debug(f"Pack and grid read window widgets")
                 idlistlb.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
                 idlist.grid(column=0, row=1, rowspan=4, sticky="nsew", padx=2, pady=2)
                 identry.grid(column=1, row=1, sticky="nsew", padx=2, pady=2)
@@ -692,15 +801,25 @@ class DataEntry(SuperWidget):
                 submitbut.grid(column=1, row=4, sticky="nsew", padx=2, pady=2)
 
                 getNFCorBarcode()
+            
+            else:
+                self.logger.debug(f"Could not display read window contents, as read source is unknown.")
+        
+        else:
+            self.logger.debug(f"Did not open read window, as button is disabled")
 
 
     def remove(self, *args):
         '''Callback for when the flag remove button is pressed'''
-        self.w_li_flags.delete(self.w_li_flags.curselection())
+        self.logger.debug(f"Remove flag button activated")
+        sel, *_ = self.w_li_flags.curselection()
+        self.w_li_flags.delete(sel)
+        self.logger.debug(f"Removed flag from flag list with index {sel}")
 
 
     def save(self, *args):
         '''Callback for when the save button is pressed.'''
+        self.logger.debug(f"Save button activated")
         doc = self.last_doc
         physid = None
         schema = self.db.schema_schema(cat=self.last_doc["category"])
@@ -717,11 +836,15 @@ class DataEntry(SuperWidget):
                 break
             doc[field] = value
         else:
+            self.editing = False
+            self.logger.debug(f"Edit mode set to {self.editing}")
             doc["flags"] = list(self.w_li_flags.get(0, "end"))
             if "_id" in doc:
+                self.logger.debug(f"Editing {doc['category']} {doc['_id']}")
                 self.db.item_edit(id=doc["_id"], data=doc)
                 id = None
             else:
+                self.logger.debug(f"Saving new {doc['category']}")
                 doc["_id"] = self.db.item_create(cat=doc["category"], doc=doc)
                 id = doc["_id"]
             if physid != None:
@@ -732,10 +855,11 @@ class DataEntry(SuperWidget):
                 if self.last_photo != None:
                     self.db.photo_delete(item=doc["_id"])
             if self._save != None:
-                #self.editing = False
                 self._save(id)
             self.back_doc = self.last_doc
+            self.logger.debug(f"Back doc is now {self.back_doc.get('_id','_')}")
             self.last_doc = doc
+            self.logger.debug("Save successful")
             return True
         self.logger.error("Could not save item because required fields are missing")
         return False
@@ -749,9 +873,13 @@ class DataEntry(SuperWidget):
         if doc != None:
             if self.last_doc != doc:
                 self.back_doc = self.last_doc
+                self.logger.debug(f"Back doc is now {self.back_doc.get('_id','_')}")
                 self.last_doc = doc
             id = self.last_doc.get("_id", "")
+            self.logger.debug(f"Showing document {id if id != '' else '_'} in the data pane")
             self.last_photo = self.db.photo_load(item=id)
+        else:
+            self.logger.debug("Showing document _ in the data pane")
 
         for child in self.w_fr_data.winfo_children():
             child.destroy()
@@ -779,6 +907,7 @@ class DataEntry(SuperWidget):
         self.w_bu_add.config(state="disabled")
         self.w_bu_remove.config(state="disabled")
         self.w_co_flags.config(state="disabled")
+        self.logger.debug(f"Data pane buttons are now disabled")
 
         if len(self.last_doc) > 0:
             self.w_bu_edit.config(state="normal")
@@ -935,7 +1064,6 @@ class DataEntry(SuperWidget):
             if len(flags) > 0:
                 self.w_li_flags.selection_set(0)
 
-
             # Correct tab order
             for entry, buttona, buttonb, buttonc in zip(self.w_input_data, self.w_buttona_data, self.w_buttonb_data, self.w_buttonc_data):
                 if entry != None:
@@ -946,6 +1074,8 @@ class DataEntry(SuperWidget):
                     buttonb.lift()
                 if buttonc != None:
                     buttonc.lift()
+        
+        self.logger.debug("Current show() completed")
 
 
     def showlist(self, event: tk.Event, source: str):
@@ -954,6 +1084,7 @@ class DataEntry(SuperWidget):
         event: The tkinter event object associated with the callback.
         source: The source to read from.
         '''
+        self.logger.debug("Show button activated")
         button = event.widget
         state = str(button.cget("state"))
         if state != "disabled":
@@ -965,6 +1096,10 @@ class DataEntry(SuperWidget):
                     if len(entry['values']) > 0:
                         id = hidden[entry.current()]
                         self._show(id)
+            else:
+                self.logger.debug("Did not show, as the user declined")
+        else:
+            self.logger.debug("Did not show, as the state is disabled")
 
 
     def __del__(self):
@@ -1035,6 +1170,7 @@ class SearchTree(SuperWidget):
     def prepare(self):
         '''Constructs the frames and widgets of the SearchTree.'''
         # Frames & Canvas
+        self.logger.debug(f"Preparing widgets")
         self.w_fr_search = ttk.Frame(master=self.w_fr)
 
         self.w_fr.columnconfigure(0, weight=500)
@@ -1120,6 +1256,8 @@ class SearchTree(SuperWidget):
 
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the SearchTree.'''
+        self.logger.debug(f"Packing and gridding widgets")
+
         # Frames & Canvas
         self.w_fr_search.grid(column=0, row=0, columnspan=5, sticky="nsew")
 
@@ -1180,7 +1318,7 @@ class SearchTree(SuperWidget):
                         dragendtree.tree_open(node=destination)
                         self.dragstarttree.tree_open(node=source)
                     else:
-                        self.logger.error("Could not perform move, as it would create an infinite loop.")
+                        self.logger.error("Could not perform move, as it would create an infinite loop")
         
         self.dragstarttree = None
         self.dragstartid = None
@@ -1444,9 +1582,7 @@ class SearchTree(SuperWidget):
             raise RuntimeError("Unable to open tree nodes")
 
         children = self.db.container_children(container=id, result="DOC")
-        self.logger.debug("Container Load finished at  %.5f" % (time.perf_counter() - start_time)  )
         children.sort(key=lambda doc: (doc["category"], doc[self.db.schema_name(cat=doc["category"])]))
-        self.logger.debug("Children sort finished at  %.5f" % (time.perf_counter() - start_time)  )
         self.w_tr_tree.delete(*self.w_tr_tree.get_children(item=id))
         for child in children:
             child_id = child["_id"]
@@ -1454,7 +1590,6 @@ class SearchTree(SuperWidget):
             self.tree_insert(parent=id, iid=child_id, text=child_name)
             self.tree_sum(node=child_id)
         self.w_tr_tree.item(item=id, open=True)
-        self.logger.debug("Tree open finished in %.5f" % (time.perf_counter() - start_time)  )
         self.dragstarttree = None
         self.dragstartid = None
 
@@ -1570,6 +1705,7 @@ class ContainerManager(SuperWidget):
     def prepare(self):
         '''Constructs the frames and widgets of the ContainerManager.'''
         # Frames
+        self.logger.debug(f"Preparing widgets")
         self.w_fr_bookmarks = ttk.Frame(master=self.w_fr)
         
         # Widgets
@@ -1616,6 +1752,7 @@ class ContainerManager(SuperWidget):
 
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the ContainerManager.'''
+        self.logger.debug(f"Packing and gridding widgets")
         self.w_fr_bookmarks.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
         self.w_bu_bm1.grid(column=0, row=0, sticky="nsew", padx=2, pady=2)
         self.w_bu_bm2.grid(column=1, row=0, sticky="nsew", padx=2, pady=2)
@@ -1673,7 +1810,7 @@ class ContainerManager(SuperWidget):
                 self.botopen()
                 self.open()
             except:
-                self.logger.exception(f"Could not open Bookmark {preset}.")
+                self.logger.error(f"Could not open Bookmark {preset}")
                 self.refresh()
 
 
@@ -1747,7 +1884,7 @@ class ContainerManager(SuperWidget):
                 self.open()
                 self.botopen()
             else:
-                self.logger.error("Could not perform move, as it would create an infinite loop.")
+                self.logger.error("Could not perform move, as it would create an infinite loop")
 
 
     # This functionality is currently inaccessible since there's no button tied to it
@@ -1825,11 +1962,13 @@ class StatusBar(SuperWidget):
 
     def prepare(self):
         '''Constructs the frames and widgets of the StatusBar.'''
+        self.logger.debug(f"Preparing widgets")
         self.w_status = ttk.Label(master=self.w_fr, text="Status Online", justify=tk.LEFT, anchor="w")
         
     
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the StatusBar.'''
+        self.logger.debug(f"Packing and gridding widgets")
         self.w_status.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
 

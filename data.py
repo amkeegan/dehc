@@ -17,7 +17,7 @@ parser.add_argument('-n','--name', type=str, default="dehc", help="which databas
 parser.add_argument('-s','--sche', type=str, default="db_schema.json", help="relative path to database schema file", metavar="PATH")
 args = parser.parse_args()
 
-db = md.DEHCDatabase(config=args.auth, level="INFO", namespace=args.name, quickstart=False, schema=args.sche)
+db = md.DEHCDatabase(config=args.auth, level="DEBUG", namespace=args.name, quickstart=False, schema=args.sche)
 
 if args.drop == True:
     db.databases_delete(lazy=True)
