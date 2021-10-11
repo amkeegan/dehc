@@ -1,10 +1,15 @@
 from multiprocessing import Process, Queue
 import queue
 import time
-import sys
-import os
 
+import ctypes
+import os
 import usb.core ## python -m pip install pyusb
+
+os.chdir('./mods/zebra_ds22_reader/DLL') # Assumes we start from dehc/
+check = ctypes.WinDLL('./libusb-1.0.dll')
+usb.core.find()
+os.chdir('../../..') # Go back to start
 
 from mods.dehc_worker import Hardware_Worker
 

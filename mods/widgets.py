@@ -693,7 +693,7 @@ class DataEntry(SuperWidget):
                     self.logger.debug(f"List field's read window closed")
 
                 self.logger.debug(f"Prepare read window widgets")
-                tree = SearchTree(master=window, db=self.db, base=base, cats=self.cats, level=self.level, prepare=True, simple=True)
+                tree = SearchTree(master=window, db=self.db, base=base, cats=self.cats, level=self.level, prepare=True, simple=True, hardware=self.hardware)
                 namelistlb = ttk.Label(master=window, text="Guardians")
                 namelist = tk.Listbox(master=window, selectmode=tk.SINGLE)
                 for name in entry['values']:
@@ -743,7 +743,6 @@ class DataEntry(SuperWidget):
                         self.logger.debug(f"Deleted physical ID at index {index}")
                     else:
                         self.logger.debug(f"Did not delete physical ID, as none were selected")
-
 
                 def getNFCorBarcode():
                     result = ''
@@ -1128,7 +1127,7 @@ class SearchTree(SuperWidget):
     _select: If present, a callback function that triggers when a tree item is selected.
     '''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, simple: bool = False, yesno: Callable = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, simple: bool = False, yesno: Callable = None, hardware: hw.Hardware = None):
         '''Constructs a SearchTree object.
         
         master: The widget that the SearchTree's component widgets will be instantiated under.
@@ -1162,6 +1161,8 @@ class SearchTree(SuperWidget):
         self.summables = self.db.schema_sums()
         self.summation = False
         self.yes_no = yesno
+
+        self.hardware = hardware
 
         if prepare == True:
             self.prepare()
@@ -1343,6 +1344,7 @@ class SearchTree(SuperWidget):
         self.search(preselector=self.last_selector)
 
 
+
     def scan(self, *args):
         '''Callback for when the scan button is pressed.'''
         for child in self.w_bu_scan.winfo_children():
@@ -1352,6 +1354,21 @@ class SearchTree(SuperWidget):
         window.focus_force()
         window.title("Scan")
         window.configure(background="#D9D9D9")
+
+        def getNFCorBarcode():
+            result = ''
+            if self.hardware is not None: 
+                nfcResult = self.hardware.getCurrentNFCUID()
+                barcodeResult = self.hardware.getCurrentBarcode()
+                if nfcResult == '':
+                    if barcodeResult != '':
+                        result = barcodeResult
+                if barcodeResult == '':
+                    if nfcResult != '':
+                        result = nfcResult
+            if result != '':
+                input_var.set(result)
+            window.after(250, getNFCorBarcode)
 
         def find(*args):
             physid = input_var.get()
@@ -1372,6 +1389,8 @@ class SearchTree(SuperWidget):
         find_button = ttk.Button(master=window, text="Find", command=find)
         input_box.focus_set()
         input_box.bind("<Return>", find, add="+")
+
+        getNFCorBarcode()
 
         window.columnconfigure(0, weight=1000)
         window.rowconfigure(0, weight=1, minsize=17)
@@ -1683,7 +1702,7 @@ class ContainerManager(SuperWidget):
     select: If present, a callback function that triggers when a tree item is selected.
     '''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, topbase: dict, botbase: dict,  *, bookmarks: str = "bookmarks.json", cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, yesno: Callable = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, topbase: dict, botbase: dict,  *, bookmarks: str = "bookmarks.json", cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, yesno: Callable = None, hardware: hw.Hardware = None):
         '''Constructs a ContainerManager object.
         
         master: The widget that the ContainerManager's component widgets will be instantiated under.
@@ -1708,6 +1727,8 @@ class ContainerManager(SuperWidget):
         
         self.yes_no = yesno
 
+        self.hardware = hardware
+
         self.bookmarks_path = bookmarks
         with open(self.bookmarks_path, "r") as f:
             self.bookmarks = json.loads(f.read())
@@ -1731,7 +1752,7 @@ class ContainerManager(SuperWidget):
         self.w_bu_bm2.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="2"), add="+")
         self.w_bu_bm3.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="3"), add="+")
         self.w_bu_bm4.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="4"), add="+")
-        self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, cats=self.cats, level=self.level, prepare=True, select=self.select, yesno=self.yes_no)
+        self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, cats=self.cats, level=self.level, prepare=True, select=self.select, yesno=self.yes_no, hardware=self.hardware)
         self.w_bu_move_item = ttk.Button(master=self.w_fr, text="⇓ ⇓ ⇓", command=lambda *_: self.move(), style="large.TButton")
         self.w_bu_move_subs = ttk.Button(master=self.w_fr, text="⇑ ⇑ ⇑", command=lambda *_: self.move(reverse=True), style="large.TButton")
         self.w_se_bottom = SearchTree(master=self.w_fr, db=self.db, base=self.botbase, cats=self.cats, level=self.level, prepare=True, select=self.select, yesno=self.yes_no)

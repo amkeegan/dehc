@@ -11,3 +11,6 @@ pycache/
 
 # Don't track 'temporary' generated images stored locally
 /data/*
+
+#Ignore local VS Code project settings
+.vscode/
