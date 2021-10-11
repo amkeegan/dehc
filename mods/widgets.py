@@ -1285,6 +1285,7 @@ class SearchTree(SuperWidget):
         tree = event.widget
         self.dragstartid = tree.identify_row(event.y)
         self.dragstarttree = tree.SearchTree
+        self.logger.debug(f"Mouse clicked on tree. Root xy: {tree.winfo_pointerxy()}; Tree: {tree}; Tree xy: {(event.x, event.y)}; Row: {repr(self.dragstartid)}")
     
 
     def dragstop(self, *args):
@@ -1292,12 +1293,16 @@ class SearchTree(SuperWidget):
         event, = args
         mx, my = event.widget.winfo_pointerxy()
         tree = self.w_fr.winfo_containing(mx, my)
+        self.logger.debug(f"Mouse released. Root xy: {(mx, my)}; Target tree: {tree}; Start ID: {repr(self.dragstartid)}")
 
-        if tree != None and tree.winfo_class() == "Treeview" and self.dragstartid != None:
+        if tree != None and tree.winfo_class() == "Treeview" and self.dragstartid != None and self.dragstartid != "":
             dragendtree = tree.SearchTree
-            dragendid = tree.identify_row(my - tree.winfo_rooty())
+            x = mx - tree.winfo_rootx()
+            y = my - tree.winfo_rooty()
+            dragendid = tree.identify_row(y)
+            self.logger.debug(f"Mouse released cont. Target tree xy: {(x, y)}; Target row: {repr(dragendid)}")
             
-            if self.dragstartid != dragendid:
+            if self.dragstartid != dragendid and dragendid != None and dragendid != "":
                 if self.yes_no == None or (self.dragstarttree.w_var_autoopen.get() == 0 and dragendtree.w_var_autoopen.get() == 0):
                     permitted = True
                 else:
@@ -1307,18 +1312,27 @@ class SearchTree(SuperWidget):
                     target = self.dragstartid
                     source, *_ = self.db.item_parents(item=target)
                     destination = dragendid
+                    self.logger.debug(f"Moving {target} from {source} to {destination}")
 
                     recur_risk_list = self.db.item_parents(item=destination)
+                    self.logger.debug(f"Recursion risk list: {recur_risk_list}")
                     if target not in recur_risk_list:
                         self.db.container_move(from_con=source, to_con=destination, item=target)
-                        dragendtree.tree_refresh(selection=destination)
                         self.dragstarttree.tree_refresh(selection=source)
-                        dragendtree.tree_focus(goal=destination, rebase=True)
+                        dragendtree.tree_refresh(selection=destination)
                         self.dragstarttree.tree_focus(goal=source, rebase=True)
-                        dragendtree.tree_open(node=destination)
+                        dragendtree.tree_focus(goal=destination, rebase=True)
                         self.dragstarttree.tree_open(node=source)
+                        dragendtree.tree_open(node=destination)
+                        self.logger.debug(f"Move completed")
                     else:
                         self.logger.error("Could not perform move, as it would create an infinite loop")
+                else:
+                    self.logger.debug(f"Could not perform move, as user declined.")
+            else:
+                self.logger.debug(f"No further action. Drag's start and end ID are the same.")
+        else:
+            self.logger.debug(f"No further action. Drag either not released on tree, or not started on tree")
         
         self.dragstarttree = None
         self.dragstartid = None
