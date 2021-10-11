@@ -27,7 +27,7 @@ if __name__ == "__main__": # Multiprocessing library complains if this guard isn
     # ----------------------------------------------------------------------------
 
     logger = ml.get(name="Main", level=args.logg)
-    logger.debug("Application has started.")
+    logger.info("Application has started.")
 
     hardware = None
     try:
@@ -41,5 +41,5 @@ if __name__ == "__main__": # Multiprocessing library complains if this guard isn
     if hardware is not None:
         hardware.terminateProcesses()
 
-    logger.debug("Application is ending.")
+    logger.info("Application is ending.")
     sys.exit(0)

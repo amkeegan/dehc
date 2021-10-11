@@ -408,7 +408,7 @@ class DataEntry(SuperWidget):
                 if self._delete != None:
                     self._delete(id, parents)
             else:
-                self.logger.error("Can't delete top level item")
+                self.logger.debug("Can't delete top level item")
         else:
             self.logger.debug(f"Not deleting item, as user declined")
 
@@ -523,7 +523,7 @@ class DataEntry(SuperWidget):
                 photoframe.image = img
                 window.after(200, fetch_photo)
             except:
-                self.logger.error("Could not take photo. Webcam may be unavailable")
+                self.logger.debug("Could not take photo. Webcam may be unavailable")
 
         def update(*args):
             '''Pushes current photo to data pane. Can function as a callback.'''
@@ -535,7 +535,7 @@ class DataEntry(SuperWidget):
                 self.w_bu_photo.image = img
                 self.logger.debug(f"Photo pushed to data pane")
             except:
-                self.logger.error("Could not take photo. Webcam may be unavailable")
+                self.logger.debug("Could not take photo. Webcam may be unavailable")
             window.destroy()
             self.logger.debug(f"Closed photo window")
 
@@ -616,7 +616,7 @@ class DataEntry(SuperWidget):
                 read_weight()
             
             else:
-                self.logger.debug(f"Could not display read window contents, as read source is unknown.")
+                self.logger.debug(f"Could not display read window contents, as read source is unknown")
 
         else:
             self.logger.debug(f"Did not open read window, as button is disabled")
@@ -803,7 +803,7 @@ class DataEntry(SuperWidget):
                 getNFCorBarcode()
             
             else:
-                self.logger.debug(f"Could not display read window contents, as read source is unknown.")
+                self.logger.debug(f"Could not display read window contents, as read source is unknown")
         
         else:
             self.logger.debug(f"Did not open read window, as button is disabled")
@@ -861,7 +861,7 @@ class DataEntry(SuperWidget):
             self.last_doc = doc
             self.logger.debug("Save successful")
             return True
-        self.logger.error("Could not save item because required fields are missing")
+        self.logger.debug("Could not save item because required fields are missing")
         return False
 
 
@@ -1128,12 +1128,13 @@ class SearchTree(SuperWidget):
     _select: If present, a callback function that triggers when a tree item is selected.
     '''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, simple: bool = False, yesno: Callable = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, autoopen: bool = False, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, simple: bool = False, yesno: Callable = None):
         '''Constructs a SearchTree object.
         
         master: The widget that the SearchTree's component widgets will be instantiated under.
         db: The database object which the widget uses for database transactions.
         base: The document of the item upon which the tree is initially based.
+        autoopen: The default setting for autoopen.
         cats: The categories of items that can be searched.
         dragstarttree: Stores the origin tree when clicking and dragging.
         dragstartid: Stores the id of the origin item when clicking and dragging between trees.
@@ -1151,6 +1152,7 @@ class SearchTree(SuperWidget):
 
         self._select = select
 
+        self.autoopen = autoopen
         self.base = base
         self.dragstarttree = None
         self.dragstartid = None
@@ -1198,6 +1200,8 @@ class SearchTree(SuperWidget):
         self.w_var_op = tk.StringVar()
         self.w_var_value = tk.StringVar()
         self.w_var_autoopen = tk.IntVar()
+        if self.autoopen == True:
+            self.w_var_autoopen.set(1)
         self.w_var_summation = tk.IntVar()
         self.w_var_summation.trace("w", self.summation_toggle)
 
@@ -1224,9 +1228,8 @@ class SearchTree(SuperWidget):
         self.w_tr_tree.bind("<Button-3>", self.tree_rebase_mouse)
         self.w_tr_tree.bind("<Control-r>", self.tree_rebase_keyboard)
 
-        if self.simple == False:
-            self.w_tr_tree.bind("<ButtonPress-1>", self.dragstart)
-            self.w_tr_tree.bind("<ButtonRelease-1>", self.dragstop)
+        self.w_tr_tree.bind("<ButtonPress-1>", self.dragstart)
+        self.w_tr_tree.bind("<ButtonRelease-1>", self.dragstop)
 
         self.w_co_cat.current(0)
         self.w_co_field.current(1)
@@ -1295,14 +1298,14 @@ class SearchTree(SuperWidget):
         tree = self.w_fr.winfo_containing(mx, my)
         self.logger.debug(f"Mouse released. Root xy: {(mx, my)}; Target tree: {tree}; Start ID: {repr(self.dragstartid)}")
 
-        if tree != None and tree.winfo_class() == "Treeview" and self.dragstartid != None and self.dragstartid != "":
+        if tree != None and tree.winfo_class() == "Treeview" and self.dragstartid not in [None, ""] and self.dragstarttree not in [None, ""]:
             dragendtree = tree.SearchTree
             x = mx - tree.winfo_rootx()
             y = my - tree.winfo_rooty()
             dragendid = tree.identify_row(y)
             self.logger.debug(f"Mouse released cont. Target tree xy: {(x, y)}; Target row: {repr(dragendid)}")
             
-            if self.dragstartid != dragendid and dragendid != None and dragendid != "":
+            if self.dragstartid != dragendid and dragendid not in [None, ""] and dragendtree not in [None, ""]:
                 if self.yes_no == None or (self.dragstarttree.w_var_autoopen.get() == 0 and dragendtree.w_var_autoopen.get() == 0):
                     permitted = True
                 else:
@@ -1312,7 +1315,7 @@ class SearchTree(SuperWidget):
                     target = self.dragstartid
                     source, *_ = self.db.item_parents(item=target)
                     destination = dragendid
-                    self.logger.debug(f"Moving {target} from {source} to {destination}")
+                    self.logger.debug(f"Moving {target} from {source} to {destination} via D&D")
 
                     recur_risk_list = self.db.item_parents(item=destination)
                     self.logger.debug(f"Recursion risk list: {recur_risk_list}")
@@ -1326,13 +1329,13 @@ class SearchTree(SuperWidget):
                         dragendtree.tree_open(node=destination)
                         self.logger.debug(f"Move completed")
                     else:
-                        self.logger.error("Could not perform move, as it would create an infinite loop")
+                        self.logger.debug("Did not perform move, as it would create an infinite loop")
                 else:
-                    self.logger.debug(f"Could not perform move, as user declined.")
+                    self.logger.debug(f"Did not perform move, as user declined")
             else:
-                self.logger.debug(f"No further action. Drag's start and end ID are the same.")
+                self.logger.debug(f"No further action. Drag did not start and end on distinct valid rows")
         else:
-            self.logger.debug(f"No further action. Drag either not released on tree, or not started on tree")
+            self.logger.debug(f"No further action. Drag did not start and end on a tree")
         
         self.dragstarttree = None
         self.dragstartid = None
@@ -1340,31 +1343,40 @@ class SearchTree(SuperWidget):
 
     def narrow(self, *args):
         '''Callback for when the narrow button is pressed.'''
+        self.logger.debug("Narrow button activated")
         self.search(preselector=self.last_selector)
 
 
     def scan(self, *args):
         '''Callback for when the scan button is pressed.'''
+        self.logger.debug("Can button activated")
         for child in self.w_bu_scan.winfo_children():
             child.destroy()
         window = tk.Toplevel(master=self.w_bu_scan)
+        self.logger.debug("Opening scan window")
         window.attributes("-topmost", True)
         window.focus_force()
         window.title("Scan")
         window.configure(background="#D9D9D9")
 
         def find(*args):
+            self.logger.debug("Scan window's find button activated")
             physid = input_var.get()
             ids = self.db.ids_find(physid=physid)
             if len(ids) == 1:
+                self.logger.debug(f"Search for physical ID {physid} successful")
                 id, *_ = ids
                 self.tree_focus(goal=id, rebase=True)
                 window.destroy()
+                self.logger.debug("Closing scan window")
             elif len(ids) == 0:
+                self.logger.debug(f"Search for physical ID {physid} failed. No matches")
                 feedback.config(text="No matching ID found")
             else:
+                self.logger.debug(f"Search for physical ID {physid} failed. Multiple matches")
                 feedback.config(text="Multiple matching IDs found")
 
+        self.logger.debug("Preparing scan window widgets")
         input_var = tk.StringVar()
         title = ttk.Label(master=window, text="Phys ID Search")
         input_box = ttk.Entry(master=window, textvariable=input_var)
@@ -1379,6 +1391,7 @@ class SearchTree(SuperWidget):
         window.rowconfigure(2, weight=1, minsize=17)
         window.rowconfigure(3, weight=1000)
 
+        self.logger.debug("Packing and gridding scan window widgets")
         title.grid(column=0, row=0, sticky="nsew", padx=2, pady=2)
         input_box.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
         feedback.grid(column=0, row=2, sticky="nsew", padx=2, pady=2)
@@ -1387,8 +1400,10 @@ class SearchTree(SuperWidget):
 
     def search(self, preselector: dict = {}):
         '''Callback for when the search button is pressed.'''
+        self.logger.debug("Search button activated")
         cat = self.w_var_cat.get()
         field = self.w_var_field.get()
+        op = self.w_var_op.get()
         value = self.w_var_value.get()
         opvalue = {
             "=": {"$eq": value}, 
@@ -1398,7 +1413,8 @@ class SearchTree(SuperWidget):
             "≥": {"$gte": value}, 
             "≠": {"$ne": value},
             "≈": {"$regex": value}
-            }[self.w_var_op.get()]
+            }[op]
+        self.logger.debug(f"Search settings; Category: {cat}; Field: {field}: Op: {op}; Value: {value}")
 
         selector = preselector.copy()
         selector[field] = opvalue
@@ -1417,12 +1433,14 @@ class SearchTree(SuperWidget):
         else:
             self.w_li_search.insert("end", "No results found")
             self.w_li_search.config(state="disabled")
+        self.logger.debug(f"Search returned {len(self.search_result)} results")
 
 
 
     def search_cat(self, *args):
         '''Callback for when the search category is changed.'''
         cat = self.w_var_cat.get()
+        self.logger.debug(f"Search category changed to {cat}")
         fields = ['_id']+self.db.schema_fields(cat=cat)
 
         # Searching by IDS and PHYSIDS fields doesn't work, so hide them:
@@ -1441,7 +1459,11 @@ class SearchTree(SuperWidget):
         if len(selected) == 1:
             index, = selected
             id = self.search_result[index]["_id"]
+            self.logger.debug(f"Search item {id} was selected")
             self.tree_focus(goal=id, rebase=True)
+        else:
+            self.logger.debug(f"Multiple search items were selected")
+
 
 
     def summation_toggle(self, *args):
@@ -1449,10 +1471,14 @@ class SearchTree(SuperWidget):
         state = self.w_var_summation.get()
         if state == 0:
             self.summation = False
+            self.logger.debug(f"Summation toggled OFF")
             self.w_tr_tree.config(show="tree")
         elif state == 1:
             self.summation = True
+            self.logger.debug(f"Summation toggled ON")
             self.w_tr_tree.config(show="tree headings")
+        else:
+            self.logger.debug(f"Summation toggled to unknown state {state}")
         self.tree_refresh()
 
 
@@ -1462,6 +1488,7 @@ class SearchTree(SuperWidget):
         goal: The node to select.
         rebase: If true, will rebase in attempt to find focus item.
         '''
+        self.logger.debug(f"Attempting to focus on node {goal}")
         path = self.db.item_parents_all(item=goal)
         path.reverse()
         old_base = self.base
@@ -1476,13 +1503,16 @@ class SearchTree(SuperWidget):
                 self.w_tr_tree.focus(item=goal)
             elif rebase == True and len(path) > 0:
                 if self.base != path[0]:
-                    self.base = self.db.item_get(id=path[0])
+                    new_base = self.db.item_get(id=path[0])
+                    self.base = new_base
+                    self.logger.debug(f"Rebasing to find node {goal}")
                     self.tree_refresh()
                     continue
                 else:
                     self.base = old_base
                     self.tree_refresh()
             break
+        self.logger.debug(f"Focused on node {goal}")
 
 
     def tree_get(self):
@@ -1507,14 +1537,18 @@ class SearchTree(SuperWidget):
 
     def tree_rebase_keyboard(self, *args):
         '''Callback for when the tree is rebased using the keyboard.'''
+        self.logger.debug(f"Rebase requested using keyboard or event")
         targets = self.w_tr_tree.selection()
         if len(targets) >= 1:
             target, *_ = targets
-        self.tree_rebase(target=target)
+            self.tree_rebase(target=target)
+        else:
+            self.logger.debug(f"Did not rebase, as no nodes were selected")
 
 
     def tree_rebase_mouse(self, *args):
         '''Callback for when the tree is rebased using right-click.'''
+        self.logger.debug(f"Rebase requested using mouse")
         event, = args
         target = event.widget.identify_row(event.y)
         self.tree_rebase(target=target)
@@ -1527,11 +1561,15 @@ class SearchTree(SuperWidget):
 
         target: The item to make the new base.
         '''
+        self.logger.debug(f"Rebasing to {target}")
         self.w_tr_tree.selection_set(target)
         if self.w_tr_tree.parent(target) == "":
             parents = self.db.item_parents(item=target, result="DOC")
             if len(parents) > 0:
                 self.base, *_ = parents
+                self.logger.debug(f"Previous rebase was top of tree, thus rebasing to {self.base}")
+            else:
+                self.logger.debug(f"Did not rebase, as the tree is already at its highest point")
         else:
             self.base = self.db.item_get(id=target)
         self.tree_refresh()
@@ -1540,6 +1578,7 @@ class SearchTree(SuperWidget):
 
     def tree_refresh(self, selection: tuple = None):
         '''Refreshes the tree view.'''
+        self.logger.debug(f"Refreshing the tree")
         base_id = self.base["_id"]
         if selection == None:
             self.selection = self.w_tr_tree.selection()
@@ -1567,14 +1606,18 @@ class SearchTree(SuperWidget):
             if permitted == True:
                 if len(self.selection) == 1:
                     id, = self.selection
+                    self.logger.debug(f"Node {id} was selected")
                     doc = self.db.item_get(id=id, lazy=True)
                     self._select(doc, self)
+                else:
+                    self.logger.debug(f"Multiple nodes were selected")
+            else:
+                self.logger.debug(f"Node was selected but item was not opened, as user declined")
 
 
     def tree_close(self, *args):
         '''Callback which triggers when a tree node is closed.'''
-        self.dragstarttree = None
-        self.dragstartid = None
+        pass
 
 
     def tree_open(self, node: str = None):
@@ -1582,18 +1625,19 @@ class SearchTree(SuperWidget):
         
         node: The node to open. If omitted, opens currently selected node.
         '''
-        self.logger.debug("Tree opened")
-        start_time = time.perf_counter()
         self.selection = self.w_tr_tree.selection()
         if node != None:
             id = node
+            self.logger.debug(f"Opening requested node {id}")
         elif self.w_tr_tree.focus() != "":
             id = self.w_tr_tree.focus()
+            self.logger.debug(f"Opening focused node {id}")
         elif len(self.selection) == 1:
             id, = self.selection
+            self.logger.debug(f"Opening selected node {id}")
         else:
-            id = None
-            raise RuntimeError("Unable to open tree nodes")
+            self.logger.debug(f"Could not open any nodes, as none were selected")
+            return
 
         children = self.db.container_children(container=id, result="DOC")
         children.sort(key=lambda doc: (doc["category"], doc[self.db.schema_name(cat=doc["category"])]))
@@ -1604,8 +1648,6 @@ class SearchTree(SuperWidget):
             self.tree_insert(parent=id, iid=child_id, text=child_name)
             self.tree_sum(node=child_id)
         self.w_tr_tree.item(item=id, open=True)
-        self.dragstarttree = None
-        self.dragstartid = None
 
 
     def tree_sum(self, node: str):
@@ -1614,6 +1656,7 @@ class SearchTree(SuperWidget):
         node: The node to display sums of.
         '''
         if self.summation == True:
+            self.logger.debug("Summing node {node}")
             schema = self.db.schema_schema(id=node)
             values = [""]*(len(self.summables)+1)
             doc = self.db.item_get(id=node)
@@ -1709,8 +1752,10 @@ class ContainerManager(SuperWidget):
         self.yes_no = yesno
 
         self.bookmarks_path = bookmarks
+        self.logger.debug(f"Loading bookmarks from {self.bookmarks_path}")
         with open(self.bookmarks_path, "r") as f:
             self.bookmarks = json.loads(f.read())
+        self.logger.debug(f"Finished loading bookmarks")
 
         if prepare == True:
             self.prepare()
@@ -1731,7 +1776,7 @@ class ContainerManager(SuperWidget):
         self.w_bu_bm2.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="2"), add="+")
         self.w_bu_bm3.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="3"), add="+")
         self.w_bu_bm4.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="4"), add="+")
-        self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, cats=self.cats, level=self.level, prepare=True, select=self.select, yesno=self.yes_no)
+        self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, autoopen=True, cats=self.cats, level=self.level, prepare=True, select=self.select, yesno=self.yes_no)
         self.w_bu_move_item = ttk.Button(master=self.w_fr, text="⇓ ⇓ ⇓", command=lambda *_: self.move(), style="large.TButton")
         self.w_bu_move_subs = ttk.Button(master=self.w_fr, text="⇑ ⇑ ⇑", command=lambda *_: self.move(reverse=True), style="large.TButton")
         self.w_se_bottom = SearchTree(master=self.w_fr, db=self.db, base=self.botbase, cats=self.cats, level=self.level, prepare=True, select=self.select, yesno=self.yes_no)
@@ -1805,6 +1850,7 @@ class ContainerManager(SuperWidget):
         
         preset: Which bookmark to use.
         '''
+        self.logger.debug(f"Bookmark {preset} activated")
         if self.yes_no == None or (self.w_se_top.w_var_autoopen.get() == 0 and self.w_se_bottom.w_var_autoopen.get() == 0):
             permitted = True
         else:
@@ -1817,6 +1863,7 @@ class ContainerManager(SuperWidget):
                 items = self.db.items_get(ids=[top, bottom], lazy=True)
                 top, bottom = items
                 topid, bottomid = top["_id"], bottom["_id"]
+                self.logger.debug(f"Following bookmark to {topid} and {bottomid}")
                 self.basebot(newbase=bottom)
                 self.base(newbase=top)
                 self.refresh(topselection=topid, bottomselection=bottomid)
@@ -1824,8 +1871,10 @@ class ContainerManager(SuperWidget):
                 self.botopen()
                 self.open()
             except:
-                self.logger.error(f"Could not open Bookmark {preset}")
+                self.logger.debug(f"Could not open bookmark {preset}")
                 self.refresh()
+        else:
+            self.logger.debug(f"Did not go to bookmark, as user declined")
 
 
     def bookmark_change(self, preset: str):
@@ -1833,9 +1882,12 @@ class ContainerManager(SuperWidget):
         
         preset: Which bookmark to change.
         '''
-        topselect, botselect = self.selections()
-        toptext = self.w_se_top.w_tr_tree.item(topselect)['text'][:10]
-        bottext = self.w_se_bottom.w_tr_tree.item(botselect)['text'][:10]
+        self.logger.debug(f"Bookmark {preset} change activated")
+        topselect = self.w_se_top.base['_id']
+        botselect = self.w_se_bottom.base['_id']
+        toptext = self.w_se_top.base['Display Name'][:10]
+        bottext = self.w_se_bottom.base['Display Name'][:10]
+        self.logger.debug(f"Bookmark {preset} now goes to {topselect} and {botselect}")
         fulltext = f"{toptext}/{bottext}"
         if preset == "1":
             self.w_bu_bm1.config(text=fulltext)
@@ -1848,8 +1900,11 @@ class ContainerManager(SuperWidget):
         self.bookmarks[preset]["name"] = fulltext
         self.bookmarks[preset]["top"] = topselect
         self.bookmarks[preset]["bottom"] = botselect
+
+        self.logger.debug(f"Saving new bookmarks to {self.bookmarks_path}")
         with open(self.bookmarks_path, "w") as f:
             f.write(json.dumps(self.bookmarks))
+        self.logger.debug(f"Done saving new bookmarks")
 
 
     def highlight(self, item: str = None, botitem: str = None):
@@ -1868,6 +1923,7 @@ class ContainerManager(SuperWidget):
         
         reverse: If true, container movement is bottom to top.
         '''
+        self.logger.debug(f"Move {'down' if reverse == False else 'up'} button activated")
         if self.yes_no == None or (self.w_se_top.w_var_autoopen.get() == 0 and self.w_se_bottom.w_var_autoopen.get() == 0):
             permitted = True
         else:
@@ -1882,8 +1938,10 @@ class ContainerManager(SuperWidget):
                 target, *_ = self.w_se_bottom.selection
                 source, *_ = self.db.item_parents(item=target)
                 destination, *_ = self.w_se_top.selection
+            self.logger.debug(f"Moving {target} from {source} to {destination} via button")
 
             recur_risk_list = [destination]+self.db.item_parents(item=destination)
+            self.logger.debug(f"Recursion risk list: {recur_risk_list}")
             if target not in recur_risk_list:
                 self.db.container_move(from_con=source, to_con=destination, item=target)
 
@@ -1897,8 +1955,11 @@ class ContainerManager(SuperWidget):
                     self.highlight(item=destination)
                 self.open()
                 self.botopen()
+                self.logger.debug(f"Move completed")
             else:
-                self.logger.error("Could not perform move, as it would create an infinite loop")
+                self.logger.debug("Did not perform move, as it would create an infinite loop")
+        else:
+            self.logger.debug("Did not perform move, as user declined")
 
 
     # This functionality is currently inaccessible since there's no button tied to it
@@ -1932,9 +1993,11 @@ class ContainerManager(SuperWidget):
         active: If present, refreshes such that the active tree is the one provided.
         '''
         if active == self.w_se_top:
+            self.logger.debug(f"Refreshing both trees with priority to top")
             self.w_se_bottom.tree_refresh(selection=bottomselection)
             self.w_se_top.tree_refresh(selection=topselection)
         else:
+            self.logger.debug(f"Refreshing both trees with priority to bottom")
             self.w_se_top.tree_refresh(selection=topselection)
             self.w_se_bottom.tree_refresh(selection=bottomselection)
 

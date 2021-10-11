@@ -34,12 +34,16 @@ class Database:
         '''
         self.logger = ml.get("Database", level=level)
         self.logger.debug("Database object instantiated")
+
+        self.logger.info(f"Loading database connection config from {config}")
         with open(config, "r") as f:
             self.data = json.loads(f.read())
+        self.logger.debug(f"Finished loading database connection config")
+
         auth = CouchDbSessionAuthenticator(username=self.data['user'], password=self.data['pass'])
         self.client = CloudantV1(authenticator=auth)
         self.client.set_service_url(self.data['url'])
-        self.logger.debug(f"Connection to {self.data['url']} established")
+        self.logger.info(f"Connection to {self.data['url']} established")
         self.index_cache = {}
 
 
@@ -71,8 +75,10 @@ class Database:
             if response == 200:
                 self.logger.debug(f"Database {dbname} exists")
                 return True
-        except:
-            pass
+            else:
+                self.logger.warning(f"Database existance request responded with code {response}")
+        except Exception as e:
+            self.logger.error(e)
         self.logger.debug(f"Database {dbname} does not exist")
         return False
 
@@ -145,6 +151,8 @@ class Database:
             if response == 200:
                 self.logger.debug(f"Document {dbname} {id} exists")
                 return True
+            else:
+                self.logger.warning(f"Database existance request responded with code {response}")
         except:
             pass
         self.logger.debug(f"Document {dbname} {id} does not exist")
@@ -360,6 +368,8 @@ class Database:
                 if (name not in self.index_cache[dbname]): #new dictionary
                     self.index_cache[dbname].append(name)
                 return True
+            else:
+                self.logger.warning(f"Index existance request responded with code {response}")
         except:
             pass
         self.logger.debug(f"Index {dbname} {name} does not exist")
@@ -396,7 +406,7 @@ class Database:
                 return True
         except:
             pass
-        self.logger.debug(f"Database server is not accessible.")
+        self.logger.warning(f"Database server is not accessible.")
         return False
 
 
@@ -448,7 +458,7 @@ class DEHCDatabase:
         self.db_files = self.namespace+"-files"
         self.db_configs = self.namespace+"-configs"
         self.db_list = [self.db_items, self.db_containers, self.db_ids, self.db_files, self.db_configs]
-        self.logger.debug(f"Using namespace {namespace}")
+        self.logger.info(f"Using namespace {namespace}")
 
         self.id_len = 12
         self.limit = 1000000
@@ -456,7 +466,7 @@ class DEHCDatabase:
         self.schema = {}
         self.schema_path = schema
         if quickstart == True:
-            self.logger.debug(f"Performing quickstart")
+            self.logger.info(f"Performing quickstart")
             self.databases_create(lazy=True)
             self.schema_load(schema=self.schema_path, forcelocal=True)
             self.schema_save()
@@ -469,7 +479,7 @@ class DEHCDatabase:
         
         lazy: If true, won't error if databases already exist.
         '''
-        self.logger.debug(f"Creating DEHC databases")
+        self.logger.info(f"Creating DEHC databases")
         for db in self.db_list:
             if lazy == False or self.db.database_exists(db) == False:
                 self.db.database_create(db)
@@ -481,7 +491,7 @@ class DEHCDatabase:
         
         lazy: If true, won't error if database doesn't exist.
         '''
-        self.logger.debug(f"Emptying DEHC databases")
+        self.logger.info(f"Emptying DEHC databases")
         for db in self.db_list:
             if lazy == False or self.db.database_exists(db) == True:
                 items = self.db.documents_list(dbname=db, limit=self.limit)
@@ -495,7 +505,7 @@ class DEHCDatabase:
         
         lazy: If true, won't error if databases don't exist.
         '''
-        self.logger.debug(f"Dropping DEHC databases")
+        self.logger.info(f"Dropping DEHC databases")
         for db in self.db_list:
             if lazy == False or self.db.database_exists(db) == True:
                 self.db.database_delete(db)
@@ -509,7 +519,7 @@ class DEHCDatabase:
         item: The UUID of the item.
         lazy: If true, won't error if item already in container.
         '''
-        self.logger.debug(f"Adding {item} to {container}")
+        self.logger.info(f"Adding {item} to {container}")
         idc = container+"/"+item
         if lazy == False or self.db.document_exists(dbname=self.db_containers, id=idc) == False:
             doc = {"container": container, "child": item}
@@ -524,7 +534,7 @@ class DEHCDatabase:
         container: The UUID of the container.
         items: The UUIDs of the items.
         '''
-        self.logger.debug(f"Adding {len(items)} items to {container}")
+        self.logger.info(f"Adding {len(items)} items to {container}")
         ids_list = [container+"/"+item for item in items]
         docs_list = [{"container": container, "child": item} for item in items]
         self.db.documents_create(dbname=self.db_containers, ids=ids_list, docs=docs_list)
@@ -554,7 +564,6 @@ class DEHCDatabase:
                 children = self.db.documents_get(dbname=self.db_items, ids=children)
         else:
             raise ValueError("result should be one of ITEM, CON or DOC")
-        self.logger.debug(f"Done finding children of {container}")
         return children
 
 
@@ -567,7 +576,6 @@ class DEHCDatabase:
         '''
         self.logger.debug(f"Finding all children and sub-children of {container}")
         children = self.containers_children_all(containers=[container], cat=cat, result=result)
-        self.logger.debug(f"Done finding all children and sub-children of {container}")
         return children
 
 
@@ -579,7 +587,6 @@ class DEHCDatabase:
         '''
         self.logger.debug(f"Finding all children and sub-children of {container}")
         children = self.containers_children_all_dict(containers=[container], cat=cat)
-        self.logger.debug(f"Done finding all children and sub-children of {container}")
         return children
 
 
@@ -614,7 +621,7 @@ class DEHCDatabase:
         item: The UUID of the item.
         lazy: If true, won't error if from_con doesn't exist, or to_con already exists.
         '''
-        self.logger.debug(f"Moving {item} from {from_con} to {to_con}")
+        self.logger.info(f"Moving {item} from {from_con} to {to_con}")
         self.container_add(container=to_con, item=item, lazy=lazy)
         self.container_remove(container=from_con, item=item, lazy=lazy)
         self.logger.debug(f"Done moving {item} from {from_con} to {to_con}")
@@ -628,7 +635,7 @@ class DEHCDatabase:
         items: The UUIDs of the items.
         lazy: If true, won't error if from_con doesn't exist, or to_con already exists.
         '''
-        self.logger.debug(f"Moving {len(items)} items from {from_con} to {to_con}")
+        self.logger.info(f"Moving {len(items)} items from {from_con} to {to_con}")
         self.container_adds(container=to_con, items=items)
         self.container_removes(container=from_con, items=items, lazy=lazy)
         self.logger.debug(f"Done moving {len(items)} items from {from_con} to {to_con}")
@@ -641,7 +648,7 @@ class DEHCDatabase:
         item: The UUID of the item.
         lazy: If true, won't error if container or child doesn't exist.
         '''
-        self.logger.debug(f"Removing {item} from {container}")
+        self.logger.info(f"Removing {item} from {container}")
         id = container+"/"+item
         self.db.document_delete(dbname=self.db_containers, id=id, lazy=lazy)
         self.logger.debug(f"Done removing {item} from {container}")
@@ -654,7 +661,7 @@ class DEHCDatabase:
         items: The UUIDs of the items.
         lazy: If true, won't error if container or child doesn't exist.
         '''
-        self.logger.debug(f"Removing {len(items)} items from {container}")
+        self.logger.info(f"Removing {len(items)} items from {container}")
         ids = [container+"/"+item for item in items]
         self.db.documents_delete(dbname=self.db_containers, ids=ids, lazy=lazy)
         self.logger.debug(f"Done removing {len(items)} items from {container}")
@@ -682,7 +689,6 @@ class DEHCDatabase:
                 children = self.db.documents_get(dbname=self.db_items, ids=children)
         else:
             raise ValueError("result should be one of ITEM, CON or DOC")
-        self.logger.debug(f"Done finding children of {len(containers)} containers")
         return children
 
 
@@ -703,7 +709,6 @@ class DEHCDatabase:
                 current_containers = ids
             else:
                 break
-        self.logger.debug(f"Done finding all children and sub-children of {len(containers)} containers")
         return children
 
 
@@ -743,7 +748,6 @@ class DEHCDatabase:
             child = row['child']
             if cat == None or self.id_cat(child) in cat:
                 children[row['container']].append(child)
-        self.logger.debug(f"Done finding children of {len(containers)} containers")
         return children
 
 
@@ -794,7 +798,7 @@ class DEHCDatabase:
         item: The item to edit the physical IDs of.
         ids: A list of strings, consisting of all physical IDs associated with an item.
         '''
-        self.logger.debug(f"Editing physical IDs of {item}")
+        self.logger.info(f"Editing physical IDs of {item}")
         old_ids = set(self.ids_get(item=item))
         new_ids = set(ids)
         ids_to_create = list(new_ids - old_ids)
@@ -833,7 +837,7 @@ class DEHCDatabase:
 
     def index_prepare(self):
         '''Prepares certain known indexes used by database queries.'''
-        self.logger.debug(f"Preparing indexes")
+        self.logger.info(f"Preparing indexes")
         if self.db.index_exists(dbname=self.db_ids, name="idx-item") == False:
             self.db.index_create(dbname=self.db_ids, name="idx-item", fields=[{'item': 'asc'}])
         if self.db.index_exists(dbname=self.db_ids, name="idx-physid") == False:
@@ -848,7 +852,7 @@ class DEHCDatabase:
         doc: The item's data: {"field": "value", ...}
         '''
         id, = self.db.id_create(length=self.id_len, prefix=cat+"/")
-        self.logger.debug(f"Creating new item {id}")
+        self.logger.info(f"Creating new item {id}")
         doc['category'] = cat
         if 'flags' not in doc:
             doc['flags'] = []
@@ -865,14 +869,14 @@ class DEHCDatabase:
         recur: If true, also deletes all children the item contains.
         lazy: If true, won't error if document doesn't exist.
         '''
-        self.logger.debug(f"Deleting item {id}")
+        self.logger.info(f"Deleting item {id}")
         self.db.document_delete(dbname=self.db_items, id=id, lazy=lazy)
         if recur == True:
-            self.logger.debug(f"Also deleting all children of {id}")
+            self.logger.info(f"Also deleting all children of {id}")
             all_children = self.container_children_all(container=id, result="ITEM")
             self.items_delete(ids=all_children, all=all, recur=False, lazy=True)
         if all == True:
-            self.logger.debug(f"Also deleting all associated documents of {id}")
+            self.logger.info(f"Also deleting all associated documents of {id}")
             children = self.container_children(container=id, result="CON")
             parents = self.item_parents(item=id, result="CON")
             self.db.documents_delete(dbname=self.db_containers, ids=children+parents, lazy=lazy)
@@ -887,7 +891,7 @@ class DEHCDatabase:
         data: Dictionary of fields+values to adjust.
         lazy: If true, won't error if document doesn't exist.
         '''
-        self.logger.debug(f"Editing item {id}")
+        self.logger.info(f"Editing item {id}")
         self.db.document_edit(dbname=self.db_items, id=id, doc=data, lazy=lazy)
         self.logger.debug(f"Done editing item {id}")
 
@@ -982,7 +986,7 @@ class DEHCDatabase:
         docs: The items' data: [{"field": "value", ...}, {"field": "value", ...}, ...]
         '''
         ids = self.db.id_create(n=len(docs), length=self.id_len, prefix=cat+"/")
-        self.logger.debug(f"Creating {len(ids)} new items")
+        self.logger.info(f"Creating {len(ids)} new items")
         new_docs = []
         for doc in docs:
             doc_c = doc.copy()
@@ -1002,14 +1006,14 @@ class DEHCDatabase:
         all: If true, also deletes items' container and file docs.
         lazy: If true, won't error if document doesn't exist.
         '''
-        self.logger.debug(f"Deleting {len(ids)} items")
+        self.logger.info(f"Deleting {len(ids)} items")
         self.db.documents_delete(dbname=self.db_items, ids=ids, lazy=lazy)
         if recur == True:
-            self.logger.debug(f"Also deleting {len(ids)} items children")
+            self.logger.info(f"Also deleting {len(ids)} items children")
             all_children = self.containers_children(containers=ids, result="ITEM")
             self.items_delete(ids=all_children, all=all, recur=False, lazy=True)
         if all == True:
-            self.logger.debug(f"Also deleting {len(ids)} items associated documents")
+            self.logger.info(f"Also deleting {len(ids)} items associated documents")
             children = self.containers_children(containers=ids, result="CON")
             parents = self.items_parents(items=ids, result="CON")
             self.db.documents_delete(dbname=self.db_containers, ids=children+parents, lazy=lazy)
@@ -1023,7 +1027,7 @@ class DEHCDatabase:
         data: Dictionary of fields+values to adjust.
         lazy: If true, won't error if document doesn't exist.
         '''
-        self.logger.debug(f"Editing {len(ids)} items")
+        self.logger.info(f"Editing {len(ids)} items")
         self.db.documents_edit(dbname=self.db_items, ids=ids, docs=data, lazy=lazy)
         self.logger.debug(f"Done editing {len(ids)} items")
 
@@ -1192,7 +1196,7 @@ class DEHCDatabase:
         
         item: The item to delete the photo of.
         '''
-        self.logger.debug(f"Deleting photo of {item}")
+        self.logger.info(f"Deleting photo of {item}")
         name = "photo-"+item
         if self.db.document_exists(dbname=self.db_files, id=name) == True:
             self.db.document_delete(dbname=self.db_files, id=name)
@@ -1240,7 +1244,7 @@ class DEHCDatabase:
         item: The item the photo is associated with.
         img: The PIL object to save to the database.
         '''
-        self.logger.debug(f"Saving photo of {item}")
+        self.logger.info(f"Saving photo of {item}")
         buffer = io.BytesIO()
         img.save(buffer, format="JPEG")
         data = base64.b64encode(buffer.getvalue()).decode('utf-8')
@@ -1310,10 +1314,10 @@ class DEHCDatabase:
         '''
         self.logger.debug(f"Loading database schema")
         if forcelocal == False and self.db.document_exists(dbname=self.db_configs, id="schema") == True:
-            self.logger.debug(f"Loading database schema from database")
+            self.logger.info(f"Loading database schema from database")
             loaded_schema = self.db.document_get(dbname=self.db_configs, id="schema")
         else:
-            self.logger.debug(f"Loading database schema from {schema}")
+            self.logger.info(f"Loading database schema from {schema}")
             with open(schema, "r") as f:
                 loaded_schema = json.loads(f.read())
         for key, value in self.schema.items():

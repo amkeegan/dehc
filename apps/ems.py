@@ -36,7 +36,7 @@ class EMS():
         self.root.configure(background="#D9D9D9")
 
         if autorun == True:
-            self.logger.debug(f"Performing autorun")
+            self.logger.info(f"Performing autorun")
             self.prepare()
             self.pack()
             self.run()
@@ -109,9 +109,9 @@ class EMS():
 
     def run(self):
         '''Enters the root's main loop, drawing the app screen.'''
-        self.logger.debug(f"Starting main loop")
+        self.logger.info(f"Starting main UI loop")
         self.root.mainloop()
-        self.logger.debug(f"Ending main loop")
+        self.logger.info(f"Ending main UI loop")
 
 
     def item_select(self, *args):
