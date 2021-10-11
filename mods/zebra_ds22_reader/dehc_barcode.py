@@ -1,10 +1,18 @@
 from multiprocessing import Process, Queue
 import queue
 import time
-import sys
-import os
 
+import ctypes
+import os
 import usb.core ## python -m pip install pyusb
+
+os.chdir('./mods/zebra_ds22_reader/DLL') # Assumes we start from dehc/
+try:
+    check = ctypes.WinDLL('./libusb-1.0.dll')
+    usb.core.find()
+except Exception as err:
+    print(f'USB Loading error: {err}')
+os.chdir('../../..') # Go back to start
 
 from mods.dehc_worker import Hardware_Worker
 
@@ -24,7 +32,10 @@ class Barcode_Worker(Hardware_Worker):
     
     def openDevice(self):
         #TODO: Do exception handling
-        self.usbDevice = usb.core.find(idVendor=self.idVendor, idProduct=self.idProduct)
+        try:
+            self.usbDevice = usb.core.find(idVendor=self.idVendor, idProduct=self.idProduct)
+        except Exception as err:
+            print(f'USB Connection Error: {err}')
         if self.usbDevice is None:
             print(f"USB Device could not be opened. Vendor {self.idVendor}, Product: {self.idProduct}")
             return
