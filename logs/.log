@@ -1,0 +1,2 @@
+Logs are generated in this folder.
+This file exists so git includes the (otherwise empty) directory as part of the repository.

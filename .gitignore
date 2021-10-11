@@ -9,8 +9,12 @@ pycache/
 *.txt
 !requirements.txt
 
-# Don't track 'temporary' generated images stored locally
+# Ignore logs except for .log itself
+*.log
+!.log
+
+# Ignore 'temporary' generated images stored locally
 /data/*
 
-#Ignore local VS Code project settings
+# Ignore local VS Code project settings
 .vscode/

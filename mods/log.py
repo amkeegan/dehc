@@ -1,6 +1,7 @@
 '''The module containing objects that manage logging.'''
 
 import logging
+import datetime
 
 
 # ----------------------------------------------------------------------------
@@ -19,6 +20,7 @@ LEVELS = {"NOTSET":logging.NOTSET, "DEBUG":logging.DEBUG, "INFO":logging.INFO,
 # NOTSET is the default. It returns all messages.
 # NONE is a setting which returns no messages.
 
+LOGTIME = str(datetime.datetime.now().strftime('%Y-%m-%d-%H%M%S'))
 
 # ----------------------------------------------------------------------------
 
@@ -33,13 +35,21 @@ def get(name: str, level: str = "NOTSET"):
     level = Minimum level of logging messages to report: "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE"
     '''
     logger = logging.getLogger(name=name)
+    
     handler = logging.StreamHandler()
+    handler_file = logging.FileHandler(f"logs/{LOGTIME}.log")
     formatter =  logging.Formatter(fmt="%(asctime)s %(name)s.%(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S %z")
     level = LEVELS[level]
+
     handler.setLevel(level)
     handler.setFormatter(formatter)
+    handler_file.setLevel(level)
+    handler_file.setFormatter(formatter)
+
     logger.setLevel(level)
     logger.addHandler(handler)
+    logger.addHandler(handler_file)
+
     return logger
 
 
