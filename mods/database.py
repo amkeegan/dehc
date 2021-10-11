@@ -79,7 +79,7 @@ class Database:
                 self.logger.warning(f"Database existance request responded with code {response}")
         except Exception as e:
             self.logger.error(e)
-        self.logger.debug(f"Database {dbname} does not exist")
+        self.logger.debug(f"Database {dbname} does not exist or could not be reached")
         return False
 
 

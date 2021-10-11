@@ -1,8 +1,6 @@
 '''The module containing objects that create and manage groups of tkinter widgets.'''
 
 import json
-import time
-from tkinter.constants import S
 
 from PIL import Image, ImageTk
 import tkinter as tk
@@ -236,18 +234,19 @@ class DataEntry(SuperWidget):
         message: The message inside the dialog  window.
         always: If true, it'll always ask, even if not in "edit mode".
         '''
-        self.logger.debug(f"Asked {repr(message)} ...")
         if self.editing == True or always == True:
+            self.logger.info(f"Asked {repr(message)} ...")
             answer = messagebox.askyesno(title=title, message=message)
             if answer == True:
                 if always == False:
                     self.editing = False
-                self.logger.debug(f"... user selected yes, setting edit mode to {self.editing}")
+                self.logger.info(f"... user selected yes, setting edit mode to {self.editing}")
                 return True
             else:
-                self.logger.debug(f"... user selected no")
+                self.logger.info(f"... user selected no")
                 return False
         else:
+            self.logger.debug(f"Asked {repr(message)} ...")
             self.logger.debug(f"... automatically selected yes, as edit mode is {self.editing}")
             return True
 
@@ -275,7 +274,7 @@ class DataEntry(SuperWidget):
         flag = self.w_var_flags.get()
         if flag not in self.w_li_flags.get(0, "end"):
             self.w_li_flags.insert("end", flag)
-            self.logger.debug(f"Inserted {flag} into flag list")
+            self.logger.info(f"Inserted {flag} into flag list")
         else:
             self.logger.debug(f"Did not insert {flag} into flag list, as it was already there")
 
@@ -286,7 +285,7 @@ class DataEntry(SuperWidget):
         if self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to open a different item?"):
             if "_id" in self.back_doc:
                 last, back = self.back_doc, self.last_doc
-                self.logger.debug(f"Going back to {last['_id']}")
+                self.logger.info(f"Going back to {last['_id']}")
                 self._show(last["_id"])
 
                 def restore_history():
@@ -305,7 +304,7 @@ class DataEntry(SuperWidget):
         '''Callback for when the cancel button is pressed.'''
         self.logger.debug(f"Cancel button activated")
         if self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to cancel?"):
-            self.logger.debug(f"Reverting data pane to last doc {self.last_doc.get('_id','_')}")
+            self.logger.info(f"Reverting data pane to last doc {self.last_doc.get('_id','_')}")
             self.show()
         else:
             self.logger.debug(f"Not reverting data pane, as user declined")
@@ -344,7 +343,7 @@ class DataEntry(SuperWidget):
                 if len(printers) == 0:
                     return
                 #TODO Link to self.hw.Hardware and print
-                self.logger.debug('Printing ID Card')
+                self.logger.info('Printing ID Card')
                 self.logger.debug(f'Printing to: {variable.get()}')
                 self.hardware.sendNewIDCard(self.id_card_printable, variable.get())
 
@@ -391,7 +390,7 @@ class DataEntry(SuperWidget):
         root.clipboard_clear()
         id = self.last_doc.get("_id", "")
         root.clipboard_append(id)
-        self.logger.debug(f"{repr(id)} copied to clipboard")
+        self.logger.info(f"{repr(id)} copied to clipboard")
 
 
     def delete(self, *args):
@@ -401,7 +400,7 @@ class DataEntry(SuperWidget):
             id = self.last_doc["_id"]
             parents = self.db.item_parents(item=id)
             if len(parents) > 0:
-                self.logger.debug(f"Deleting item {id} and all its children")
+                self.logger.info(f"Deleting item {id} and all its children")
                 self.db.item_delete(id=id, all=True, recur=True)
                 self.last_doc = {}
                 self.show()
@@ -416,7 +415,7 @@ class DataEntry(SuperWidget):
     def edit(self, *args):
         '''Callback for when the edit button is pressed'''
         self.editing = True
-        self.logger.debug(f"Edit button activated, setting edit mode to {self.editing}")
+        self.logger.info(f"Edit button activated, setting edit mode to {self.editing}")
         for entry, buttona, buttonb, buttonc, hidden in zip(self.w_input_data, self.w_buttona_data, self.w_buttonb_data, self.w_buttonc_data, self.w_hidden_data):
             if hidden == None:
                 entry.config(state="normal")
@@ -462,7 +461,7 @@ class DataEntry(SuperWidget):
             self.logger.debug(f"Activating edit as part of the new item process")
             self.edit()
             self.w_bu_delete.config(state="disabled")
-            self.logger.debug(f"New {self.last_doc['category']} ready to be edited")
+            self.logger.info(f"New {self.last_doc['category']} ready to be edited")
         else:
             self.logger.debug(f"Did not open a new item, as user declined")
 
@@ -473,7 +472,7 @@ class DataEntry(SuperWidget):
         id = self.last_doc.get("_id", "")
         if id != "":
             if self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to create a new item?"):
-                self.logger.debug(f"Creating new child of {id}")
+                self.logger.info(f"Creating new child of {id}")
                 button = event.widget
                 row = self.w_buttonc_data.index(button)
                 field = self.w_la_data[row].cget("text")
@@ -501,7 +500,7 @@ class DataEntry(SuperWidget):
         for child in self.w_bu_photo.winfo_children():
             child.destroy()
         window = tk.Toplevel(master=self.w_bu_photo)
-        self.logger.debug(f"Photo window opened")
+        self.logger.info(f"Photo window opened")
         window.attributes("-topmost", True)
         window.focus_force()
         window.title("Photo")
@@ -513,7 +512,7 @@ class DataEntry(SuperWidget):
             self.current_photo = None
             self.w_bu_photo.config(image="")
             self.w_bu_photo.image = ""
-            self.logger.debug(f"Photo cleared from data pane")
+            self.logger.info(f"Photo cleared from data pane")
 
         def fetch_photo():
             '''Updates the photoframe with a new photo.'''
@@ -521,9 +520,9 @@ class DataEntry(SuperWidget):
                 img = ImageTk.PhotoImage(self.photomanager.take_photo())
                 photoframe.config(image=img)
                 photoframe.image = img
-                window.after(200, fetch_photo)
+                window.after(250, fetch_photo)
             except:
-                self.logger.debug("Could not take photo. Webcam may be unavailable")
+                self.logger.warning("Could not take photo. Webcam may be unavailable")
 
         def update(*args):
             '''Pushes current photo to data pane. Can function as a callback.'''
@@ -533,9 +532,9 @@ class DataEntry(SuperWidget):
                 img = ImageTk.PhotoImage(self.current_photo)
                 self.w_bu_photo.config(image=img)
                 self.w_bu_photo.image = img
-                self.logger.debug(f"Photo pushed to data pane")
+                self.logger.info(f"Photo pushed to data pane")
             except:
-                self.logger.debug("Could not take photo. Webcam may be unavailable")
+                self.logger.warning("Could not take photo. Webcam may be unavailable")
             window.destroy()
             self.logger.debug(f"Closed photo window")
 
@@ -575,7 +574,7 @@ class DataEntry(SuperWidget):
             for child in button.winfo_children():
                 child.destroy()
             window = tk.Toplevel(master=button)
-            self.logger.debug(f"Read window opened")
+            self.logger.info(f"Read window opened")
             window.attributes("-topmost", True)
             window.focus_force()
             window.title(field.cget("text"))
@@ -598,7 +597,7 @@ class DataEntry(SuperWidget):
 
                 def commit_weight(*args):
                     '''Inserts current weight into data pane.'''
-                    self.logger.debug(f"Push weight to data pane")
+                    self.logger.info(f"Pushed weight to data pane")
                     entry.delete(0, "end")
                     entry.insert(0, msg.cget('text'))
                     window.destroy()
@@ -616,7 +615,7 @@ class DataEntry(SuperWidget):
                 read_weight()
             
             else:
-                self.logger.debug(f"Could not display read window contents, as read source is unknown")
+                self.logger.error(f"Could not display read window contents, as read source is unknown")
 
         else:
             self.logger.debug(f"Did not open read window, as button is disabled")
@@ -640,7 +639,7 @@ class DataEntry(SuperWidget):
             for child in button.winfo_children():
                 child.destroy()
             window = tk.Toplevel(master=button)
-            self.logger.debug(f"Read window opened")
+            self.logger.info(f"Read window opened")
             window.attributes("-topmost", True)
             window.focus_force()
             window.title(field.cget("text"))
@@ -662,7 +661,7 @@ class DataEntry(SuperWidget):
                     if name not in namelist.get(0, "end"):
                         listids.append(id)
                         namelist.insert("end", name)
-                        self.logger.debug(f"Added {id} / {name} to ID name list")
+                        self.logger.info(f"Added {id} / {name} to ID name list")
                     else:
                         self.logger.debug(f"Did not add {id} / {name} to ID name list, as it was already there")
 
@@ -675,7 +674,7 @@ class DataEntry(SuperWidget):
                         index, *_ = indexes
                         id = listids.pop(index)
                         namelist.delete(index)
-                        self.logger.debug(f"Removed {id} from ID name list")
+                        self.logger.info(f"Removed {id} from ID name list")
                     else:
                         self.logger.debug(f"Did not remove any IDs from name list, as nothing was selected")
 
@@ -688,7 +687,7 @@ class DataEntry(SuperWidget):
                     if len(values) > 0:
                         entry.current(0)
                     self.w_hidden_data[row] = listids
-                    self.logger.debug(f"Pushed ids to date pane: {listids} / {values}")
+                    self.logger.info(f"Pushed ids to date pane: {listids} / {values}")
                     window.destroy()
                     self.logger.debug(f"List field's read window closed")
 
@@ -729,7 +728,7 @@ class DataEntry(SuperWidget):
                     if id not in idlist.get(0, "end") and len(id) > 0:
                         idlist.insert("end", id)
                         identry.delete(0, "end")
-                        self.logger.debug(f"Added {id} to physical ID list")
+                        self.logger.info(f"Added {id} to physical ID list")
                     else:
                         self.logger.debug(f"Did not add to physical ID list, as id was blank or already existed")
 
@@ -740,7 +739,7 @@ class DataEntry(SuperWidget):
                     if len(indexes) > 0:
                         index, *_ = indexes
                         idlist.delete(index)
-                        self.logger.debug(f"Deleted physical ID at index {index}")
+                        self.logger.info(f"Deleted physical ID at index {index}")
                     else:
                         self.logger.debug(f"Did not delete physical ID, as none were selected")
 
@@ -768,7 +767,7 @@ class DataEntry(SuperWidget):
                     if len(values) > 0:
                         entry.current(0)
                     self.w_hidden_data[row] = values
-                    self.logger.debug(f"Pushed physical ids to date pane: {values}")
+                    self.logger.info(f"Pushed physical ids to date pane: {values}")
                     window.destroy()
                     self.logger.debug(f"List field's read window closed")
 
@@ -803,7 +802,7 @@ class DataEntry(SuperWidget):
                 getNFCorBarcode()
             
             else:
-                self.logger.debug(f"Could not display read window contents, as read source is unknown")
+                self.logger.error(f"Could not display read window contents, as read source is unknown")
         
         else:
             self.logger.debug(f"Did not open read window, as button is disabled")
@@ -814,7 +813,7 @@ class DataEntry(SuperWidget):
         self.logger.debug(f"Remove flag button activated")
         sel, *_ = self.w_li_flags.curselection()
         self.w_li_flags.delete(sel)
-        self.logger.debug(f"Removed flag from flag list with index {sel}")
+        self.logger.info(f"Removed flag from flag list with index {sel}")
 
 
     def save(self, *args):
@@ -837,14 +836,14 @@ class DataEntry(SuperWidget):
             doc[field] = value
         else:
             self.editing = False
-            self.logger.debug(f"Edit mode set to {self.editing}")
+            self.logger.info(f"Edit mode set to {self.editing}")
             doc["flags"] = list(self.w_li_flags.get(0, "end"))
             if "_id" in doc:
-                self.logger.debug(f"Editing {doc['category']} {doc['_id']}")
+                self.logger.info(f"Editing {doc['category']} {doc['_id']}")
                 self.db.item_edit(id=doc["_id"], data=doc)
                 id = None
             else:
-                self.logger.debug(f"Saving new {doc['category']}")
+                self.logger.info(f"Saving new {doc['category']}")
                 doc["_id"] = self.db.item_create(cat=doc["category"], doc=doc)
                 id = doc["_id"]
             if physid != None:
@@ -859,9 +858,10 @@ class DataEntry(SuperWidget):
             self.back_doc = self.last_doc
             self.logger.debug(f"Back doc is now {self.back_doc.get('_id','_')}")
             self.last_doc = doc
-            self.logger.debug("Save successful")
+            self.logger.info("Save completed")
             return True
-        self.logger.debug("Could not save item because required fields are missing")
+        messagebox.showwarning("Missing Information", "Could not save item because required fields are missing.")
+        self.logger.warning("Could not save item because required fields are missing")
         return False
 
 
@@ -876,10 +876,10 @@ class DataEntry(SuperWidget):
                 self.logger.debug(f"Back doc is now {self.back_doc.get('_id','_')}")
                 self.last_doc = doc
             id = self.last_doc.get("_id", "")
-            self.logger.debug(f"Showing document {id if id != '' else '_'} in the data pane")
+            self.logger.info(f"Showing document {id if id != '' else '_'} in the data pane")
             self.last_photo = self.db.photo_load(item=id)
         else:
-            self.logger.debug("Showing document _ in the data pane")
+            self.logger.info("Showing document _ in the data pane")
 
         for child in self.w_fr_data.winfo_children():
             child.destroy()
@@ -1075,7 +1075,7 @@ class DataEntry(SuperWidget):
                 if buttonc != None:
                     buttonc.lift()
         
-        self.logger.debug("Current show() completed")
+        self.logger.debug("Current show completed")
 
 
     def showlist(self, event: tk.Event, source: str):
@@ -1315,7 +1315,7 @@ class SearchTree(SuperWidget):
                     target = self.dragstartid
                     source, *_ = self.db.item_parents(item=target)
                     destination = dragendid
-                    self.logger.debug(f"Moving {target} from {source} to {destination} via D&D")
+                    self.logger.info(f"Moving {target} from {source} to {destination} via D&D")
 
                     recur_risk_list = self.db.item_parents(item=destination)
                     self.logger.debug(f"Recursion risk list: {recur_risk_list}")
@@ -1329,7 +1329,7 @@ class SearchTree(SuperWidget):
                         dragendtree.tree_open(node=destination)
                         self.logger.debug(f"Move completed")
                     else:
-                        self.logger.debug("Did not perform move, as it would create an infinite loop")
+                        self.logger.warning("Did not perform move, as it would create an infinite loop")
                 else:
                     self.logger.debug(f"Did not perform move, as user declined")
             else:
@@ -1343,17 +1343,17 @@ class SearchTree(SuperWidget):
 
     def narrow(self, *args):
         '''Callback for when the narrow button is pressed.'''
-        self.logger.debug("Narrow button activated")
+        self.logger.info("Narrow button activated")
         self.search(preselector=self.last_selector)
 
 
     def scan(self, *args):
         '''Callback for when the scan button is pressed.'''
-        self.logger.debug("Can button activated")
+        self.logger.debug("Scan button activated")
         for child in self.w_bu_scan.winfo_children():
             child.destroy()
         window = tk.Toplevel(master=self.w_bu_scan)
-        self.logger.debug("Opening scan window")
+        self.logger.info("Opening scan window")
         window.attributes("-topmost", True)
         window.focus_force()
         window.title("Scan")
@@ -1364,7 +1364,7 @@ class SearchTree(SuperWidget):
             physid = input_var.get()
             ids = self.db.ids_find(physid=physid)
             if len(ids) == 1:
-                self.logger.debug(f"Search for physical ID {physid} successful")
+                self.logger.info(f"Search for physical ID {physid} successful")
                 id, *_ = ids
                 self.tree_focus(goal=id, rebase=True)
                 window.destroy()
@@ -1373,7 +1373,7 @@ class SearchTree(SuperWidget):
                 self.logger.debug(f"Search for physical ID {physid} failed. No matches")
                 feedback.config(text="No matching ID found")
             else:
-                self.logger.debug(f"Search for physical ID {physid} failed. Multiple matches")
+                self.logger.warning(f"Search for physical ID {physid} failed. Multiple matches")
                 feedback.config(text="Multiple matching IDs found")
 
         self.logger.debug("Preparing scan window widgets")
@@ -1414,7 +1414,7 @@ class SearchTree(SuperWidget):
             "≠": {"$ne": value},
             "≈": {"$regex": value}
             }[op]
-        self.logger.debug(f"Search settings; Category: {cat}; Field: {field}: Op: {op}; Value: {value}")
+        self.logger.debug(f"Searching; Category: {cat}; Field: {field}: Op: {op}; Value: {value}")
 
         selector = preselector.copy()
         selector[field] = opvalue
@@ -1462,7 +1462,7 @@ class SearchTree(SuperWidget):
             self.logger.debug(f"Search item {id} was selected")
             self.tree_focus(goal=id, rebase=True)
         else:
-            self.logger.debug(f"Multiple search items were selected")
+            self.logger.warning(f"Multiple search items were selected")
 
 
 
@@ -1478,7 +1478,7 @@ class SearchTree(SuperWidget):
             self.logger.debug(f"Summation toggled ON")
             self.w_tr_tree.config(show="tree headings")
         else:
-            self.logger.debug(f"Summation toggled to unknown state {state}")
+            self.logger.error(f"Summation toggled to unknown state {state}")
         self.tree_refresh()
 
 
@@ -1561,15 +1561,15 @@ class SearchTree(SuperWidget):
 
         target: The item to make the new base.
         '''
-        self.logger.debug(f"Rebasing to {target}")
+        self.logger.info(f"Rebasing to {target}")
         self.w_tr_tree.selection_set(target)
         if self.w_tr_tree.parent(target) == "":
             parents = self.db.item_parents(item=target, result="DOC")
             if len(parents) > 0:
                 self.base, *_ = parents
-                self.logger.debug(f"Previous rebase was top of tree, thus rebasing to {self.base}")
+                self.logger.info(f"Previous rebase was top of tree, thus rebasing to {self.base}")
             else:
-                self.logger.debug(f"Did not rebase, as the tree is already at its highest point")
+                self.logger.info(f"Did not rebase, as the tree is already at its highest point")
         else:
             self.base = self.db.item_get(id=target)
         self.tree_refresh()
@@ -1610,7 +1610,7 @@ class SearchTree(SuperWidget):
                     doc = self.db.item_get(id=id, lazy=True)
                     self._select(doc, self)
                 else:
-                    self.logger.debug(f"Multiple nodes were selected")
+                    self.logger.warning(f"Multiple nodes were selected")
             else:
                 self.logger.debug(f"Node was selected but item was not opened, as user declined")
 
@@ -1636,7 +1636,7 @@ class SearchTree(SuperWidget):
             id, = self.selection
             self.logger.debug(f"Opening selected node {id}")
         else:
-            self.logger.debug(f"Could not open any nodes, as none were selected")
+            self.logger.warning(f"Could not open any nodes, as none were selected")
             return
 
         children = self.db.container_children(container=id, result="DOC")
@@ -1752,7 +1752,7 @@ class ContainerManager(SuperWidget):
         self.yes_no = yesno
 
         self.bookmarks_path = bookmarks
-        self.logger.debug(f"Loading bookmarks from {self.bookmarks_path}")
+        self.logger.info(f"Loading bookmarks from {self.bookmarks_path}")
         with open(self.bookmarks_path, "r") as f:
             self.bookmarks = json.loads(f.read())
         self.logger.debug(f"Finished loading bookmarks")
@@ -1850,7 +1850,7 @@ class ContainerManager(SuperWidget):
         
         preset: Which bookmark to use.
         '''
-        self.logger.debug(f"Bookmark {preset} activated")
+        self.logger.info(f"Bookmark {preset} activated")
         if self.yes_no == None or (self.w_se_top.w_var_autoopen.get() == 0 and self.w_se_bottom.w_var_autoopen.get() == 0):
             permitted = True
         else:
@@ -1863,7 +1863,7 @@ class ContainerManager(SuperWidget):
                 items = self.db.items_get(ids=[top, bottom], lazy=True)
                 top, bottom = items
                 topid, bottomid = top["_id"], bottom["_id"]
-                self.logger.debug(f"Following bookmark to {topid} and {bottomid}")
+                self.logger.info(f"Following bookmark to {topid} and {bottomid}")
                 self.basebot(newbase=bottom)
                 self.base(newbase=top)
                 self.refresh(topselection=topid, bottomselection=bottomid)
@@ -1871,7 +1871,7 @@ class ContainerManager(SuperWidget):
                 self.botopen()
                 self.open()
             except:
-                self.logger.debug(f"Could not open bookmark {preset}")
+                self.logger.warning(f"Could not open bookmark {preset}")
                 self.refresh()
         else:
             self.logger.debug(f"Did not go to bookmark, as user declined")
@@ -1882,12 +1882,12 @@ class ContainerManager(SuperWidget):
         
         preset: Which bookmark to change.
         '''
-        self.logger.debug(f"Bookmark {preset} change activated")
+        self.logger.info(f"Bookmark {preset} change activated")
         topselect = self.w_se_top.base['_id']
         botselect = self.w_se_bottom.base['_id']
         toptext = self.w_se_top.base['Display Name'][:10]
         bottext = self.w_se_bottom.base['Display Name'][:10]
-        self.logger.debug(f"Bookmark {preset} now goes to {topselect} and {botselect}")
+        self.logger.info(f"Bookmark {preset} now goes to {topselect} and {botselect}")
         fulltext = f"{toptext}/{bottext}"
         if preset == "1":
             self.w_bu_bm1.config(text=fulltext)
@@ -1901,7 +1901,7 @@ class ContainerManager(SuperWidget):
         self.bookmarks[preset]["top"] = topselect
         self.bookmarks[preset]["bottom"] = botselect
 
-        self.logger.debug(f"Saving new bookmarks to {self.bookmarks_path}")
+        self.logger.info(f"Saving new bookmarks to {self.bookmarks_path}")
         with open(self.bookmarks_path, "w") as f:
             f.write(json.dumps(self.bookmarks))
         self.logger.debug(f"Done saving new bookmarks")
@@ -1938,7 +1938,7 @@ class ContainerManager(SuperWidget):
                 target, *_ = self.w_se_bottom.selection
                 source, *_ = self.db.item_parents(item=target)
                 destination, *_ = self.w_se_top.selection
-            self.logger.debug(f"Moving {target} from {source} to {destination} via button")
+            self.logger.info(f"Moving {target} from {source} to {destination} via button")
 
             recur_risk_list = [destination]+self.db.item_parents(item=destination)
             self.logger.debug(f"Recursion risk list: {recur_risk_list}")
@@ -1957,7 +1957,7 @@ class ContainerManager(SuperWidget):
                 self.botopen()
                 self.logger.debug(f"Move completed")
             else:
-                self.logger.debug("Did not perform move, as it would create an infinite loop")
+                self.logger.warning("Did not perform move, as it would create an infinite loop")
         else:
             self.logger.debug("Did not perform move, as user declined")
 

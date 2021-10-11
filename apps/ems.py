@@ -121,6 +121,7 @@ class EMS():
             self.active.w_tr_tree.configure(style="unactive.Treeview")
         self.active = tree
         self.active.w_tr_tree.configure(style="active.Treeview")
+        self.logger.info(f"Item {doc.get('_id','_')} was selected")
         self.de.show(doc)
 
 
