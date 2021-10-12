@@ -876,7 +876,7 @@ class DEHCDatabase:
             children = self.container_children(container=id, result="CON")
             parents = self.item_parents(item=id, result="CON")
             self.db.documents_delete(dbname=self.db_containers, ids=children+parents, lazy=lazy)
-            #TODO: Delete associated file (photo) too
+            self.photo_delete(item=id)
         self.logger.debug(f"Done deleting item {id}")
 
 
@@ -1013,6 +1013,8 @@ class DEHCDatabase:
             children = self.containers_children(containers=ids, result="CON")
             parents = self.items_parents(items=ids, result="CON")
             self.db.documents_delete(dbname=self.db_containers, ids=children+parents, lazy=lazy)
+            for id in ids:
+                self.photo_delete(item=id)
         self.logger.debug(f"Done deleting {len(ids)} items")
 
 

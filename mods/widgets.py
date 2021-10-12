@@ -1115,22 +1115,7 @@ class DataEntry(SuperWidget):
 # ----------------------------------------------------------------------------
 
 class SearchTree(SuperWidget):
-    '''A SuperWidget representing a searchable tree.
-    
-    base: The id of the tree's root node.
-    cats: The categories which may be searched using this SearchTree.
-    db: The database object which the widget uses for database transactions.
-    headings: A mapping of column names -> column IDs in the search tree.
-    logger: The logger object used for logging.
-    master: The widget that the SearchTree's component widgets will be instantiated under.
-    ops: The operations that can be used in searches.
-    search_result: The contents of the last search result.
-    selection: The last selected element of the tree.
-    summables: A list of summable fields defined in the database schema.
-    summation: Whether or not to sum summable fields in the tree.
-    style: The style to use for the tree's appearence.
-    _select: If present, a callback function that triggers when a tree item is selected.
-    '''
+    '''A SuperWidget representing a searchable tree.'''
 
     def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, autoopen: bool = False, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, simple: bool = False, yesno: Callable = None, hardware: hw.Hardware = None):
         '''Constructs a SearchTree object.
@@ -1151,25 +1136,24 @@ class SearchTree(SuperWidget):
         '''
         super().__init__(master=master, db=db, level=level)
 
-        self.cats = cats
-        self.ops = ["=", "<", ">", "≤", "≥", "≠", "≈"]
-
-        self._select = select
-
-        self.autoopen = autoopen
-        self.base = base
-        self.dragstarttree = None
-        self.dragstartid = None
-        self.headings = {}
-        self.last_selector = {}
-        self.selection = None
-        self.search_result = None
-        self.simple = simple
-        self.summables = self.db.schema_sums()
-        self.summation = False
-        self.yes_no = yesno
-
-        self.hardware = hardware
+        self.cats = cats                               # A list of item categories that can be selected
+        self.ops = ["=", "<", ">", "≤", "≥", "≠", "≈"] # The operators available to use in searches
+        self._select = select                          # A callback which triggers when a tree node is selected
+        self.altheld = False                           # Whether or not the alt key is currently being held
+        self.autoopen = autoopen                       # The starting value of autoopen
+        self.base = base                               # The current base of the tree
+        self.dragstarttree = None                      # The SearchTree a drag and drop originated from
+        self.dragstartid = None                        # The ID of the item at the start of a drag and drop
+        self.headings = {}                             # The tree headings when summation is turned on
+        self.last_selector = {}                        # The previous search selector
+        self.root = self.w_fr.winfo_toplevel()         # The root widget that contains this SuperWidget
+        self.selection = None                          # The currently selected item
+        self.search_result = None                      # The previous search result
+        self.simple = simple                           # Whether or not to hide auto-open and summation
+        self.summables = self.db.schema_sums()         # List of summable fields
+        self.summation = False                         # Whether or not summation is currently turned on
+        self.yes_no = yesno                            # A callback which leads to a DataEntry's yes_no()
+        self.hardware = hardware                       # The hardware manager
 
         if prepare == True:
             self.prepare()
@@ -1225,6 +1209,9 @@ class SearchTree(SuperWidget):
         self.w_ch_autoopen = ttk.Checkbutton(master=self.w_fr, variable=self.w_var_autoopen, text="Auto Open?")
         self.w_ch_summation = ttk.Checkbutton(master=self.w_fr, variable=self.w_var_summation, text="Show Sums?")
 
+        self.root.bind("<KeyPress-Alt_L>", self.altpress, add="+")
+        self.root.bind("<KeyRelease-Alt_L>", self.altrelease, add="+")
+
         self.w_en_value.bind("<Return>", self.search, add="+")
         self.w_li_search.bind("<<ListboxSelect>>", self.search_select)
 
@@ -1235,6 +1222,7 @@ class SearchTree(SuperWidget):
         self.w_tr_tree.bind("<Control-r>", self.tree_rebase_keyboard)
 
         self.w_tr_tree.bind("<ButtonPress-1>", self.dragstart)
+        self.w_tr_tree.bind("<B1-Motion>", self.dragmid)
         self.w_tr_tree.bind("<ButtonRelease-1>", self.dragstop)
 
         self.w_co_cat.current(0)
@@ -1288,6 +1276,16 @@ class SearchTree(SuperWidget):
             self.w_ch_summation.grid(column=3, row=2, columnspan=2, sticky="nsew", padx=1, pady=1)
 
 
+    def altpress(self, *args):
+        '''Callback for when alt is pressed down.'''
+        self.altheld = True
+
+    
+    def altrelease(self, *args):
+        '''Callback for when alt is released.'''
+        self.altheld = False
+
+
     def dragstart(self, *args):
         '''Callback for when the mouse is clicked down on the tree.'''
         event, = args
@@ -1295,10 +1293,16 @@ class SearchTree(SuperWidget):
         self.dragstartid = tree.identify_row(event.y)
         self.dragstarttree = tree.SearchTree
         self.logger.debug(f"Mouse clicked on tree. Root xy: {tree.winfo_pointerxy()}; Tree: {tree}; Tree xy: {(event.x, event.y)}; Row: {repr(self.dragstartid)}")
-    
+
+
+    def dragmid(self, *args):
+        '''Callback for when the mouse is mid-drag'''
+        self.root.configure(cursor="target")
+
 
     def dragstop(self, *args):
         '''Callback for when the mouse is released after clicking down on the tree.'''
+        self.root.configure(cursor="")
         event, = args
         mx, my = event.widget.winfo_pointerxy()
         tree = self.w_fr.winfo_containing(mx, my)
@@ -1321,21 +1325,24 @@ class SearchTree(SuperWidget):
                     target = self.dragstartid
                     source, *_ = self.db.item_parents(item=target)
                     destination = dragendid
-                    self.logger.info(f"Moving {target} from {source} to {destination} via D&D")
+                    if source != destination:
+                        self.logger.info(f"Moving {target} from {source} to {destination} via D&D")
 
-                    recur_risk_list = self.db.item_parents(item=destination)
-                    self.logger.debug(f"Recursion risk list: {recur_risk_list}")
-                    if target not in recur_risk_list:
-                        self.db.container_move(from_con=source, to_con=destination, item=target)
-                        self.dragstarttree.tree_refresh(selection=source)
-                        dragendtree.tree_refresh(selection=destination)
-                        self.dragstarttree.tree_focus(goal=source, rebase=True)
-                        dragendtree.tree_focus(goal=destination, rebase=True)
-                        self.dragstarttree.tree_open(node=source)
-                        dragendtree.tree_open(node=destination)
-                        self.logger.debug(f"Move completed")
+                        recur_risk_list = [destination]+self.db.item_parents(item=destination)
+                        self.logger.debug(f"Recursion risk list: {recur_risk_list}")
+                        if target not in recur_risk_list:
+                            self.db.container_move(from_con=source, to_con=destination, item=target)
+                            self.dragstarttree.tree_refresh(selection=source)
+                            dragendtree.tree_refresh(selection=destination)
+                            self.dragstarttree.tree_focus(goal=source, rebase=True)
+                            dragendtree.tree_focus(goal=destination, rebase=True)
+                            self.dragstarttree.tree_open(node=source)
+                            dragendtree.tree_open(node=destination)
+                            self.logger.debug(f"Move completed")
+                        else:
+                            self.logger.warning("Did not perform move, as it would create an infinite loop")
                     else:
-                        self.logger.warning("Did not perform move, as it would create an infinite loop")
+                        self.logger.debug(f"Did not perform move, as start and end container were the same")
                 else:
                     self.logger.debug(f"Did not perform move, as user declined")
             else:
@@ -1351,7 +1358,6 @@ class SearchTree(SuperWidget):
         '''Callback for when the narrow button is pressed.'''
         self.logger.info("Narrow button activated")
         self.search(preselector=self.last_selector)
-
 
 
     def scan(self, *args):
@@ -1622,21 +1628,23 @@ class SearchTree(SuperWidget):
         '''Callback for when an item in the tree is selected.'''
         event, = args
         self.selection = event.widget.selection()
-        if self._select != None and self.w_var_autoopen.get() == 1:
+        if self._select != None and (self.w_var_autoopen.get() == 1 or self.altheld == True):
             if self.yes_no == None:
                 permitted = True
             else:
                 permitted = self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to open an item?")
             if permitted == True:
                 if len(self.selection) == 1:
-                    id, = self.selection
-                    self.logger.debug(f"Node {id} was selected")
-                    doc = self.db.item_get(id=id, lazy=True)
+                    sid, = self.selection
+                    self.logger.debug(f"Node {sid} was selected")
+                    doc = self.db.item_get(id=sid, lazy=True)
                     self._select(doc, self)
                 else:
                     self.logger.warning(f"Multiple nodes were selected")
             else:
                 self.logger.debug(f"Node was selected but item was not opened, as user declined")
+        else:
+            self.logger.debug(f"Node was selected, but autoopen was disabled.")
 
 
     def tree_close(self, *args):
@@ -1665,13 +1673,18 @@ class SearchTree(SuperWidget):
 
         children = self.db.container_children(container=id, result="DOC")
         children.sort(key=lambda doc: (doc["category"], doc[self.db.schema_name(cat=doc["category"])]))
-        self.w_tr_tree.delete(*self.w_tr_tree.get_children(item=id))
-        for child in children:
-            child_id = child["_id"]
-            child_name = child[self.db.schema_name(id=child_id)]
-            self.tree_insert(parent=id, iid=child_id, text=child_name)
-            self.tree_sum(node=child_id)
-        self.w_tr_tree.item(item=id, open=True)
+        
+        # Try/except prevents strange behavior if the targeted node isn't in the tree
+        try:
+            self.w_tr_tree.delete(*self.w_tr_tree.get_children(item=id))
+            for child in children:
+                child_id = child["_id"]
+                child_name = child[self.db.schema_name(id=child_id)]
+                self.tree_insert(parent=id, iid=child_id, text=child_name)
+                self.tree_sum(node=child_id)
+            self.w_tr_tree.item(item=id, open=True)
+        except:
+            self.logger.error(f"Unable to open {id}")
 
 
     def tree_sum(self, node: str):
