@@ -37,8 +37,3 @@ class PhotoManager:
             self.logger.warning(f"Photo capture failed")
         return img
 
-
-    def __del__(self):
-        '''Runs when PhotoManager object is deleted.'''
-        self.logger.debug("PhotoManager object destroyed")
-

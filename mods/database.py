@@ -410,11 +410,6 @@ class Database:
         return False
 
 
-    def __del__(self):
-        '''Runs when Database object is deleted.'''
-        self.logger.debug("Database object destroyed")
-
-
 # ----------------------------------------------------------------------------
 
 class DEHCDatabase:
@@ -438,7 +433,7 @@ class DEHCDatabase:
     schema_path: Path to .json file containing database schema.
     '''
 
-    def __init__(self, *, config: str, level: str = "NOTSET", namespace: str = "dehc", quickstart: bool = False, schema: str = "db_schema.json"):
+    def __init__(self, *, config: str, level: str = "NOTSET", namespace: str = "dehc", quickstart: bool = False, schema: str = "db_schema.json", version: str = "1"):
         '''Constructs a DEHCDatabase object.
 
         config: Path to .json file containing database server credentials.
@@ -465,6 +460,7 @@ class DEHCDatabase:
 
         self.schema = {}
         self.schema_path = schema
+        self.version = version
         if quickstart == True:
             self.logger.info(f"Performing quickstart")
             self.databases_create(lazy=True)
@@ -1259,6 +1255,7 @@ class DEHCDatabase:
     def schema_cats(self):
         '''Returns the list of categories present in the schema.'''
         cats = list(self.schema.keys())
+        cats.remove("#")
         return cats
 
 
@@ -1313,6 +1310,7 @@ class DEHCDatabase:
         forcelocal: If true, uses local schema over one stored in the database.
         '''
         self.logger.debug(f"Loading database schema")
+
         if forcelocal == False and self.db.document_exists(dbname=self.db_configs, id="schema") == True:
             self.logger.info(f"Loading database schema from database")
             loaded_schema = self.db.document_get(dbname=self.db_configs, id="schema")
@@ -1320,6 +1318,10 @@ class DEHCDatabase:
             self.logger.info(f"Loading database schema from {schema}")
             with open(schema, "r") as f:
                 loaded_schema = json.loads(f.read())
+
+        if loaded_schema["#"]["version"] != self.version:
+            raise RuntimeError("Schema version doesn't match what the application was expecting.")
+
         for key, value in self.schema.items():
             if "/" in key:
                 raise ValueError("Category names cannot contain / chars.")
@@ -1327,6 +1329,7 @@ class DEHCDatabase:
             if "category" in value["fields"]:
                 raise ValueError("category can't be a field name.")
                 # ...because it's reserved by app for identifying item types
+        
         self.schema = loaded_schema
         self.logger.debug(f"Done loading database schema")
 
@@ -1371,15 +1374,11 @@ class DEHCDatabase:
         '''Returns all of the summable fields within the entire schema.'''
         summables = []
         for cat, schema in self.schema.items():
-            for field, info in schema['fields'].items():
-                if info['type'] == "sum" or info['type'] == "count":
-                    summables.append(field)
+            if "fields" in schema:
+                for field, info in schema['fields'].items():
+                    if info['type'] == "sum" or info['type'] == "count":
+                        summables.append(field)
         return list(dict.fromkeys(summables))
-
-
-    def __del__(self):
-        '''Runs when DEHCDatabase object is deleted.'''
-        self.logger.debug("DEHCDatabase object destroyed")
 
 
 # ----------------------------------------------------------------------------

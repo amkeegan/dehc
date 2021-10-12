@@ -165,10 +165,4 @@ class EMS():
             self.root.after(ms=1, func=lambda *_: self.active.w_var_autoopen.set(autoopen)) # .after is required to make this trigger after <<TreeviewSelect>>
 
 
-    def __del__(self):
-        '''Runs when EMS object is deleted.'''
-        self.logger.debug("EMS object destroyed")
-    
-
-
 # ----------------------------------------------------------------------------

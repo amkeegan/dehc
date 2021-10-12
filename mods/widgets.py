@@ -393,6 +393,13 @@ class DataEntry(SuperWidget):
         self.logger.info(f"{repr(id)} copied to clipboard")
 
 
+    def data_change(self, *args):
+        '''Callback for when an item's information in the data pane is modified.'''
+        if self.editing == False:
+            self.editing = True
+            self.logger.info(f"Item edited, setting edit mode to {self.editing}")
+
+
     def delete(self, *args):
         '''Callback for when the delete button is pressed'''
         self.logger.debug(f"Delete item button activated")
@@ -414,8 +421,6 @@ class DataEntry(SuperWidget):
 
     def edit(self, *args):
         '''Callback for when the edit button is pressed'''
-        self.editing = True
-        self.logger.info(f"Edit button activated, setting edit mode to {self.editing}")
         for entry, buttona, buttonb, buttonc, hidden in zip(self.w_input_data, self.w_buttona_data, self.w_buttonb_data, self.w_buttonc_data, self.w_hidden_data):
             if hidden == None:
                 entry.config(state="normal")
@@ -924,6 +929,7 @@ class DataEntry(SuperWidget):
                 value = self.last_doc.get(field, "")
                 var = tk.StringVar()
                 var.set(value)
+                var.trace("w", self.data_change)
                 label = ttk.Label(master=self.w_fr_data, text=field, justify=tk.LEFT, anchor="w")
 
                 w_type = info['type']
@@ -1104,7 +1110,6 @@ class DataEntry(SuperWidget):
     def __del__(self):
         '''Runs when DataEntry object is deleted.'''
         self.photomanager.destroy()
-        self.logger.debug("DataEntry object destroyed")
 
 
 # ----------------------------------------------------------------------------
@@ -1417,7 +1422,7 @@ class SearchTree(SuperWidget):
         find_button.grid(column=0, row=3, sticky="nsew", padx=2, pady=2)
 
 
-    def search(self, preselector: dict = {}):
+    def search(self, *args, preselector: dict = {}):
         '''Callback for when the search button is pressed.'''
         self.logger.debug("Search button activated")
         cat = self.w_var_cat.get()
@@ -1433,7 +1438,7 @@ class SearchTree(SuperWidget):
             "≠": {"$ne": value},
             "≈": {"$regex": value}
             }[op]
-        self.logger.debug(f"Searching; Category: {cat}; Field: {field}: Op: {op}; Value: {value}")
+        self.logger.info(f"Searching; Category: {cat}; Field: {field}: Op: {op}; Value: {value}")
 
         selector = preselector.copy()
         selector[field] = opvalue
@@ -1722,11 +1727,6 @@ class SearchTree(SuperWidget):
             values[len(self.summables)] = minilist
 
             self.w_tr_tree.item(item=node, values=values)
-
-
-    def __del__(self):
-        '''Runs when SearchTree object is deleted.'''
-        self.logger.debug("SearchTree object destroyed")
 
 
 # ----------------------------------------------------------------------------
@@ -2030,11 +2030,6 @@ class ContainerManager(SuperWidget):
         return (top, bot)
 
 
-    def __del__(self):
-        '''Runs when ContainerManager object is deleted.'''
-        self.logger.debug("ContainerManager object destroyed")
-
-
 # ----------------------------------------------------------------------------
 
 class StatusBar(SuperWidget):
@@ -2069,7 +2064,3 @@ class StatusBar(SuperWidget):
         self.logger.debug(f"Packing and gridding widgets")
         self.w_status.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-
-    def __del__(self):
-        '''Runs when StatusBar object is deleted.'''
-        self.logger.debug("StatusBar object destroyed")
