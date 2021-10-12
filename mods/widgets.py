@@ -456,12 +456,14 @@ class DataEntry(SuperWidget):
                 self.logger.debug(f"Using prespecified guardian {self.guardian_doc.get('_id','_')}")
                 self.back_doc = self.guardian_doc
                 self.last_doc = {"category": self.child_doc["category"], self.child_doc["field"]: [self.child_doc["value"]]}
+                self.last_photo = None
                 self.child_doc = {}
                 self.guardian_doc = {}
             else:
                 self.back_doc = self.last_doc
                 self.logger.debug(f"No prespecified guardian for new item")
                 self.last_doc = {"category": self.w_var_cat.get()}
+                self.last_photo = None
             self.logger.debug(f"Back doc is now {self.back_doc.get('_id','_')}")
             self.logger.debug(f"Showing new item of category {self.last_doc['category']}")
             self.show()
@@ -1299,7 +1301,8 @@ class SearchTree(SuperWidget):
 
     def dragmid(self, *args):
         '''Callback for when the mouse is mid-drag'''
-        self.root.configure(cursor="target")
+        if self.dragstartid != None:
+            self.root.configure(cursor="target")
 
 
     def dragstop(self, *args):
@@ -1651,6 +1654,8 @@ class SearchTree(SuperWidget):
 
     def tree_close(self, *args):
         '''Callback which triggers when a tree node is closed.'''
+        self.dragstartid = None
+        self.dragstarttree = None
         pass
 
 
@@ -1659,6 +1664,8 @@ class SearchTree(SuperWidget):
         
         node: The node to open. If omitted, opens currently selected node.
         '''
+        self.dragstartid = None
+        self.dragstarttree = None
         self.selection = self.w_tr_tree.selection()
         if node != None:
             id = node
