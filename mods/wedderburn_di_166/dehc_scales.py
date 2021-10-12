@@ -11,15 +11,17 @@ class Scales_Worker(Hardware_Worker):
 
     serialDevice = None
     port = None
-    units = None
+    units = 'KG'
 
     def __init__(self, inQueue: Queue = None, outQueue: Queue = None):
         super().__init__(inQueue=inQueue, outQueue=outQueue)
     
     def detectDevice(self):
         ports = serial.tools.list_ports.comports()
+        
         for port, desc, hwid in sorted(ports):    
-            if hwid == 0x1234: #TODO Confirm HWID of FDTI / UART converter
+            print(f'Port: {port}, DESC: {desc}, HWID: {hwid}')
+            if 'VID:PID=067B:2303' in hwid:
                 self.port = port
                 print('Selected COM Port for scales:')
                 print(f'\t{port}: {desc} [{hwid}]')
@@ -27,16 +29,24 @@ class Scales_Worker(Hardware_Worker):
     
     def openDevice(self):
         try:
-            self.serialDevice = serial.Serial(self.port, 19200, timeout=1)
+            if self.port is not None:
+                self.serialDevice = serial.Serial(self.port, 19200, timeout=1)
+                self.connection = True
+                print(f'Successfully opened Serial device on {self.port}')
+            else:
+                print(f'No Serial Port to open..')
         except Exception as err: #TODO: Actual error checking
             print(f'Error opening {self.port}: {err}')
-        print(f'Successfully opened Serial device on {self.port}')
     
     def closeDevice(self):
         if self.serialDevice is not None:
             self.serialDevice.close()
             self.serialDevice = None
+            self.connection = False
             print(f'Closed Serial device on {self.port}')
+
+    def processQueueMessage(self, message):
+        return super().processQueueMessage(message)
 
     def parseWeightBytes(self, line: str):
         #TODO: Error checking, not a number
@@ -60,7 +70,7 @@ class Scales_Worker(Hardware_Worker):
                 except queue.Full:
                     time.sleep(0.1)
             else:
-                print(msg)
+                print(f'currentWeight queue is None: {msg}')
 
     def readNewData(self, type=None):
         self.readCurrentWeight()

@@ -362,8 +362,10 @@ class DataEntry(SuperWidget):
         card_builder = card_gen.IDCardBuilder()
 
         self.id_card_printable = card_builder.generateIDCard(
+            #TODO: Change qrcode_id to be one of available Physical IDs, not _id
             qrcode_id=self.last_doc['_id'] if '_id' in self.last_doc else 'NILQRCODE',
             embedded_logo_path='assets/embedded-logo.png',
+            #TODO: Change barcode_id to be one of available Physical IDs, not _id
             barcode_id=self.last_doc['_id'] if '_id' in self.last_doc else 'NILBARCODE',
             name=self.last_doc['Display Name'] if 'Display Name' in self.last_doc else 'UNKNOWN NAME',
             secondary_texts=(
@@ -598,7 +600,7 @@ class DataEntry(SuperWidget):
                         result = round(80+random.random()*10, 2) 
                     if result != '':
                         msg.config(text=str(result))
-                    window.after(500, read_weight)
+                    window.after(100, read_weight)
 
                 def commit_weight(*args):
                     '''Inserts current weight into data pane.'''

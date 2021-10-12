@@ -14,7 +14,7 @@ pycache/
 !.log
 
 # Ignore 'temporary' generated images stored locally
-/data/*
+/data/*/*.png
 
 # Ignore local VS Code project settings
 .vscode/

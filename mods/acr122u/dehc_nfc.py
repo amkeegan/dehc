@@ -21,9 +21,12 @@ class NFC_Worker(Hardware_Worker):
         super().__init__(inQueue=inQueue, outQueue=outQueue)
     
     def detectDevice(self):
-        self.systemReaders = readers()
-        print(f'Found NFC readers: {self.systemReaders}')
-    
+        try:
+            self.systemReaders = readers()
+            print(f'Found NFC readers: {self.systemReaders}')
+        except Exception as err:
+            print(f'Smartcard reader error: {err}')
+        
     def openDevice(self):
         if self.systemReaders is not None:
             if len(self.systemReaders) > 0:
@@ -36,7 +39,7 @@ class NFC_Worker(Hardware_Worker):
         #TODO: Check if cleanup necessary
         self.reader = None
         self.connection = False
-        print('Closing NFC hardware connection.')
+        print('Closed NFC hardware connection.')
 
     def processQueueMessage(self, message):
         return super().processQueueMessage(message)

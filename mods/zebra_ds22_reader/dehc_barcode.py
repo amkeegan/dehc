@@ -5,10 +5,12 @@ import time
 import ctypes
 import os
 import usb.core ## python -m pip install pyusb
+import usb.backend.libusb1
 
 os.chdir('./mods/zebra_ds22_reader/DLL') # Assumes we start from dehc/
 try:
-    check = ctypes.WinDLL('./libusb-1.0.dll')
+    #check = ctypes.WinDLL('./libusb-1.0.dll')
+    backend = usb.backend.libusb1.get_backend(find_library=lambda x: './libusb-1.0.dll')
     usb.core.find()
 except Exception as err:
     print(f'USB Loading error: {err}')
@@ -19,12 +21,10 @@ from mods.dehc_worker import Hardware_Worker
 class Barcode_Worker(Hardware_Worker):
 
     usbDevice = None
-
+    idVendor = 0x05E0
+    idProduct = 0x1300
+    
     def __init__(self, inQueue: Queue = None, outQueue: Queue = None):
-        ## TODO: Add some detection logic
-        ## TODO: Decide if we should hardcode, and/or allow passed in PID,VID
-        self.idVendor = 0x05E0
-        self.idProduct = 0x1300
         super().__init__(inQueue=inQueue, outQueue=outQueue)
     
     def detectDevice(self):
@@ -47,7 +47,7 @@ class Barcode_Worker(Hardware_Worker):
     def closeDevice(self):
         self.usbDevice = None
         self.connection = None
-        print('Closing Barcode hardware connection')
+        print('Closed Barcode hardware connection')
 
     def processQueueMessage(self, message):
         return super().processQueueMessage(message)
