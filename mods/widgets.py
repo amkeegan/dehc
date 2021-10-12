@@ -1337,12 +1337,19 @@ class SearchTree(SuperWidget):
                         self.logger.debug(f"Recursion risk list: {recur_risk_list}")
                         if target not in recur_risk_list:
                             self.db.container_move(from_con=source, to_con=destination, item=target)
-                            self.dragstarttree.tree_refresh(selection=source)
-                            dragendtree.tree_refresh(selection=destination)
-                            self.dragstarttree.tree_focus(goal=source, rebase=True, dragreset=False)
-                            dragendtree.tree_focus(goal=destination, rebase=True, dragreset=False)
-                            self.dragstarttree.tree_open(node=source, dragreset=False)
-                            dragendtree.tree_open(node=destination, dragreset=False)
+                            if self.dragstarttree == dragendtree:
+                                dragendtree.tree_refresh(selection=destination)
+                                dragendtree.tree_focus(goal=source, rebase=True, dragreset=False)
+                                dragendtree.tree_focus(goal=destination, rebase=True, dragreset=False)
+                                dragendtree.tree_open(node=source, dragreset=False)
+                                dragendtree.tree_open(node=destination, dragreset=False)
+                            else:
+                                self.dragstarttree.tree_refresh(selection=source)
+                                dragendtree.tree_refresh(selection=destination)
+                                self.dragstarttree.tree_focus(goal=source, rebase=True, dragreset=False)
+                                dragendtree.tree_focus(goal=destination, rebase=True, dragreset=False)
+                                self.dragstarttree.tree_open(node=source, dragreset=False)
+                                dragendtree.tree_open(node=destination, dragreset=False)
                             self.logger.debug(f"Move completed")
                         else:
                             self.logger.warning("Did not perform move, as it would create an infinite loop")
@@ -1649,7 +1656,7 @@ class SearchTree(SuperWidget):
                     doc = self.db.item_get(id=sid, lazy=True)
                     self._select(doc, self)
                 else:
-                    self.logger.warning(f"Multiple nodes were selected")
+                    self.logger.warning(f"Multiple or zero nodes were selected")
             else:
                 self.logger.debug(f"Node was selected but item was not opened, as user declined")
         else:
@@ -1684,6 +1691,10 @@ class SearchTree(SuperWidget):
             self.logger.info(f"Opening selected node {id}")
         else:
             self.logger.warning(f"Could not open any nodes, as none were selected")
+            return
+
+        # Do not open node if it's already open
+        if self.w_tr_tree.item(id, 'open') == 1:
             return
 
         children = self.db.container_children(container=id, result="DOC")
