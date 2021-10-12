@@ -998,12 +998,12 @@ class DataEntry(SuperWidget):
                     if self.last_doc.get('_id','') != "":
                         children = self.db.container_children_all(container=self.last_doc["_id"], cat=info['cat'], result="DOC")
                         target = info['target']
-                        default = info.get('default', 0)
                         items = []
                         defaulted = False
                         for child in children:
                             value = child.get(target, "")
                             if value == "":
+                                default = self.db.schema_schema(cat=child['category'])[target].get('default', 0)
                                 value = default
                                 defaulted = True
                             items.append(float(value))
@@ -1339,10 +1339,10 @@ class SearchTree(SuperWidget):
                             self.db.container_move(from_con=source, to_con=destination, item=target)
                             self.dragstarttree.tree_refresh(selection=source)
                             dragendtree.tree_refresh(selection=destination)
-                            self.dragstarttree.tree_focus(goal=source, rebase=True)
-                            dragendtree.tree_focus(goal=destination, rebase=True)
-                            self.dragstarttree.tree_open(node=source)
-                            dragendtree.tree_open(node=destination)
+                            self.dragstarttree.tree_focus(goal=source, rebase=True, dragreset=False)
+                            dragendtree.tree_focus(goal=destination, rebase=True, dragreset=False)
+                            self.dragstarttree.tree_open(node=source, dragreset=False)
+                            dragendtree.tree_open(node=destination, dragreset=False)
                             self.logger.debug(f"Move completed")
                         else:
                             self.logger.warning("Did not perform move, as it would create an infinite loop")
@@ -1517,12 +1517,16 @@ class SearchTree(SuperWidget):
         self.tree_refresh()
 
 
-    def tree_focus(self, goal: str, rebase: bool = False):
+    def tree_focus(self, goal: str, rebase: bool = False, dragreset: bool = True):
         '''Selects a node in the tree, opening parent nodes as required.
         
         goal: The node to select.
         rebase: If true, will rebase in attempt to find focus item.
+        dragreset: If true, invalidates any ongoing drag and drop operations.
         '''
+        if dragreset == True:
+            self.dragstartid = None
+            self.dragstarttree = None
         self.logger.debug(f"Attempting to focus on node {goal}")
         path = self.db.item_parents_all(item=goal)
         path.reverse()
@@ -1530,7 +1534,7 @@ class SearchTree(SuperWidget):
         while True:
             for step in path:
                 if self.w_tr_tree.exists(item=step):
-                    self.tree_open(node=step)
+                    self.tree_open(node=step, dragreset=dragreset)
             if self.w_tr_tree.exists(item=goal):
                 self.w_tr_tree.selection_set(goal)
                 self.w_tr_tree.see(item=goal)
@@ -1659,13 +1663,15 @@ class SearchTree(SuperWidget):
         pass
 
 
-    def tree_open(self, node: str = None):
+    def tree_open(self, node: str = None, dragreset: bool = True):
         '''Open a node on the tree view.
         
         node: The node to open. If omitted, opens currently selected node.
+        dragreset: If true, invalidates any ongoing drag and drop operations.
         '''
-        self.dragstartid = None
-        self.dragstarttree = None
+        if dragreset == True:
+            self.dragstartid = None
+            self.dragstarttree = None
         self.selection = self.w_tr_tree.selection()
         if node != None:
             id = node
@@ -1675,7 +1681,7 @@ class SearchTree(SuperWidget):
             self.logger.debug(f"Opening focused node {id}")
         elif len(self.selection) == 1:
             id, = self.selection
-            self.logger.debug(f"Opening selected node {id}")
+            self.logger.info(f"Opening selected node {id}")
         else:
             self.logger.warning(f"Could not open any nodes, as none were selected")
             return
@@ -1683,7 +1689,7 @@ class SearchTree(SuperWidget):
         children = self.db.container_children(container=id, result="DOC")
         children.sort(key=lambda doc: (doc["category"], doc[self.db.schema_name(cat=doc["category"])]))
         
-        # Try/except prevents strange behavior if the targeted node isn't in the tree
+        # Try/except here prevents strange behavior if the targeted node isn't in the tree
         try:
             self.w_tr_tree.delete(*self.w_tr_tree.get_children(item=id))
             for child in children:
@@ -1692,8 +1698,9 @@ class SearchTree(SuperWidget):
                 self.tree_insert(parent=id, iid=child_id, text=child_name)
                 self.tree_sum(node=child_id)
             self.w_tr_tree.item(item=id, open=True)
-        except:
+        except Exception as e:
             self.logger.error(f"Unable to open {id}")
+            self.logger.error(e)
 
 
     def tree_sum(self, node: str):
@@ -1702,7 +1709,7 @@ class SearchTree(SuperWidget):
         node: The node to display sums of.
         '''
         if self.summation == True:
-            self.logger.debug("Summing node {node}")
+            self.logger.debug(f"Summing node {node}")
             schema = self.db.schema_schema(id=node)
             values = [""]*(len(self.summables)+1)
             doc = self.db.item_get(id=node)
@@ -1711,33 +1718,49 @@ class SearchTree(SuperWidget):
             for field, info in schema.items():
                 if field in self.summables:
                     defaulted = False
-
+                    
+                    # Sum fields
                     if info['type'] == "sum":
-                        children = [child for child in all_children if child['category'] in info['cat']]
-                        target = info['target']
-                        default = info.get('default', 0)
+                        print(f"{node}:{field} is sum")
                         items = []
-                        for child in children:
-                            value = child.get(target, "")
-                            if value == "":
-                                value = default
-                                defaulted = True
-                            items.append(float(value))
+                        target = info['target']
+                        print(f"{node}:{field} target is {target}")
+                        for child in all_children:
+                            child_cat = child['category']
+                            print(f"{node} child {child['_id']} is a {child_cat}")
+                            if child_cat in info['cat']:
+                                child_schema = self.db.schema_schema(cat=child_cat)
+                                default = child_schema[target].get('default', 0)
+                                print(f"{node} child {child['_id']} has a default of {default}")
+                                value = child.get(target, '')
+                                print(f"{node} child {child['_id']} has a value of {value}")
+                                if value == '':
+                                    value = default
+                                    defaulted = True
+                                items.append(float(value))
+                                print(f"{node}:{field}'s items is now {items}")
                         itemsum = f"{sum(items):.1f}" if len(items) > 0 else ""
+                        print(f"{node}:{field}'s total is {itemsum}")
+                    
+                    # Count fields
                     elif info['type'] == "count":
                         children = [child for child in all_children if child['category'] in info['cat']]
                         itemsum = len(children)
+                    
+                    # Unknown summations
                     else:
                         value = doc.get(field, "")
                         if value == "":
                             value = info.get('default', 0)
                             defaulted = True
                         itemsum = f"{float(value):.1f}"
-
+                    
+                    # Display sum
                     if defaulted == True:
                         itemsum += "*"
                     values[self.headings[field]] = itemsum
 
+            # Flag summation
             all_flags = []
             for child in [doc]+all_children:
                 flags = child.get("flags",[])
