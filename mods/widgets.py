@@ -134,10 +134,10 @@ class DataEntry(SuperWidget):
         self.w_fr.columnconfigure(index=0, weight=1000)
         self.w_fr.columnconfigure(index=1, weight=1000)
         self.w_fr.columnconfigure(index=2, weight=1, minsize=16)
-        self.w_fr.rowconfigure(index=0, weight=1, minsize=25)
+        self.w_fr.rowconfigure(index=0, weight=1, minsize=24)
         self.w_fr.rowconfigure(index=1, weight=500)
         self.w_fr.rowconfigure(index=2, weight=1000)
-        self.w_fr.rowconfigure(index=3, weight=1, minsize=25)
+        self.w_fr.rowconfigure(index=3, weight=1, minsize=24)
 
         self.w_fr_head.columnconfigure(index=0, weight=1000)
         self.w_fr_head.columnconfigure(index=1, weight=1, minsize=48)
@@ -147,14 +147,15 @@ class DataEntry(SuperWidget):
 
         self.w_fr_photo.columnconfigure(index=0, weight=1000)
         self.w_fr_photo.rowconfigure(index=0, weight=1000)
+        self.w_fr_photo.rowconfigure(index=1, weight=1, minsize=24)
 
         self.w_fr_flags.columnconfigure(index=0, weight=1000)
         self.w_fr_flags.columnconfigure(index=1, weight=1000)
         self.w_fr_flags.columnconfigure(index=2, weight=1000)
         self.w_fr_flags.columnconfigure(index=3, weight=1, minsize=16)
-        self.w_fr_flags.rowconfigure(index=0, weight=1, minsize=25)
+        self.w_fr_flags.rowconfigure(index=0, weight=1, minsize=24)
         self.w_fr_flags.rowconfigure(index=1, weight=1000)
-        self.w_fr_flags.rowconfigure(index=2, weight=1, minsize=25)
+        self.w_fr_flags.rowconfigure(index=2, weight=1, minsize=24)
 
         self.w_fr_body.columnconfigure(index=0, weight=1000)
         self.w_fr_body.rowconfigure(index=0, weight=1000)
@@ -178,6 +179,7 @@ class DataEntry(SuperWidget):
         self.w_bu_copyid = ttk.Button(master=self.w_fr_head, text="Copy ID", command=self.copyid)
         self.w_bu_back = ttk.Button(master=self.w_fr_head, text="Back", command=self.back)
         self.w_bu_photo = ttk.Button(master=self.w_fr_photo, text="Photo", command=self.photo)
+        self.w_bu_editphoto = ttk.Button(master=self.w_fr_photo, text="Edit Photo", command=self.photo)
         self.w_la_flags = ttk.Label(master=self.w_fr_flags, text="Flags")
         self.w_li_flags = tk.Listbox(master=self.w_fr_flags, selectmode=tk.SINGLE, relief=tk.GROOVE, exportselection=False)
         self.w_co_flags = ttk.Combobox(master=self.w_fr_flags, textvariable=self.w_var_flags, state="readonly")
@@ -213,7 +215,9 @@ class DataEntry(SuperWidget):
         self.w_bu_generate_id.grid(column=1,row=0,sticky="nsew",padx=2,pady=2)
         self.w_bu_copyid.grid(column=2, row=0, sticky="nsew", padx=2, pady=2)
         self.w_bu_back.grid(column=3, row=0, sticky="nsew", padx=2, pady=2)
-        self.w_bu_photo.grid(column=0, row=0, sticky="nsew", padx=2, pady=2)
+        
+        self.w_bu_photo.grid(column=0, row=0, sticky="nsew", padx=2, pady=1)
+        self.w_bu_editphoto.grid(column=0, row=1, sticky="nsew", padx=2, pady=1)
 
         self.w_la_flags.grid(column=0, row=0, columnspan=4, sticky="nsew", padx=1, pady=1)
         self.w_li_flags.grid(column=0, row=1, columnspan=3, sticky="nsew", padx=1, pady=1)
@@ -408,7 +412,9 @@ class DataEntry(SuperWidget):
     def delete(self, *args):
         '''Callback for when the delete button is pressed'''
         self.logger.debug(f"Delete item button activated")
-        if self.yes_no("Delete Item","Are you sure you want to delete this item and all of its children?", always=True):
+        id = self.last_doc["_id"]
+        name = self.last_doc[self.db.schema_name(id=id)]
+        if self.yes_no("Delete Item",f"Are you sure you want to delete {name} ({id}) and all of its children?", always=True):
             id = self.last_doc["_id"]
             parents = self.db.item_parents(item=id)
             if len(parents) > 0:
@@ -436,6 +442,7 @@ class DataEntry(SuperWidget):
             if buttonc != None:
                 buttonc.config(state="normal")
         self.w_bu_photo.config(command=self.photo)
+        self.w_bu_editphoto.config(state="normal")
         self.w_bu_edit.config(state="disabled")
         self.w_bu_cancel.config(state="normal")
         self.w_bu_save.config(state="normal")
@@ -718,7 +725,7 @@ class DataEntry(SuperWidget):
                 window.columnconfigure(1, weight=1000)
                 window.columnconfigure(2, weight=1000)
                 window.columnconfigure(3, weight=1000)
-                window.rowconfigure(0, weight=1, minsize=25)
+                window.rowconfigure(0, weight=1, minsize=24)
                 window.rowconfigure(1, weight=1000)
                 window.rowconfigure(2, weight=1000)
                 window.rowconfigure(3, weight=1000)
@@ -872,8 +879,9 @@ class DataEntry(SuperWidget):
             self.last_doc = doc
             self.logger.info("Save completed")
             return True
-        messagebox.showwarning("Missing Information", "Could not save item because required fields are missing.")
-        self.logger.warning("Could not save item because required fields are missing")
+        missingfield = repr(self.db.schema_name(cat=self.last_doc['category']))
+        messagebox.showwarning("Missing Information", f"Could not save item because required field {missingfield} is empty.")
+        self.logger.warning(f"Could not save item because required field {missingfield} is empty")
         return False
 
 
@@ -912,6 +920,7 @@ class DataEntry(SuperWidget):
 
         self.editing = False
         self.w_bu_photo.config(command="")
+        self.w_bu_editphoto.config(state="disabled")
         self.w_bu_edit.config(state="disabled")
         self.w_bu_cancel.config(state="disabled")
         self.w_bu_save.config(state="disabled")
@@ -1183,7 +1192,7 @@ class SearchTree(SuperWidget):
         self.w_fr.columnconfigure(2, weight=1000)
         self.w_fr.columnconfigure(3, weight=1000)
         self.w_fr.columnconfigure(4, weight=1, minsize=16)
-        self.w_fr.rowconfigure(0, weight=1, minsize=25)
+        self.w_fr.rowconfigure(0, weight=1, minsize=24)
         self.w_fr.rowconfigure(1, weight=1000)
         self.w_fr.rowconfigure(2, weight=1, minsize=17)
 
@@ -1893,7 +1902,7 @@ class ContainerManager(SuperWidget):
         self.w_fr.columnconfigure(1, weight=1000)
         self.w_fr.rowconfigure(0, weight=1, minsize=17)
         self.w_fr.rowconfigure(1, weight=1000)
-        self.w_fr.rowconfigure(2, weight=1, minsize=25)
+        self.w_fr.rowconfigure(2, weight=1, minsize=24)
         self.w_fr.rowconfigure(3, weight=1000)
 
         self.w_fr_bookmarks.columnconfigure(0, weight=1000)
