@@ -199,7 +199,7 @@ class Database:
             id = re['id']
             self.logger.debug(f"Bulk created document {dbname} {id}")
             ids.append(id)
-        self.logger.debug(f"Finished bulk creating {len(ids)} documents")
+        self.logger.debug(f"Finished bulk creating documents")
         return ids
 
 
@@ -223,7 +223,7 @@ class Database:
                 self.logger.debug(f"Bulk deleted document {dbname} {id}")
             else:
                 self.logger.debug(f"Could not bulk lazy delete document {dbname} {id}")
-        self.logger.debug(f"Finished bulk deleting {len(ids)} documents")
+        self.logger.debug(f"Finished bulk deleting documents")
 
 
     def documents_edit(self, dbname: str, docs: list, ids: list, lazy: bool = False):
@@ -251,7 +251,7 @@ class Database:
         res = self.client.post_bulk_docs(db=dbname, bulk_docs=doc_list).get_result()
         for re in res:
             self.logger.debug(f"Bulk edited document {dbname} {re['id']}")
-        self.logger.debug(f"Finished bulk editing {len(doc_list)} documents")
+        self.logger.debug(f"Finished bulk editing documents")
 
 
     def documents_get(self, dbname: str, ids: str, lazy: bool = False):
@@ -270,7 +270,7 @@ class Database:
                 doc_list.append(doc['doc'])
             else:
                 self.logger.debug(f"Could not bulk lazy fetch {dbname} {id}")
-        self.logger.debug(f"Finished bulk fetching {len(ids)} documents")
+        self.logger.debug(f"Finished bulk fetching documents")
         return doc_list
 
 
@@ -466,10 +466,10 @@ class DEHCDatabase:
         self.version = version
         if quickstart == True:
             self.logger.info(f"Performing quickstart")
-            self.databases_create(lazy=True)
             self.schema_load(schema=self.schema_path)
-            self.schema_save()
+            self.databases_create(lazy=True)
             self.index_prepare()
+            self.schema_save()
             self.logger.debug(f"Completed quickstart")
 
 
@@ -780,6 +780,50 @@ class DEHCDatabase:
         res = self.db.query(dbname=self.db_containers, selector=selector, fields=fields, sort=sort, limit=limit)
         self.logger.debug(f"Done querying the containers database")
         return res
+
+
+    def flag_assign_tree(self, container: str, flag: str):
+        '''Assigns a flag to an item and all its children recursively.
+        
+        container: The item to reference.
+        flag: The flag to set.
+        '''
+        parent = self.item_get(id=container)
+        children = self.container_children_all(container=container, result="DOC")
+        items = [parent] + children
+        ids = []
+        data = []
+        for item in items:
+            if flag in self.schema_flags(cat=item['category']):
+                if 'flags' not in item:
+                    item['flags'] = []
+                if flag not in item['flags']:
+                    item['flags'].append(flag)
+                    ids.append(item['_id'])
+                    data.append(item)
+        self.items_edit(ids=ids, data=data, lazy=True)
+
+
+    def flag_revoke_tree(self, container: str, flag: str):
+        '''Revokes a flag from an item and all its children recursively.
+        
+        container: The item to reference.
+        flag: The flag to revoke.
+        '''
+        parent = self.item_get(id=container)
+        children = self.container_children_all(container=container, result="DOC")
+        items = [parent] + children
+        ids = []
+        data = []
+        for item in items:
+            if flag in self.schema_flags(cat=item['category']):
+                if 'flags' not in item:
+                    item['flags'] = []
+                if flag in item['flags']:
+                    item['flags'].remove(flag)
+                    ids.append(item['_id'])
+                    data.append(item)
+        self.items_edit(ids=ids, data=data, lazy=True)
 
 
     def id_cat(self, id: str):

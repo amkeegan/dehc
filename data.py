@@ -8,7 +8,7 @@ import mods.database as md
 
 # ----------------------------------------------------------------------------
 
-DBVERSION = "211013-2"
+DBVERSION = "211013"
 parser = argparse.ArgumentParser(description='Inserts data into the DEHC database.')
 parser.add_argument('persons', type=int, help="number of persons to add to the database", metavar="PERSONS")
 parser.add_argument('vessels', type=int, help="number of vessels to add to the database", metavar="VESSELS")
@@ -21,12 +21,12 @@ args = parser.parse_args()
 
 db = md.DEHCDatabase(config=args.auth, version=args.vers, level="DEBUG", namespace=args.name, quickstart=False, schema=args.sche)
 
+db.schema_load(schema=args.sche)
 if args.drop == True:
     db.databases_delete(lazy=True)
 else:
     db.databases_clear(lazy=True)
 db.databases_create(lazy=True)
-db.schema_load(schema=args.sche)
 db.schema_save()
 
 # ----------------------------------------------------------------------------
