@@ -112,9 +112,10 @@ class DataEntry(SuperWidget):
         self._newchild = newchild              # Stores the parent object's callback to run when new child is pressed.
         self._save = save                      # Stores the parent object's callback to run when save is pressed.
         self._show = show                      # Stores the parent object's callback to run when show is pressed.
-
         self.hardware = hardware               # Stores the hardware manager object associated with this DataEntry
+        
         self.photomanager = mp.PhotoManager(level=self.level)
+        self.photo_blank = Image.new("RGB", (300, 300), (217, 217, 217))
 
         if prepare == True:
             self.prepare()
@@ -521,8 +522,9 @@ class DataEntry(SuperWidget):
             '''Removes current photo from data pane.'''
             self.logger.debug(f"Photo clear button activated")
             self.current_photo = None
-            self.w_bu_photo.config(image="")
-            self.w_bu_photo.image = ""
+            img = ImageTk.PhotoImage(self.photo_blank)
+            self.w_bu_photo.config(image=img)
+            self.w_bu_photo.image = img
             self.logger.info(f"Photo cleared from data pane")
 
         def fetch_photo():
@@ -1065,8 +1067,10 @@ class DataEntry(SuperWidget):
             
             if self.current_photo != None:
                 img = ImageTk.PhotoImage(self.current_photo)
-                self.w_bu_photo.config(image=img)
-                self.w_bu_photo.image = img
+            else:
+                img = ImageTk.PhotoImage(self.photo_blank)
+            self.w_bu_photo.config(image=img)
+            self.w_bu_photo.image = img
 
             flags = self.last_doc.get("flags", [])
             flags.sort()
@@ -1146,9 +1150,10 @@ class SearchTree(SuperWidget):
         self.ops = ["=", "<", ">", "≤", "≥", "≠", "≈"] # The operators available to use in searches
         self._select = select                          # A callback which triggers when a tree node is selected
         self.altheld = False                           # Whether or not the alt key is currently being held
+        self.ctrlheld = False                          # Whether or not the ctrl key is currently being held
         self.autoopen = autoopen                       # The starting value of autoopen
         self.base = base                               # The current base of the tree
-        self.mindragtime = 0.25                        # The minimum time (in seconds) a drag must last to count
+        self.mindragtime = 0.2                         # The minimum time (in seconds) a drag must last to count
         self.dragstarttime = None                      # The time a drag was started
         self.dragstarttree = None                      # The SearchTree a drag and drop originated from
         self.dragstartid = None                        # The ID of the item at the start of a drag and drop
@@ -1217,9 +1222,6 @@ class SearchTree(SuperWidget):
         self.w_ch_autoopen = ttk.Checkbutton(master=self.w_fr, variable=self.w_var_autoopen, text="Auto Open?")
         self.w_ch_summation = ttk.Checkbutton(master=self.w_fr, variable=self.w_var_summation, text="Show Sums?")
 
-        self.root.bind("<KeyPress-Alt_L>", self.altpress, add="+")
-        self.root.bind("<KeyRelease-Alt_L>", self.altrelease, add="+")
-
         self.w_en_value.bind("<Return>", self.search, add="+")
         self.w_li_search.bind("<<ListboxSelect>>", self.search_select)
 
@@ -1228,6 +1230,11 @@ class SearchTree(SuperWidget):
         self.w_tr_tree.bind("<<TreeviewClose>>", lambda *_: self.tree_close())
         self.w_tr_tree.bind("<Button-3>", self.tree_rebase_mouse)
         self.w_tr_tree.bind("<Control-r>", self.tree_rebase_keyboard)
+
+        self.root.bind("<KeyPress-Alt_L>", self.altpress, add="+")
+        self.root.bind("<KeyRelease-Alt_L>", self.altrelease, add="+")
+        self.root.bind("<KeyPress-Control_L>", self.ctrlpress, add="+")
+        self.root.bind("<KeyRelease-Control_L>", self.ctrlrelease, add="+")
 
         self.w_tr_tree.bind("<ButtonPress-1>", self.dragstart)
         self.w_tr_tree.bind("<B1-Motion>", self.dragmid)
@@ -1294,15 +1301,25 @@ class SearchTree(SuperWidget):
         self.altheld = False
 
 
+    def ctrlpress(self, *args):
+        '''Callback for when ctrl is pressed down.'''
+        self.ctrlheld = True
+
+    
+    def ctrlrelease(self, *args):
+        '''Callback for when ctrl is released.'''
+        self.ctrlheld = False
+
+
     def dragstart(self, *args):
         '''Callback for when the mouse is clicked down on the tree.'''
-        event, = args
-        tree = event.widget
-        self.dragstarttime = time.time()
-        self.dragstartid = tree.identify_row(event.y)
-        self.dragstarttree = tree.SearchTree
-        
-        self.logger.info(f"Mouse clicked on tree. Root xy: {tree.winfo_pointerxy()}; Tree: {tree}; Tree xy: {(event.x, event.y)}; Row: {repr(self.dragstartid)}")
+        if self.ctrlheld == True:
+            event, = args
+            tree = event.widget
+            self.dragstarttime = time.time()
+            self.dragstartid = tree.identify_row(event.y)
+            self.dragstarttree = tree.SearchTree
+            self.logger.debug(f"Mouse clicked on tree. Root xy: {tree.winfo_pointerxy()}; Tree: {tree}; Tree xy: {(event.x, event.y)}; Row: {repr(self.dragstartid)}")
 
 
     def dragmid(self, *args):
@@ -1314,65 +1331,66 @@ class SearchTree(SuperWidget):
     def dragstop(self, *args):
         '''Callback for when the mouse is released after clicking down on the tree.'''
         self.root.configure(cursor="")
-        event, = args
-        dragendtime = time.time()
-        mx, my = event.widget.winfo_pointerxy()
-        tree = self.w_fr.winfo_containing(mx, my)
-        dragtime = dragendtime - self.dragstarttime
+        if self.ctrlheld == True:
+            event, = args
+            dragendtime = time.time()
+            mx, my = event.widget.winfo_pointerxy()
+            tree = self.w_fr.winfo_containing(mx, my)
+            dragtime = dragendtime - self.dragstarttime
 
-        if dragtime > self.mindragtime:
-            self.logger.info(f"Mouse released. Time: {dragtime}; Root xy: {(mx, my)}; Target tree: {tree}; Start ID: {repr(self.dragstartid)}")
+            if dragtime > self.mindragtime:
+                self.logger.debug(f"Mouse released. Time: {dragtime}; Root xy: {(mx, my)}; Target tree: {tree}; Start ID: {repr(self.dragstartid)}")
 
-            if tree != None and tree.winfo_class() == "Treeview" and self.dragstartid not in [None, ""] and self.dragstarttree not in [None, ""]:
-                dragendtree = tree.SearchTree
-                x = mx - tree.winfo_rootx()
-                y = my - tree.winfo_rooty()
-                dragendid = tree.identify_row(y)
-                self.logger.debug(f"Mouse released cont. Target tree xy: {(x, y)}; Target row: {repr(dragendid)}")
-                
-                if self.dragstartid != dragendid and dragendid not in [None, ""] and dragendtree not in [None, ""]:
-                    if self.yes_no == None or (self.dragstarttree.w_var_autoopen.get() == 0 and dragendtree.w_var_autoopen.get() == 0):
-                        permitted = True
-                    else:
-                        permitted = self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to move an item?")
+                if tree != None and tree.winfo_class() == "Treeview" and self.dragstartid not in [None, ""] and self.dragstarttree not in [None, ""]:
+                    dragendtree = tree.SearchTree
+                    x = mx - tree.winfo_rootx()
+                    y = my - tree.winfo_rooty()
+                    dragendid = tree.identify_row(y)
+                    self.logger.debug(f"Mouse released cont. Target tree xy: {(x, y)}; Target row: {repr(dragendid)}")
                     
-                    if permitted == True:
-                        target = self.dragstartid
-                        source, *_ = self.db.item_parents(item=target)
-                        destination = dragendid
-                        if source != destination:
-                            self.logger.info(f"Moving {target} from {source} to {destination} via D&D")
-
-                            recur_risk_list = [destination]+self.db.item_parents(item=destination)
-                            self.logger.debug(f"Recursion risk list: {recur_risk_list}")
-                            if target not in recur_risk_list:
-                                self.db.container_move(from_con=source, to_con=destination, item=target)
-                                if self.dragstarttree == dragendtree:
-                                    dragendtree.tree_refresh(selection=destination)
-                                    dragendtree.tree_focus(goal=source, rebase=True, dragreset=False)
-                                    dragendtree.tree_focus(goal=destination, rebase=True, dragreset=False)
-                                    dragendtree.tree_open(node=source, dragreset=False)
-                                    dragendtree.tree_open(node=destination, dragreset=False)
-                                else:
-                                    self.dragstarttree.tree_refresh(selection=source)
-                                    dragendtree.tree_refresh(selection=destination)
-                                    self.dragstarttree.tree_focus(goal=source, rebase=True, dragreset=False)
-                                    dragendtree.tree_focus(goal=destination, rebase=True, dragreset=False)
-                                    self.dragstarttree.tree_open(node=source, dragreset=False)
-                                    dragendtree.tree_open(node=destination, dragreset=False)
-                                self.logger.debug(f"Move completed")
-                            else:
-                                self.logger.warning("Did not perform move, as it would create an infinite loop")
+                    if self.dragstartid != dragendid and dragendid not in [None, ""] and dragendtree not in [None, ""]:
+                        if self.yes_no == None or (self.dragstarttree.w_var_autoopen.get() == 0 and dragendtree.w_var_autoopen.get() == 0):
+                            permitted = True
                         else:
-                            self.logger.debug(f"Did not perform move, as start and end container were the same")
+                            permitted = self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to move an item?")
+                        
+                        if permitted == True:
+                            target = self.dragstartid
+                            source, *_ = self.db.item_parents(item=target)
+                            destination = dragendid
+                            if source != destination:
+                                self.logger.info(f"Moving {target} from {source} to {destination} via D&D")
+
+                                recur_risk_list = [destination]+self.db.item_parents(item=destination)
+                                self.logger.debug(f"Recursion risk list: {recur_risk_list}")
+                                if target not in recur_risk_list:
+                                    self.db.container_move(from_con=source, to_con=destination, item=target)
+                                    if self.dragstarttree == dragendtree:
+                                        dragendtree.tree_refresh(selection=destination)
+                                        dragendtree.tree_focus(goal=source, rebase=True, dragreset=False)
+                                        dragendtree.tree_focus(goal=destination, rebase=True, dragreset=False)
+                                        dragendtree.tree_open(node=source, dragreset=False)
+                                        dragendtree.tree_open(node=destination, dragreset=False)
+                                    else:
+                                        self.dragstarttree.tree_refresh(selection=source)
+                                        dragendtree.tree_refresh(selection=destination)
+                                        self.dragstarttree.tree_focus(goal=source, rebase=True, dragreset=False)
+                                        dragendtree.tree_focus(goal=destination, rebase=True, dragreset=False)
+                                        self.dragstarttree.tree_open(node=source, dragreset=False)
+                                        dragendtree.tree_open(node=destination, dragreset=False)
+                                    self.logger.debug(f"Move completed")
+                                else:
+                                    self.logger.warning("Did not perform move, as it would create an infinite loop")
+                            else:
+                                self.logger.debug(f"Did not perform move, as start and end container were the same")
+                        else:
+                            self.logger.debug(f"Did not perform move, as user declined")
                     else:
-                        self.logger.debug(f"Did not perform move, as user declined")
+                        self.logger.debug(f"No further action. Drag did not start and end on distinct valid rows")
                 else:
-                    self.logger.debug(f"No further action. Drag did not start and end on distinct valid rows")
+                    self.logger.debug(f"No further action. Drag did not start and end on a tree")
             else:
-                self.logger.debug(f"No further action. Drag did not start and end on a tree")
-        else:
-            self.logger.info(f"Mouse released, but no further action. Drag lasted {dragtime}, which is less than {self.mindragtime}")
+                self.logger.debug(f"Mouse released, but no further action. Drag lasted {dragtime}, which is less than {self.mindragtime}")
         
         self.dragstartttime = None
         self.dragstarttree = None
