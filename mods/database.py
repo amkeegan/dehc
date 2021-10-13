@@ -429,14 +429,16 @@ class DEHCDatabase:
     id_len: Length of hex part of document UUIDs used in the database.
     limit: Max number of documents to return from _list and _query methods.
     logger: The logger object used for logging.
+    forcelocal: If true, uses local schema over one stored in the database.
     schema: Dictionary describing objects and fields in the database.
     schema_path: Path to .json file containing database schema.
     '''
 
-    def __init__(self, *, config: str, level: str = "NOTSET", namespace: str = "dehc", quickstart: bool = False, schema: str = "db_schema.json", version: str = "1"):
+    def __init__(self, *, config: str, version: str, forcelocal: bool = False, level: str = "NOTSET", namespace: str = "dehc", quickstart: bool = False, schema: str = "db_schema.json"):
         '''Constructs a DEHCDatabase object.
 
-        config: Path to .json file containing database server credentials.
+        config: Required. Path to .json file containing database server credentials.
+        version: Required. The version of the schema the database is expecting to use.
         level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         namespace: A name to prefix all CouchDB databases with.
         quickstart: Creates databases and loads schema automatically.
@@ -458,13 +460,14 @@ class DEHCDatabase:
         self.id_len = 12
         self.limit = 1000000
 
+        self.forcelocal = forcelocal
         self.schema = {}
         self.schema_path = schema
         self.version = version
         if quickstart == True:
             self.logger.info(f"Performing quickstart")
             self.databases_create(lazy=True)
-            self.schema_load(schema=self.schema_path, forcelocal=True)
+            self.schema_load(schema=self.schema_path)
             self.schema_save()
             self.index_prepare()
             self.logger.debug(f"Completed quickstart")
@@ -1303,19 +1306,20 @@ class DEHCDatabase:
         return keys
 
 
-    def schema_load(self, schema: str = None, forcelocal: bool = False):
+    def schema_load(self, schema: str = None):
         '''Loads database schema into memory.
 
         Will look for doc "schema" in db "items" first, then locally.
         
         schema: Path to local .json file containing database schema.
-        forcelocal: If true, uses local schema over one stored in the database.
         '''
         self.logger.debug(f"Loading database schema")
 
-        if forcelocal == False and self.db.document_exists(dbname=self.db_configs, id="schema") == True:
+        if self.forcelocal == False and self.db.document_exists(dbname=self.db_configs, id="schema") == True:
             self.logger.info(f"Loading database schema from database")
             loaded_schema = self.db.document_get(dbname=self.db_configs, id="schema")
+            del loaded_schema['_id']
+            del loaded_schema['_rev']
         else:
             self.logger.info(f"Loading database schema from {schema}")
             with open(schema, "r") as f:
