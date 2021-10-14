@@ -843,9 +843,12 @@ class DataEntry(SuperWidget):
         schema = self.db.schema_schema(cat=self.last_doc["category"])
         for index, (field, info) in enumerate(schema.items()):
             if self.w_hidden_data[index] == None:
-                value = self.w_var_data[index].get()
+                if info.get('type','') == 'multitext':
+                    value = self.w_input_data[index].get("1.0","end").rstrip()
+                else:
+                    value = self.w_var_data[index].get()
             else:
-                if info.get('type','') == 'list' and info.get('source') == 'PHYSIDS':
+                if info.get('type','') == 'list' and info.get('source','') == 'PHYSIDS':
                     physid = self.w_hidden_data[index]
                     value = ""
                 else:
@@ -953,6 +956,15 @@ class DataEntry(SuperWidget):
 
                 if w_type == "text":
                     entry = ttk.Entry(master=self.w_fr_data, textvariable=var, state="disabled")
+                    buttona = None
+                    buttonb = None
+                    buttonc = None
+                    hidden = None
+
+                elif w_type == "multitext":
+                    entry = tk.Text(master=self.w_fr_data, wrap=tk.WORD, height=3)
+                    entry.insert("1.0", value)
+                    entry.config(state="disabled")
                     buttona = None
                     buttonb = None
                     buttonc = None

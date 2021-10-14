@@ -1,7 +1,7 @@
 {
     "#":
     {
-        "version": "211013"
+        "version": "211014"
     },
     "Person":
     {
@@ -29,7 +29,7 @@
             "Accommodation":                     {"index": 19, "type": "text",   "regex": ".*",                      "required": false},
             "Dietary Requirements":              {"index": 20, "type": "text",   "regex": ".*",                      "required": false},
             "Unit":                              {"index": 21, "type": "text",   "regex": ".*",                      "required": false},
-            "Notes":                             {"index": 22, "type": "text",   "regex": ".*",                      "required": false}
+            "Notes":                             {"index": 22, "type": "multitext",   "regex": ".*",                      "required": false}
         },
         "flags": ["Blacklisted", "Cleared", "Medical", "Screened", "Searched"],
         "keys": ["Display Name"]
@@ -41,7 +41,7 @@
             "Display Name": {"index": 0, "type": "text", "regex": ".*", "required": true},
             "Weight (KG)":  {"index": 1, "type": "sum",  "cat": ["Person", "Luggage"], "target": "Weight (KG)", "required": false},
             "Souls":        {"index": 2, "type": "count", "cat": ["Person"], "required": false},
-            "Notes":        {"index": 3, "type": "text", "regex": ".*", "required": false}
+            "Notes":        {"index": 3, "type": "multitext", "regex": ".*", "required": false}
         },
         "flags": ["Blacklisted", "Cleared", "Medical", "Screened", "Searched"],
         "keys": ["Display Name"]
@@ -59,7 +59,7 @@
             "Consignment Number": {"index": 6, "type": "text", "regex": ".*", "required": false},
             "Weight (KG)":        {"index": 7, "type": "read", "source": "WEIGHT", "default": 50, "required": false},
             "DG Class":           {"index": 8, "type": "option", "options": ["", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "2.1", "2.2", "2.3", "3", "4.1", "4.2", "4.3", "5.1", "5.2", "6.1", "6.2", "7", "8", "9.I", "9.II", "9.III"], "required": false},
-            "Notes":              {"index": 9, "type": "text", "regex": ".*", "required": false}
+            "Notes":              {"index": 9, "type": "multitext", "regex": ".*", "required": false}
         },
         "flags": ["Dangerous", "Prohibited", "Screened", "Searched"],
         "keys": ["Display Name"]
@@ -81,7 +81,7 @@
             "Capacity (KG)":       {"index": 10, "type": "text", "regex": ".*", "required": false},
             "Weight (KG)":         {"index": 11, "type": "sum",  "cat": ["Person", "Luggage"], "target": "Weight (KG)", "required": false},
             "Souls":               {"index": 12, "type": "count", "cat": ["Person"], "required": false},
-            "Notes":               {"index": 13, "type": "text", "regex": ".*", "required": false}
+            "Notes":               {"index": 13, "type": "multitext", "regex": ".*", "required": false}
         },
         "flags": ["Arrived", "Departed", "Ready"],
         "keys": ["Display Name"]
@@ -93,7 +93,7 @@
             "Display Name": {"index": 0, "type": "text", "regex": ".*", "required": true},
             "Responsible":  {"index": 1, "type": "text", "regex": ".*", "required": false},
             "Souls":        {"index": 2, "type": "count", "cat": ["Person"], "required": false},
-            "Notes":        {"index": 3, "type": "text", "regex": ".*", "required": false}
+            "Notes":        {"index": 3, "type": "multitext", "regex": ".*", "required": false}
         },
         "keys": ["Display Name"]
     },
@@ -104,7 +104,7 @@
             "Display Name": {"index": 0, "type": "text", "regex": ".*", "required": true},
             "Responsible":  {"index": 1, "type": "text", "regex": ".*", "required": false},
             "Souls":        {"index": 2, "type": "count", "cat": ["Person"], "required": false},
-            "Notes":        {"index": 3, "type": "text", "regex": ".*", "required": false}
+            "Notes":        {"index": 3, "type": "multitext", "regex": ".*", "required": false}
         },
         "keys": ["Display Name"]
     },
@@ -114,7 +114,7 @@
         {
             "Display Name": {"index": 0, "type": "text", "regex": ".*", "required": true},
             "Responsible":  {"index": 1, "type": "text", "regex": ".*", "required": false},
-            "Notes":        {"index": 2, "type": "text", "regex": ".*", "required": false}
+            "Notes":        {"index": 2, "type": "multitext", "regex": ".*", "required": false}
         },
         "keys": ["Display Name"]
     }
