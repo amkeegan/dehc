@@ -116,7 +116,7 @@ class DataEntry(SuperWidget):
         self.hardware = hardware               # The hardware manager object associated with this DataEntry
         
         self.photomanager = mp.PhotoManager(level=self.level)
-        self.photo_blank = Image.new("RGB", (256, 256), (217, 217, 217))
+        self.photo_blank = Image.new("RGB", (256, 256), (220, 218, 213))
 
         if prepare == True:
             self.prepare()
@@ -129,14 +129,33 @@ class DataEntry(SuperWidget):
         self.w_fr_photo = ttk.Frame(master=self.w_fr)
         self.w_fr_flags = ttk.Frame(master=self.w_fr)
         self.w_fr_body = ttk.Frame(master=self.w_fr)
-        self.w_fr_data = ttk.Frame(master=self.w_fr_body)
+        self.w_ca_data = tk.Canvas(master=self.w_fr_body, background="#DCDAD5", bd=0, highlightthickness=0, relief='ridge')
+        self.w_fr_data = ttk.Frame(master=self.w_ca_data)
         self.w_fr_foot = ttk.Frame(master=self.w_fr)
+        self.w_ca_data.create_window((0, 0), window=self.w_fr_data, anchor="nw", tags="frame")
 
-        self.w_fr.columnconfigure(index=0, weight=1000)
+        def redraw_canvas_window(*args):
+            self.w_ca_data.itemconfig('frame', width=self.w_ca_data.winfo_width())
+
+        def mouse_scroll(*args):
+            event, *_ = args
+            self.w_ca_data.yview_scroll(int(-1*(event.delta/120)), "units")
+
+        def mouse_enter_canvas(*args):
+            self.w_ca_data.bind_all("<MouseWheel>", mouse_scroll)
+
+        def mouse_exit_canvas(*args):
+            self.w_ca_data.unbind_all("<MouseWheel>")
+
+        self.w_ca_data.bind("<Configure>", redraw_canvas_window)
+        self.w_fr_data.bind('<Enter>', mouse_enter_canvas)
+        self.w_fr_data.bind('<Leave>', mouse_exit_canvas)
+
+        self.w_fr.columnconfigure(index=0, weight=1000, minsize=280)
         self.w_fr.columnconfigure(index=1, weight=1000)
         self.w_fr.columnconfigure(index=2, weight=1, minsize=16)
         self.w_fr.rowconfigure(index=0, weight=1, minsize=24)
-        self.w_fr.rowconfigure(index=1, weight=500)
+        self.w_fr.rowconfigure(index=1, weight=1)
         self.w_fr.rowconfigure(index=2, weight=1000)
         self.w_fr.rowconfigure(index=3, weight=1, minsize=24)
 
@@ -207,6 +226,10 @@ class DataEntry(SuperWidget):
         self.w_sc_flags = ttk.Scrollbar(master=self.w_fr_flags, orient="vertical", command=self.w_li_flags.yview)
         self.w_li_flags.config(yscrollcommand=self.w_sc_flags.set)
 
+        self.w_sc_data = ttk.Scrollbar(master=self.w_fr, orient="vertical", command=self.w_ca_data.yview)
+        self.w_fr_data.bind("<Configure>", lambda e: self.w_ca_data.configure(scrollregion=self.w_ca_data.bbox("all")))
+        self.w_ca_data.configure(yscrollcommand=self.w_sc_data.set)
+
         self.show()
 
 
@@ -215,10 +238,12 @@ class DataEntry(SuperWidget):
         self.logger.debug(f"Packing and gridding widgets")
         self.w_fr_head.grid(column=0, row=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         self.w_fr_photo.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
-        self.w_fr_flags.grid(column=1, row=1, sticky="nsew", padx=2, pady=2)
+        self.w_fr_flags.grid(column=1, row=1, columnspan=2, sticky="nsew", padx=2, pady=2)
         self.w_fr_body.grid(column=0, row=2, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_fr_data.grid(column=0, row=0, sticky="nsew")
+        self.w_sc_data.grid(column=2, row=2, sticky="nsew", padx=1, pady=2)
         self.w_fr_foot.grid(column=0, row=3, columnspan=3, sticky="nsew", padx=2, pady=1)
+
+        self.w_ca_data.grid(column=0, row=0, sticky="nsew")
 
         self.w_la_title.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
         self.w_bu_generate_id.grid(column=1,row=0,sticky="nsew",padx=2,pady=2)
@@ -342,7 +367,7 @@ class DataEntry(SuperWidget):
             window.attributes("-topmost", True)
             window.focus_force()
             window.title("ID Generation")
-            window.configure(background="#D9D9D9")
+            window.configure(background="#DCDAD5")
 
             msg = ttk.Label(master=window)
             if len(printers) > 0:
@@ -544,7 +569,7 @@ class DataEntry(SuperWidget):
         window.attributes("-topmost", True)
         window.focus_force()
         window.title("Photo")
-        window.configure(background="#D9D9D9")
+        window.configure(background="#DCDAD5")
 
         def clear():
             '''Removes current photo from data pane.'''
@@ -961,11 +986,11 @@ class DataEntry(SuperWidget):
             schema = self.db.schema_schema(cat=cat)
             title = f"{self.last_doc.get(self.db.schema_name(cat=cat), cat)} ({self.last_doc.get('_id','New')})"
             self.w_la_title.config(text=title)
-            self.w_fr_data.columnconfigure(index=0, weight=1000)
-            self.w_fr_data.columnconfigure(index=1, weight=1000)
-            self.w_fr_data.columnconfigure(index=2, weight=1, minsize=32)
-            self.w_fr_data.columnconfigure(index=3, weight=1, minsize=32)
-            self.w_fr_data.columnconfigure(index=4, weight=1, minsize=32)
+            self.w_fr_data.columnconfigure(index=0, weight=1000, minsize=96)
+            self.w_fr_data.columnconfigure(index=1, weight=1000, minsize=96)
+            self.w_fr_data.columnconfigure(index=2, weight=1000, minsize=32)
+            self.w_fr_data.columnconfigure(index=3, weight=1000, minsize=32)
+            self.w_fr_data.columnconfigure(index=4, weight=1000, minsize=32)
 
             for index, (field, info) in enumerate(schema.items()):
                 value = self.last_doc.get(field, "")
@@ -1137,7 +1162,7 @@ class DataEntry(SuperWidget):
             if len(flags) > 0:
                 self.w_li_flags.selection_set(0)
 
-            # Correct tab order
+            # Correct size and tab order
             for entry, buttona, buttonb, buttonc in zip(self.w_input_data, self.w_buttona_data, self.w_buttonb_data, self.w_buttonc_data):
                 if entry != None:
                     entry.lift()
@@ -1237,10 +1262,10 @@ class SearchTree(SuperWidget):
         self.logger.debug(f"Preparing widgets")
         self.w_fr_search = ttk.Frame(master=self.w_fr)
 
-        self.w_fr.columnconfigure(0, weight=500)
+        self.w_fr.columnconfigure(0, weight=1000, minsize=96)
         self.w_fr.columnconfigure(1, weight=1, minsize=16)
-        self.w_fr.columnconfigure(2, weight=1000)
-        self.w_fr.columnconfigure(3, weight=1000)
+        self.w_fr.columnconfigure(2, weight=1000, minsize=48)
+        self.w_fr.columnconfigure(3, weight=1000, minsize=48)
         self.w_fr.columnconfigure(4, weight=1, minsize=16)
         self.w_fr.rowconfigure(0, weight=1, minsize=24)
         self.w_fr.rowconfigure(1, weight=1000)
@@ -1484,7 +1509,7 @@ class SearchTree(SuperWidget):
         window.attributes("-topmost", True)
         window.focus_force()
         window.title("Scan")
-        window.configure(background="#D9D9D9")
+        window.configure(background="#DCDAD5")
 
         def getNFCorBarcode():
             result = ''

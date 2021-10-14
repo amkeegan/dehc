@@ -7,6 +7,7 @@ import mods.log as ml
 import mods.database as md
 import mods.widgets as mw
 import mods.dehc_hardware as hw
+
 # ----------------------------------------------------------------------------
 
 class EMS():
@@ -35,7 +36,7 @@ class EMS():
 
         self.root.title(f"EMS ({self.db.namespace} @ {self.db.db.data['url']})")
         self.root.state('zoomed')
-        self.root.configure(background="#D9D9D9")
+        self.root.configure(background="#DCDAD5")
 
         if autorun == True:
             self.logger.info(f"Performing autorun")
@@ -67,10 +68,12 @@ class EMS():
         self.cm = mw.ContainerManager(master=self.root, db=self.db, topbase=base, botbase=base, bookmarks=self.bookmarks, cats=self.cats, level=self.level, prepare=True, readonly=self.readonly, select=self.item_select, yesno=self.de.yes_no, hardware=self.hardware)
         self.bu_refresh = ttk.Button(master=self.root, text="Refresh", command=self.refresh_button)
         self.sb = mw.StatusBar(master=self.root, db=self.db, level=self.level, prepare=True)
-        self.root.rowconfigure(0, weight=1000)
+        
+        self.root.rowconfigure(0, weight=10000)
         self.root.rowconfigure(1, weight=1, minsize=16)
-        self.root.columnconfigure(0, weight=1, minsize=48)
-        self.root.columnconfigure(1, weight=1000)
+        self.root.columnconfigure(0, weight=1, minsize=16)
+        self.root.columnconfigure(1, weight=2500, minsize=232)
+        self.root.columnconfigure(2, weight=1000)
 
 
     def new_child(self, target: str):
