@@ -84,7 +84,7 @@ class SuperWidget:
 class DataEntry(SuperWidget):
     '''A SuperWidget representing a data entry pane.'''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, level: str = "NOTSET", newchild: Callable = None, prepare: bool = True, save: Callable = None, show: Callable = None, hardware: hw.Hardware = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, level: str = "NOTSET", newchild: Callable = None, prepare: bool = True, readonly: bool = False, save: Callable = None, show: Callable = None, hardware: hw.Hardware = None):
         '''Constructs a DataEntry object.
         
         master: The widget that the DataEntry's component widgets will be instantiated under.
@@ -98,21 +98,22 @@ class DataEntry(SuperWidget):
         '''
         super().__init__(master=master, db=db, level=level)
 
-        self.cats = cats                       # Stores the list of item categories this DataEntry can select and work with.
-        self.editing = False                   # Stores whether or not the user is currently editing a document.
-        self.back_doc = {}                     # Stores the document to return to when the back button is pressed.
-        self.last_doc = {}                     # Stores the most recently selected and retrieved document from the database.
-        self.guardian_doc = {}                 # Stores the guardian's document when 'new child' is pressed.
-        self.child_doc = {}                    # Stores information for child document when 'new child' is pressed.
-        self.current_photo = None              # Stores the currently slown photo.
-        self.last_photo = None                 # Stores the most recently retrieved photo from the database.
-        self.level = level                     # Stores the logging level
-        self.root = self.w_fr.winfo_toplevel() # The root widget that contains this SuperWidget
-        self._delete = delete                  # Stores the parent object's callback to run when delete is pressed.
-        self._newchild = newchild              # Stores the parent object's callback to run when new child is pressed.
-        self._save = save                      # Stores the parent object's callback to run when save is pressed.
-        self._show = show                      # Stores the parent object's callback to run when show is pressed.
-        self.hardware = hardware               # Stores the hardware manager object associated with this DataEntry
+        self.cats = cats                       # The list of item categories this DataEntry can select and work with.
+        self.editing = False                   # Whether or not the user is currently editing a document.
+        self.back_doc = {}                     # The document to return to when the back button is pressed.
+        self.last_doc = {}                     # The most recently selected and retrieved document from the database.
+        self.guardian_doc = {}                 # The guardian's document when 'new child' is pressed.
+        self.child_doc = {}                    # Information for child document when 'new child' is pressed.
+        self.current_photo = None              # The currently slown photo.
+        self.last_photo = None                 # The most recently retrieved photo from the database.
+        self.level = level                     # The logging level
+        self.readonly = readonly               # Whether or not the application is in readonly mode
+        self.root = self.w_fr.winfo_toplevel() # Root widget that contains this SuperWidget
+        self._delete = delete                  # The parent object's callback to run when delete is pressed.
+        self._newchild = newchild              # The parent object's callback to run when new child is pressed.
+        self._save = save                      # The parent object's callback to run when save is pressed.
+        self._show = show                      # The parent object's callback to run when show is pressed.
+        self.hardware = hardware               # The hardware manager object associated with this DataEntry
         
         self.photomanager = mp.PhotoManager(level=self.level)
         self.photo_blank = Image.new("RGB", (256, 256), (217, 217, 217))
@@ -187,18 +188,26 @@ class DataEntry(SuperWidget):
         self.w_bu_remove = ttk.Button(master=self.w_fr_flags, text="Remove", command=self.remove)
         self.w_la_data = []
         self.w_input_data = []
-        self.w_bu_edit = ttk.Button(master=self.w_fr_foot, text="Edit", command=self.edit)
-        self.w_bu_cancel = ttk.Button(master=self.w_fr_foot, text="Cancel", command=self.cancel)
+        self.w_bu_edit = ttk.Button(master=self.w_fr_foot, text="Edit",)
+        self.w_bu_cancel = ttk.Button(master=self.w_fr_foot, text="Cancel")
         self.w_co_cat = ttk.Combobox(master=self.w_fr_foot, values=self.cats, textvariable=self.w_var_cat, state="readonly")
-        self.w_bu_new = ttk.Button(master=self.w_fr_foot, text="New", command=self.new)
-        self.w_bu_save = ttk.Button(master=self.w_fr_foot, text="Save", command=self.save)
-        self.w_bu_delete = ttk.Button(master=self.w_fr_foot, text="Delete", command=self.delete)
+        self.w_bu_new = ttk.Button(master=self.w_fr_foot, text="New")
+        self.w_bu_save = ttk.Button(master=self.w_fr_foot, text="Save")
+        self.w_bu_delete = ttk.Button(master=self.w_fr_foot, text="Delete")
         self.w_co_cat.current(0)
-        self.show()
+
+        if self.readonly == False:
+            self.w_bu_edit.configure(command=self.edit)
+            self.w_bu_cancel.configure(command=self.cancel)
+            self.w_bu_new.configure(command=self.new)
+            self.w_bu_save.configure(command=self.save)
+            self.w_bu_delete.configure(command=self.delete)
 
         # Scrollbars
         self.w_sc_flags = ttk.Scrollbar(master=self.w_fr_flags, orient="vertical", command=self.w_li_flags.yview)
         self.w_li_flags.config(yscrollcommand=self.w_sc_flags.set)
+
+        self.show()
 
 
     def _pack_children(self):
@@ -947,15 +956,16 @@ class DataEntry(SuperWidget):
 
         if len(self.last_doc) > 0:
             self.w_bu_edit.config(state="normal")
+
             cat = self.last_doc["category"]
             schema = self.db.schema_schema(cat=cat)
             title = f"{self.last_doc.get(self.db.schema_name(cat=cat), cat)} ({self.last_doc.get('_id','New')})"
             self.w_la_title.config(text=title)
             self.w_fr_data.columnconfigure(index=0, weight=1000)
             self.w_fr_data.columnconfigure(index=1, weight=1000)
-            self.w_fr_data.columnconfigure(index=2, weight=1000)
-            self.w_fr_data.columnconfigure(index=3, weight=1000)
-            self.w_fr_data.columnconfigure(index=4, weight=1000)
+            self.w_fr_data.columnconfigure(index=2, weight=1, minsize=32)
+            self.w_fr_data.columnconfigure(index=3, weight=1, minsize=32)
+            self.w_fr_data.columnconfigure(index=4, weight=1, minsize=32)
 
             for index, (field, info) in enumerate(schema.items()):
                 value = self.last_doc.get(field, "")
@@ -964,9 +974,13 @@ class DataEntry(SuperWidget):
 
                 if w_type == "lock":
                     var = tk.IntVar()
+                    if value in [0, 1]:
+                        var.set(value)
+                    else:
+                        var.set(0)
                 else:
                     var = tk.StringVar()
-                var.set(value)
+                    var.set(value)
                 var.trace("w", self.data_change)
 
                 if w_type == "text":
@@ -1031,7 +1045,8 @@ class DataEntry(SuperWidget):
                         buttona = ttk.Button(master=self.w_fr_data, text="Show", state="normal")
                         buttona.bind("<Button-1>", lambda e: self.showlist(event=e, source="IDS"))
                         buttonc = ttk.Button(master=self.w_fr_data, text="Create", state="normal")
-                        buttonc.bind("<Button-1>", self.newchild)
+                        if self.readonly == False:
+                            buttonc.bind("<Button-1>", self.newchild)
                     elif source == "PHYSIDS":
                         buttonb.bind("<Button-1>", lambda e: self.readlist(event=e, source="PHYSIDS"))
                         buttonc = None
@@ -1170,7 +1185,7 @@ class DataEntry(SuperWidget):
 class SearchTree(SuperWidget):
     '''A SuperWidget representing a searchable tree.'''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, autoopen: bool = False, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, simple: bool = False, yesno: Callable = None, hardware: hw.Hardware = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, autoopen: bool = False, cats: list = [], level: str = "NOTSET", prepare: bool = True, readonly: bool = False, select: Callable = None, simple: bool = False, yesno: Callable = None, hardware: hw.Hardware = None):
         '''Constructs a SearchTree object.
         
         master: The widget that the SearchTree's component widgets will be instantiated under.
@@ -1202,6 +1217,7 @@ class SearchTree(SuperWidget):
         self.dragstartid = None                        # The ID of the item at the start of a drag and drop
         self.headings = {}                             # The tree headings when summation is turned on
         self.last_selector = {}                        # The previous search selector
+        self.readonly = readonly                       # Whether or not the application is in readonly mode
         self.root = self.w_fr.winfo_toplevel()         # The root widget that contains this SuperWidget
         self.selection = None                          # The currently selected item
         self.search_result = None                      # The previous search result
@@ -1279,9 +1295,10 @@ class SearchTree(SuperWidget):
         self.root.bind("<KeyPress-Control_L>", self.ctrlpress, add="+")
         self.root.bind("<KeyRelease-Control_L>", self.ctrlrelease, add="+")
 
-        self.w_tr_tree.bind("<ButtonPress-1>", self.dragstart)
-        self.w_tr_tree.bind("<B1-Motion>", self.dragmid)
-        self.w_tr_tree.bind("<ButtonRelease-1>", self.dragstop)
+        if self.readonly == False:
+            self.w_tr_tree.bind("<ButtonPress-1>", self.dragstart)
+            self.w_tr_tree.bind("<B1-Motion>", self.dragmid)
+            self.w_tr_tree.bind("<ButtonRelease-1>", self.dragstop)
 
         self.w_co_cat.current(0)
         self.w_co_field.current(1)
@@ -1886,7 +1903,7 @@ class ContainerManager(SuperWidget):
     select: If present, a callback function that triggers when a tree item is selected.
     '''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, topbase: dict, botbase: dict,  *, bookmarks: str = "bookmarks.json", cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, yesno: Callable = None, hardware: hw.Hardware = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, topbase: dict, botbase: dict,  *, bookmarks: str = "bookmarks.json", cats: list = [], level: str = "NOTSET", prepare: bool = True, readonly: bool = False, select: Callable = None, yesno: Callable = None, hardware: hw.Hardware = None):
         '''Constructs a ContainerManager object.
         
         master: The widget that the ContainerManager's component widgets will be instantiated under.
@@ -1907,10 +1924,10 @@ class ContainerManager(SuperWidget):
         self.botbase = botbase
         self.cats = cats
         self.level = level
+        self.readonly = readonly
         self.select = select
         
         self.yes_no = yesno
-
         self.hardware = hardware
 
         self.bookmarks_path = bookmarks
@@ -1934,14 +1951,18 @@ class ContainerManager(SuperWidget):
         self.w_bu_bm2 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["2"]["name"], command=lambda *_: self.bookmark(preset="2"))
         self.w_bu_bm3 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["3"]["name"], command=lambda *_: self.bookmark(preset="3"))
         self.w_bu_bm4 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["4"]["name"], command=lambda *_: self.bookmark(preset="4"))
-        self.w_bu_bm1.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="1"), add="+")
-        self.w_bu_bm2.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="2"), add="+")
-        self.w_bu_bm3.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="3"), add="+")
-        self.w_bu_bm4.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="4"), add="+")
         self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, autoopen=True, cats=self.cats, level=self.level, prepare=True, select=self.select, yesno=self.yes_no, hardware=self.hardware)
-        self.w_bu_move_item = ttk.Button(master=self.w_fr, text="⇓ ⇓ ⇓", command=lambda *_: self.move(), style="large.TButton")
-        self.w_bu_move_subs = ttk.Button(master=self.w_fr, text="⇑ ⇑ ⇑", command=lambda *_: self.move(reverse=True), style="large.TButton")
+        self.w_bu_move_item = ttk.Button(master=self.w_fr, text="⇓ ⇓ ⇓", style="large.TButton")
+        self.w_bu_move_subs = ttk.Button(master=self.w_fr, text="⇑ ⇑ ⇑", style="large.TButton")
         self.w_se_bottom = SearchTree(master=self.w_fr, db=self.db, base=self.botbase, cats=self.cats, level=self.level, prepare=True, select=self.select, yesno=self.yes_no)
+
+        if self.readonly == False:
+            self.w_bu_move_item.configure(command=lambda *_: self.move())
+            self.w_bu_move_subs.configure(command=lambda *_: self.move(reverse=True))
+            self.w_bu_bm1.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="1"), add="+")
+            self.w_bu_bm2.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="2"), add="+")
+            self.w_bu_bm3.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="3"), add="+")
+            self.w_bu_bm4.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="4"), add="+")
 
         self.w_fr.columnconfigure(0, weight=1000)
         self.w_fr.columnconfigure(1, weight=1000)
@@ -1959,16 +1980,18 @@ class ContainerManager(SuperWidget):
         root = self.w_fr.winfo_toplevel()
         root.bind("<Control-s>", lambda *_: self.w_se_top.w_tr_tree.focus_set(), add="+")
         root.bind("<Control-d>", lambda *_: self.w_se_bottom.w_tr_tree.focus_set(), add="+")
-        root.bind("<Control-Down>", lambda *_: self.w_bu_move_item.invoke(), add="+")
-        root.bind("<Control-Up>", lambda *_: self.w_bu_move_subs.invoke(), add="+")
         root.bind("<Control-Key-1>", lambda *_: self.w_bu_bm1.invoke(), add="+")
         root.bind("<Control-Key-2>", lambda *_: self.w_bu_bm2.invoke(), add="+")
         root.bind("<Control-Key-3>", lambda *_: self.w_bu_bm3.invoke(), add="+")
         root.bind("<Control-Key-4>", lambda *_: self.w_bu_bm4.invoke(), add="+")
-        root.bind("<Control-Shift-KeyPress-!>", lambda *_: self.bookmark_change(preset="1"), add="+")
-        root.bind("<Control-Shift-KeyPress-@>", lambda *_: self.bookmark_change(preset="2"), add="+")
-        root.bind("<Control-Shift-KeyPress-#>", lambda *_: self.bookmark_change(preset="3"), add="+")
-        root.bind("<Control-Shift-KeyPress-$>", lambda *_: self.bookmark_change(preset="4"), add="+")
+
+        if self.readonly == False:
+            root.bind("<Control-Down>", lambda *_: self.w_bu_move_item.invoke(), add="+")
+            root.bind("<Control-Up>", lambda *_: self.w_bu_move_subs.invoke(), add="+")
+            root.bind("<Control-Shift-KeyPress-!>", lambda *_: self.bookmark_change(preset="1"), add="+")
+            root.bind("<Control-Shift-KeyPress-@>", lambda *_: self.bookmark_change(preset="2"), add="+")
+            root.bind("<Control-Shift-KeyPress-#>", lambda *_: self.bookmark_change(preset="3"), add="+")
+            root.bind("<Control-Shift-KeyPress-$>", lambda *_: self.bookmark_change(preset="4"), add="+")
 
 
     def _pack_children(self):

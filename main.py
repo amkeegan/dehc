@@ -21,8 +21,10 @@ if __name__ == "__main__": # Multiprocessing library complains if this guard isn
     parser.add_argument('-a','--auth', type=str, default="db_auth.json", help="relative path to database authentication file", metavar="PATH")
     parser.add_argument('-b','--book', type=str, default="bookmarks.json", help="relative path to EMS screen bookmarks", metavar="PATH")
     parser.add_argument('-f','--forc', help="if included, forces the app to use the local copy of the database schema", action='store_true')
+    # '-h' brings up help
     parser.add_argument('-l','--logg', type=str, default="DEBUG", help="minimum level of logging messages that are printed: DEBUG, INFO, WARNING, ERROR, CRITICAL, or NONE", choices=["DEBUG","INFO","WARNING","ERROR","CRITICAL","NONE"], metavar="LEVL")
     parser.add_argument('-n','--name', type=str, default="dehc", help="which database namespace to use", metavar="NAME")
+    parser.add_argument('-r','--read', help="if included, opens the app in read-only mode", action='store_true')
     parser.add_argument('-s','--sche', type=str, default="db_schema.json", help="relative path to database schema file", metavar="PATH")
     parser.add_argument('-v','--vers', type=str, default=DBVERSION, help="schema version to expect", metavar="VERS")
     args = parser.parse_args()
@@ -39,8 +41,14 @@ if __name__ == "__main__": # Multiprocessing library complains if this guard isn
     except RuntimeError: #TODO: determine if this is still valid, since __main__ check
         pass
 
+    if args.read == True:
+        logger.warning("Application is starting in read-only mode")
+    
+    if args.forc == True:
+        logger.warning(f"Application will load schema from '{args.auth}' save it to the database")
+
     db = md.DEHCDatabase(config=args.auth, version=args.vers, forcelocal=args.forc, level=args.logg, namespace=args.name, schema=args.sche, quickstart=True)
-    app = ae.EMS(db=db, bookmarks=args.book, level=args.logg, autorun=True, hardware=hardware)
+    app = ae.EMS(db=db, bookmarks=args.book, level=args.logg, readonly=args.read, autorun=True, hardware=hardware)
 
     if hardware is not None:
         hardware.terminateProcesses()
