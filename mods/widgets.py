@@ -115,7 +115,7 @@ class DataEntry(SuperWidget):
         self.hardware = hardware               # Stores the hardware manager object associated with this DataEntry
         
         self.photomanager = mp.PhotoManager(level=self.level)
-        self.photo_blank = Image.new("RGB", (300, 300), (217, 217, 217))
+        self.photo_blank = Image.new("RGB", (256, 256), (217, 217, 217))
 
         if prepare == True:
             self.prepare()
@@ -414,8 +414,14 @@ class DataEntry(SuperWidget):
         self.logger.debug(f"Delete item button activated")
         id = self.last_doc["_id"]
         name = self.last_doc[self.db.schema_name(id=id)]
-        if self.yes_no("Delete Item",f"Are you sure you want to delete {name} ({id}) and all of its children?", always=True):
-            id = self.last_doc["_id"]
+
+        lock = self.db.schema_lock(id=id)
+        if self.last_doc.get(lock, 0) == 1:
+            messagebox.showwarning("Locked Item", f"Could not delete \"{name}\" ({id}) because item is locked.")
+            self.logger.debug(f"Not deleting item, as item is locked")
+            return
+
+        if self.yes_no("Delete Item",f"Are you sure you want to delete \"{name}\" ({id}) and all of its children?", always=True):
             parents = self.db.item_parents(item=id)
             if len(parents) > 0:
                 self.logger.info(f"Deleting item {id} and all its children")
@@ -432,6 +438,12 @@ class DataEntry(SuperWidget):
 
     def edit(self, *args):
         '''Callback for when the edit button is pressed'''
+        cat = self.last_doc.get('category','')
+        lock = self.db.schema_lock(cat=cat)
+        if self.last_doc.get(lock, 0) == 1:
+            if not self.yes_no("Locked Item",f"This item is locked. Are you sure you want to edit it?", always=True):
+                return
+
         for entry, buttona, buttonb, buttonc, hidden in zip(self.w_input_data, self.w_buttona_data, self.w_buttonb_data, self.w_buttonc_data, self.w_hidden_data):
             if hidden == None:
                 entry.config(state="normal")
@@ -947,12 +959,15 @@ class DataEntry(SuperWidget):
 
             for index, (field, info) in enumerate(schema.items()):
                 value = self.last_doc.get(field, "")
-                var = tk.StringVar()
+                label = ttk.Label(master=self.w_fr_data, text=field, justify=tk.LEFT, anchor="w")
+                w_type = info['type']
+
+                if w_type == "lock":
+                    var = tk.IntVar()
+                else:
+                    var = tk.StringVar()
                 var.set(value)
                 var.trace("w", self.data_change)
-                label = ttk.Label(master=self.w_fr_data, text=field, justify=tk.LEFT, anchor="w")
-
-                w_type = info['type']
 
                 if w_type == "text":
                     entry = ttk.Entry(master=self.w_fr_data, textvariable=var, state="disabled")
@@ -965,6 +980,13 @@ class DataEntry(SuperWidget):
                     entry = tk.Text(master=self.w_fr_data, wrap=tk.WORD, height=3)
                     entry.insert("1.0", value)
                     entry.config(state="disabled")
+                    buttona = None
+                    buttonb = None
+                    buttonc = None
+                    hidden = None
+
+                elif w_type == "lock":
+                    entry = ttk.Checkbutton(master=self.w_fr_data, text="Locked?", variable=var, state="disabled")
                     buttona = None
                     buttonb = None
                     buttonc = None
@@ -1085,7 +1107,7 @@ class DataEntry(SuperWidget):
                 self.w_buttonb_data.append(buttonb)
                 self.w_buttonc_data.append(buttonc)
                 self.w_hidden_data.append(hidden)
-            
+
             if self.current_photo != None:
                 img = ImageTk.PhotoImage(self.current_photo)
             else:
@@ -1375,14 +1397,25 @@ class SearchTree(SuperWidget):
                         else:
                             permitted = self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to move an item?")
                         
+                        target = self.dragstartid
+                        target_doc = self.db.item_get(id=target)
+                        name = target_doc[self.db.schema_name(id=target)]
+                        lock = self.db.schema_lock(id=target)
+                        if target_doc.get(lock, 0) == 1:
+                            messagebox.showwarning("Locked Item", f"Could not move \"{name}\" ({target}) because item is locked.")
+                            self.logger.debug("Did not perform move, as target item is locked")
+                            self.dragstartttime = None
+                            self.dragstarttree = None
+                            self.dragstartid = None
+                            return
+
                         if permitted == True:
-                            target = self.dragstartid
                             source, *_ = self.db.item_parents(item=target)
                             destination = dragendid
                             if source != destination:
                                 self.logger.info(f"Moving {target} from {source} to {destination} via D&D")
 
-                                recur_risk_list = [destination]+self.db.item_parents(item=destination)
+                                recur_risk_list = [destination]+self.db.item_parents_all(item=destination)
                                 self.logger.debug(f"Recursion risk list: {recur_risk_list}")
                                 if target not in recur_risk_list:
                                     self.db.container_move(from_con=source, to_con=destination, item=target)
@@ -2053,6 +2086,20 @@ class ContainerManager(SuperWidget):
         reverse: If true, container movement is bottom to top.
         '''
         self.logger.debug(f"Move {'down' if reverse == False else 'up'} button activated")
+
+        if reverse == False:
+            target, *_ = self.w_se_top.selection
+        else:
+            target, *_ = self.w_se_bottom.selection
+
+        target_doc = self.db.item_get(id=target)
+        name = target_doc[self.db.schema_name(id=target)]
+        lock = self.db.schema_lock(id=target)
+        if target_doc.get(lock, 0) == 1:
+            messagebox.showwarning("Locked Item", f"Could not move \"{name}\" ({target}) because item is locked.")
+            self.logger.debug("Did not perform move, as target item is locked")
+            return
+
         if self.yes_no == None or (self.w_se_top.w_var_autoopen.get() == 0 and self.w_se_bottom.w_var_autoopen.get() == 0):
             permitted = True
         else:
@@ -2060,16 +2107,14 @@ class ContainerManager(SuperWidget):
 
         if permitted == True:
             if reverse == False:
-                target, *_ = self.w_se_top.selection
                 source, *_ = self.db.item_parents(item=target)
                 destination, *_ = self.w_se_bottom.selection
             else:
-                target, *_ = self.w_se_bottom.selection
                 source, *_ = self.db.item_parents(item=target)
                 destination, *_ = self.w_se_top.selection
             self.logger.info(f"Moving {target} from {source} to {destination} via button")
 
-            recur_risk_list = [destination]+self.db.item_parents(item=destination)
+            recur_risk_list = [destination]+self.db.item_parents_all(item=destination)
             self.logger.debug(f"Recursion risk list: {recur_risk_list}")
             if target not in recur_risk_list:
                 self.db.container_move(from_con=source, to_con=destination, item=target)

@@ -8,7 +8,7 @@ import mods.database as md
 
 # ----------------------------------------------------------------------------
 
-DBVERSION = "211014"
+DBVERSION = "211015"
 parser = argparse.ArgumentParser(description='Inserts data into the DEHC database.')
 parser.add_argument('persons', type=int, help="number of persons to add to the database", metavar="PERSONS")
 parser.add_argument('vessels', type=int, help="number of vessels to add to the database", metavar="VESSELS")

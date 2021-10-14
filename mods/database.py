@@ -1384,6 +1384,22 @@ class DEHCDatabase:
         self.logger.debug(f"Done loading database schema")
 
 
+    def schema_lock(self, *, cat: str = None, id: str = None):
+        '''Returns the name of a 'lock' field of a particular kind of item.
+        
+        Only cat OR id needs to be provided. If both, cat is used.
+
+        cat: Category of item to recieve fields of.
+        id: ID of item to recieve fields of.
+        '''
+        schema = self.schema_schema(cat=cat, id=id)
+        for field, info in schema.items():
+            if info.get('type', '') == 'lock':
+                return field
+        else:
+            return None
+
+
     def schema_name(self, *, cat: str = None, id: str = None):
         '''Returns the first field of a particular kind of item.
         
@@ -1407,7 +1423,7 @@ class DEHCDatabase:
 
 
     def schema_schema(self, *, cat: str = None, id: str = None):
-        '''Returns the schema of a particular kind of item.
+        '''Returns the schema ('fields') of a particular kind of item.
         
         Only cat OR id needs to be provided. If both, cat is used.
 
