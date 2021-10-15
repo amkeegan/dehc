@@ -580,6 +580,8 @@ class DEHCDatabase:
 
     def container_children_all_dict(self, container: str, cat: list = None):
         '''Returns nested dictionary, listing items contained by a container and all sub-containers, recursively.
+
+        Note that this method is NOT protected against infinite loops.
     
         container: Container to return containing items of.
         cat: If included, only returns children of these categories.
@@ -699,10 +701,19 @@ class DEHCDatabase:
         result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
         '''
         self.logger.debug(f"Finding all children and sub-children of {len(containers)} containers")
+        seen_ids = []
         children = []
         current_containers = containers
         while True:
             ids = self.containers_children(containers=current_containers, result="ITEM")
+
+            # Infinite loop protection
+            for id in ids:
+                if id not in seen_ids:
+                    seen_ids.append(id)
+                else:
+                    self.logger.error(f"Infinite container loop detected; '{id}' encountered twice")
+                    return children
             if len(ids) > 0:
                 children += self.containers_children(containers=current_containers, result=result, cat=cat)
                 current_containers = ids
@@ -714,6 +725,8 @@ class DEHCDatabase:
     def containers_children_all_dict(self, containers: list, cat: list = None):
         '''Returns nested dictionary, listing items contained by multiple containers and all sub-containers, recursively.
     
+        Note that this method is NOT protected against infinite loops.
+
         containers: Containers to return containing items of.
         cat: If included, only returns children of these categories.
         '''
@@ -1002,7 +1015,9 @@ class DEHCDatabase:
 
     def item_parents_all_dict(self, item: str, cat: list = None):
         '''Returns nested dictionary, listing all items containing an item, recursively.
-        
+
+        Note that this method is NOT protected against infinite loops.
+
         item: Item to return containing containers of.
         cat: If included, only returns parents of these categories.
         '''
@@ -1156,10 +1171,22 @@ class DEHCDatabase:
         result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
         '''
         self.logger.debug(f"Finding all parents and grandparents of {len(items)} items")
+        seen_ids = []
         parents = []
         current_containers = items
         while True:
             ids = self.items_parents(items=current_containers, result="ITEM")
+            repeat_ids = []
+
+            # Infinite loop protection
+            for id in ids:
+                if id not in seen_ids:
+                    seen_ids.append(id)
+                else:
+                    repeat_ids.append(id)
+            for repeat_id in repeat_ids:
+                ids.remove(repeat_id)
+            
             if len(ids) > 0:
                 parents += self.items_parents(items=current_containers, result=result, cat=cat)
                 current_containers = ids
@@ -1171,7 +1198,9 @@ class DEHCDatabase:
 
     def items_parents_all_dict(self, items: str, cat: list = None):
         '''Returns nested dictionary, listing all items containing one of multiple items, recursively.
-        
+
+        Note that this method is NOT protected against infinite loops.
+
         items: Items to return containing containers of.
         cat: If included, only returns parents of these categories.
         '''
