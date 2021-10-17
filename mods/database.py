@@ -199,7 +199,7 @@ class Database:
             id = re['id']
             self.logger.debug(f"Bulk created document {dbname} {id}")
             ids.append(id)
-        self.logger.debug(f"Finished bulk creating {len(ids)} documents")
+        self.logger.debug(f"Finished bulk creating documents")
         return ids
 
 
@@ -223,7 +223,7 @@ class Database:
                 self.logger.debug(f"Bulk deleted document {dbname} {id}")
             else:
                 self.logger.debug(f"Could not bulk lazy delete document {dbname} {id}")
-        self.logger.debug(f"Finished bulk deleting {len(ids)} documents")
+        self.logger.debug(f"Finished bulk deleting documents")
 
 
     def documents_edit(self, dbname: str, docs: list, ids: list, lazy: bool = False):
@@ -251,7 +251,7 @@ class Database:
         res = self.client.post_bulk_docs(db=dbname, bulk_docs=doc_list).get_result()
         for re in res:
             self.logger.debug(f"Bulk edited document {dbname} {re['id']}")
-        self.logger.debug(f"Finished bulk editing {len(doc_list)} documents")
+        self.logger.debug(f"Finished bulk editing documents")
 
 
     def documents_get(self, dbname: str, ids: str, lazy: bool = False):
@@ -270,7 +270,7 @@ class Database:
                 doc_list.append(doc['doc'])
             else:
                 self.logger.debug(f"Could not bulk lazy fetch {dbname} {id}")
-        self.logger.debug(f"Finished bulk fetching {len(ids)} documents")
+        self.logger.debug(f"Finished bulk fetching documents")
         return doc_list
 
 
@@ -410,11 +410,6 @@ class Database:
         return False
 
 
-    def __del__(self):
-        '''Runs when Database object is deleted.'''
-        self.logger.debug("Database object destroyed")
-
-
 # ----------------------------------------------------------------------------
 
 class DEHCDatabase:
@@ -434,14 +429,16 @@ class DEHCDatabase:
     id_len: Length of hex part of document UUIDs used in the database.
     limit: Max number of documents to return from _list and _query methods.
     logger: The logger object used for logging.
+    forcelocal: If true, uses local schema over one stored in the database.
     schema: Dictionary describing objects and fields in the database.
     schema_path: Path to .json file containing database schema.
     '''
 
-    def __init__(self, *, config: str, level: str = "NOTSET", namespace: str = "dehc", quickstart: bool = False, schema: str = "db_schema.json"):
+    def __init__(self, *, config: str, version: str, forcelocal: bool = False, level: str = "NOTSET", namespace: str = "dehc", quickstart: bool = False, schema: str = "db_schema.json"):
         '''Constructs a DEHCDatabase object.
 
-        config: Path to .json file containing database server credentials.
+        config: Required. Path to .json file containing database server credentials.
+        version: Required. The version of the schema the database is expecting to use.
         level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
         namespace: A name to prefix all CouchDB databases with.
         quickstart: Creates databases and loads schema automatically.
@@ -463,14 +460,16 @@ class DEHCDatabase:
         self.id_len = 12
         self.limit = 1000000
 
+        self.forcelocal = forcelocal
         self.schema = {}
         self.schema_path = schema
+        self.version = version
         if quickstart == True:
             self.logger.info(f"Performing quickstart")
+            self.schema_load(schema=self.schema_path)
             self.databases_create(lazy=True)
-            self.schema_load(schema=self.schema_path, forcelocal=True)
-            self.schema_save()
             self.index_prepare()
+            self.schema_save()
             self.logger.debug(f"Completed quickstart")
 
 
@@ -581,6 +580,8 @@ class DEHCDatabase:
 
     def container_children_all_dict(self, container: str, cat: list = None):
         '''Returns nested dictionary, listing items contained by a container and all sub-containers, recursively.
+
+        Note that this method is NOT protected against infinite loops.
     
         container: Container to return containing items of.
         cat: If included, only returns children of these categories.
@@ -700,10 +701,19 @@ class DEHCDatabase:
         result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
         '''
         self.logger.debug(f"Finding all children and sub-children of {len(containers)} containers")
+        seen_ids = []
         children = []
         current_containers = containers
         while True:
             ids = self.containers_children(containers=current_containers, result="ITEM")
+
+            # Infinite loop protection
+            for id in ids:
+                if id not in seen_ids:
+                    seen_ids.append(id)
+                else:
+                    self.logger.error(f"Infinite container loop detected; '{id}' encountered twice")
+                    return children
             if len(ids) > 0:
                 children += self.containers_children(containers=current_containers, result=result, cat=cat)
                 current_containers = ids
@@ -715,6 +725,8 @@ class DEHCDatabase:
     def containers_children_all_dict(self, containers: list, cat: list = None):
         '''Returns nested dictionary, listing items contained by multiple containers and all sub-containers, recursively.
     
+        Note that this method is NOT protected against infinite loops.
+
         containers: Containers to return containing items of.
         cat: If included, only returns children of these categories.
         '''
@@ -781,6 +793,50 @@ class DEHCDatabase:
         res = self.db.query(dbname=self.db_containers, selector=selector, fields=fields, sort=sort, limit=limit)
         self.logger.debug(f"Done querying the containers database")
         return res
+
+
+    def flag_assign_tree(self, container: str, flag: str):
+        '''Assigns a flag to an item and all its children recursively.
+        
+        container: The item to reference.
+        flag: The flag to set.
+        '''
+        parent = self.item_get(id=container)
+        children = self.container_children_all(container=container, result="DOC")
+        items = [parent] + children
+        ids = []
+        data = []
+        for item in items:
+            if flag in self.schema_flags(cat=item['category']):
+                if 'flags' not in item:
+                    item['flags'] = []
+                if flag not in item['flags']:
+                    item['flags'].append(flag)
+                    ids.append(item['_id'])
+                    data.append(item)
+        self.items_edit(ids=ids, data=data, lazy=True)
+
+
+    def flag_revoke_tree(self, container: str, flag: str):
+        '''Revokes a flag from an item and all its children recursively.
+        
+        container: The item to reference.
+        flag: The flag to revoke.
+        '''
+        parent = self.item_get(id=container)
+        children = self.container_children_all(container=container, result="DOC")
+        items = [parent] + children
+        ids = []
+        data = []
+        for item in items:
+            if flag in self.schema_flags(cat=item['category']):
+                if 'flags' not in item:
+                    item['flags'] = []
+                if flag in item['flags']:
+                    item['flags'].remove(flag)
+                    ids.append(item['_id'])
+                    data.append(item)
+        self.items_edit(ids=ids, data=data, lazy=True)
 
 
     def id_cat(self, id: str):
@@ -880,7 +936,7 @@ class DEHCDatabase:
             children = self.container_children(container=id, result="CON")
             parents = self.item_parents(item=id, result="CON")
             self.db.documents_delete(dbname=self.db_containers, ids=children+parents, lazy=lazy)
-            #TODO: Delete associated file (photo) too
+            self.photo_delete(item=id)
         self.logger.debug(f"Done deleting item {id}")
 
 
@@ -959,7 +1015,9 @@ class DEHCDatabase:
 
     def item_parents_all_dict(self, item: str, cat: list = None):
         '''Returns nested dictionary, listing all items containing an item, recursively.
-        
+
+        Note that this method is NOT protected against infinite loops.
+
         item: Item to return containing containers of.
         cat: If included, only returns parents of these categories.
         '''
@@ -1017,6 +1075,8 @@ class DEHCDatabase:
             children = self.containers_children(containers=ids, result="CON")
             parents = self.items_parents(items=ids, result="CON")
             self.db.documents_delete(dbname=self.db_containers, ids=children+parents, lazy=lazy)
+            for id in ids:
+                self.photo_delete(item=id)
         self.logger.debug(f"Done deleting {len(ids)} items")
 
 
@@ -1111,10 +1171,22 @@ class DEHCDatabase:
         result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
         '''
         self.logger.debug(f"Finding all parents and grandparents of {len(items)} items")
+        seen_ids = []
         parents = []
         current_containers = items
         while True:
             ids = self.items_parents(items=current_containers, result="ITEM")
+            repeat_ids = []
+
+            # Infinite loop protection
+            for id in ids:
+                if id not in seen_ids:
+                    seen_ids.append(id)
+                else:
+                    repeat_ids.append(id)
+            for repeat_id in repeat_ids:
+                ids.remove(repeat_id)
+            
             if len(ids) > 0:
                 parents += self.items_parents(items=current_containers, result=result, cat=cat)
                 current_containers = ids
@@ -1126,7 +1198,9 @@ class DEHCDatabase:
 
     def items_parents_all_dict(self, items: str, cat: list = None):
         '''Returns nested dictionary, listing all items containing one of multiple items, recursively.
-        
+
+        Note that this method is NOT protected against infinite loops.
+
         items: Items to return containing containers of.
         cat: If included, only returns parents of these categories.
         '''
@@ -1259,6 +1333,7 @@ class DEHCDatabase:
     def schema_cats(self):
         '''Returns the list of categories present in the schema.'''
         cats = list(self.schema.keys())
+        cats.remove("#")
         return cats
 
 
@@ -1304,22 +1379,28 @@ class DEHCDatabase:
         return keys
 
 
-    def schema_load(self, schema: str = None, forcelocal: bool = False):
+    def schema_load(self, schema: str = None):
         '''Loads database schema into memory.
 
         Will look for doc "schema" in db "items" first, then locally.
         
         schema: Path to local .json file containing database schema.
-        forcelocal: If true, uses local schema over one stored in the database.
         '''
         self.logger.debug(f"Loading database schema")
-        if forcelocal == False and self.db.document_exists(dbname=self.db_configs, id="schema") == True:
+
+        if self.forcelocal == False and self.db.document_exists(dbname=self.db_configs, id="schema") == True:
             self.logger.info(f"Loading database schema from database")
             loaded_schema = self.db.document_get(dbname=self.db_configs, id="schema")
+            del loaded_schema['_id']
+            del loaded_schema['_rev']
         else:
             self.logger.info(f"Loading database schema from {schema}")
             with open(schema, "r") as f:
                 loaded_schema = json.loads(f.read())
+
+        if loaded_schema["#"]["version"] != self.version:
+            raise RuntimeError("Schema version doesn't match what the application was expecting.")
+
         for key, value in self.schema.items():
             if "/" in key:
                 raise ValueError("Category names cannot contain / chars.")
@@ -1327,8 +1408,25 @@ class DEHCDatabase:
             if "category" in value["fields"]:
                 raise ValueError("category can't be a field name.")
                 # ...because it's reserved by app for identifying item types
+        
         self.schema = loaded_schema
         self.logger.debug(f"Done loading database schema")
+
+
+    def schema_lock(self, *, cat: str = None, id: str = None):
+        '''Returns the name of a 'lock' field of a particular kind of item.
+        
+        Only cat OR id needs to be provided. If both, cat is used.
+
+        cat: Category of item to recieve fields of.
+        id: ID of item to recieve fields of.
+        '''
+        schema = self.schema_schema(cat=cat, id=id)
+        for field, info in schema.items():
+            if info.get('type', '') == 'lock':
+                return field
+        else:
+            return None
 
 
     def schema_name(self, *, cat: str = None, id: str = None):
@@ -1354,7 +1452,7 @@ class DEHCDatabase:
 
 
     def schema_schema(self, *, cat: str = None, id: str = None):
-        '''Returns the schema of a particular kind of item.
+        '''Returns the schema ('fields') of a particular kind of item.
         
         Only cat OR id needs to be provided. If both, cat is used.
 
@@ -1371,15 +1469,11 @@ class DEHCDatabase:
         '''Returns all of the summable fields within the entire schema.'''
         summables = []
         for cat, schema in self.schema.items():
-            for field, info in schema['fields'].items():
-                if info['type'] == "sum" or info['type'] == "count":
-                    summables.append(field)
+            if "fields" in schema:
+                for field, info in schema['fields'].items():
+                    if info['type'] == "sum" or info['type'] == "count":
+                        summables.append(field)
         return list(dict.fromkeys(summables))
-
-
-    def __del__(self):
-        '''Runs when DEHCDatabase object is deleted.'''
-        self.logger.debug("DEHCDatabase object destroyed")
 
 
 # ----------------------------------------------------------------------------

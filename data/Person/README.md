@@ -1,0 +1,1 @@
+Folder to store locally generated ID Card images

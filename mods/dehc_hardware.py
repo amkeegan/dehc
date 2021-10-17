@@ -1,5 +1,4 @@
 from multiprocessing import Process, Queue
-from multiprocessing.spawn import freeze_support
 import queue
 import time
 
@@ -10,11 +9,6 @@ import mods.zebra_zc300_printer.dehc_printer as Printer
 
 from PIL import Image
 
-import random
-
-#WORKER_MESSAGE_NODATA = 'No Data'
-#WORKER_MESSAGE_BROKEN_HARDWARE_CONNECTION = 'No Connection'
-
 def listPrinters():
     return Printer.listPrinters()
 
@@ -24,6 +18,7 @@ def  getDefaultPrinter():
 class Hardware:
 
     processes = []
+
     SCALES_EXIST = False
     NFCREADER_EXIST = False
     BARCODEREADER_EXIST = False
@@ -48,7 +43,7 @@ class Hardware:
         if makeScales:
             self.inQueueScales = Queue(maxsize=1) # Only store the most recent value
             self.outQueueScales = Queue(maxsize=1) # For now, we don't need to stack up C2 messages
-            self.processScales = Process(target=Scales, args=(self.outQueueScales, self.inQueueScales))
+            self.processScales = Process(target=Scales.Scales_Worker, args=(self.outQueueScales, self.inQueueScales))
             self.processes.append(self.processScales)
         if makeNFCReader:
             self.inQueueNFC = Queue(maxsize=1) # Only store the most recent value
@@ -72,8 +67,6 @@ class Hardware:
         self.NFCREADER_EXIST = makeNFCReader
         self.BARCODEREADER_EXIST = makeBarcodeReader
         self.PRINTER_EXIST = makePrinter
-        
-        time.sleep(1)
 
     def startProcesses(self):
         for process in self.processes:
@@ -91,7 +84,7 @@ class Hardware:
         if self.outQueuePrinter:
             self.outQueuePrinter.put({"message": "close"})
         
-        time.sleep(2) # Allow some time for process to do cleanup
+        time.sleep(1) # Allow some time for process to do cleanup
         
         for process in self.processes:
             if process is None:
@@ -105,7 +98,7 @@ class Hardware:
             self.lastWeight = ''
         else:
             try:
-                tmpData = self.inQueueScales.get(block=False)
+                tmpData = self.inQueueScales.get(timeout=0.01)
                 if 'weight' in tmpData:
                     self.lastWeight = tmpData['weight']
             except queue.Empty:
@@ -141,23 +134,23 @@ class Hardware:
 
 if __name__ == "__main__":
 
-    hardware = Hardware(makeScales=False,makeBarcodeReader=False, makeNFCReader=True, makePrinter=False)
+    hardware = Hardware(makeScales=True,makeBarcodeReader=False, makeNFCReader=False, makePrinter=False)
 
-    time.sleep(2)
+    time.sleep(1)
 
-    # weight = hardware.getCurrentWeight()
+    weight = hardware.getCurrentWeight()
     
     # barcode = hardware.getCurrentBarcode()
     
-    nfcUID = hardware.getCurrentNFCUID()
+    # nfcUID = hardware.getCurrentNFCUID()
 
     # for _ in range(0,1):
     #     tmpIDCard = Image.new('RGB', (400,640), (random.randint(0,255),random.randint(0,255),random.randint(0,255)))
     #     hardware.sendNewIDCard(tmpIDCard)
     
-    # print(f'Weight: {weight}')
+    print(f'Weight: {weight}')
     # print(f'Barcode: {barcode}')
-    print(f'NFC UID: {nfcUID}')
+    # print(f'NFC UID: {nfcUID}')
     
     time.sleep(1)
     

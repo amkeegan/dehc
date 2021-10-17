@@ -1,6 +1,7 @@
 '''The module containing objects that create and manage groups of tkinter widgets.'''
 
 import json
+import time
 
 from PIL import Image, ImageTk
 import tkinter as tk
@@ -83,7 +84,7 @@ class SuperWidget:
 class DataEntry(SuperWidget):
     '''A SuperWidget representing a data entry pane.'''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, level: str = "NOTSET", newchild: Callable = None, prepare: bool = True, save: Callable = None, show: Callable = None, hardware: hw.Hardware = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, level: str = "NOTSET", newchild: Callable = None, prepare: bool = True, readonly: bool = False, save: Callable = None, show: Callable = None, hardware: hw.Hardware = None):
         '''Constructs a DataEntry object.
         
         master: The widget that the DataEntry's component widgets will be instantiated under.
@@ -97,22 +98,25 @@ class DataEntry(SuperWidget):
         '''
         super().__init__(master=master, db=db, level=level)
 
-        self.cats = cats          # Stores the list of item categories this DataEntry can select and work with.
-        self.editing = False      # Stores whether or not the user is currently editing a document.
-        self.back_doc = {}        # Stores the document to return to when the back button is pressed.
-        self.last_doc = {}        # Stores the most recently selected and retrieved document from the database.
-        self.guardian_doc = {}    # Stores the guardian's document when 'new child' is pressed.
-        self.child_doc = {}       # Stores information for child document when 'new child' is pressed.
-        self.current_photo = None # Stores the currently slown photo.
-        self.last_photo = None    # Stores the most recently retrieved photo from the database.
-        self.level = level        # Stores the logging level
-        self._delete = delete     # Stores the parent object's callback to run when delete is pressed.
-        self._newchild = newchild # Stores the parent object's callback to run when new child is pressed.
-        self._save = save         # Stores the parent object's callback to run when save is pressed.
-        self._show = show         # Stores the parent object's callback to run when show is pressed.
-
-        self.hardware = hardware  # Stores the hardware manager object associated with this DataEntry
+        self.cats = cats                       # The list of item categories this DataEntry can select and work with.
+        self.editing = False                   # Whether or not the user is currently editing a document.
+        self.back_doc = {}                     # The document to return to when the back button is pressed.
+        self.last_doc = {}                     # The most recently selected and retrieved document from the database.
+        self.guardian_doc = {}                 # The guardian's document when 'new child' is pressed.
+        self.child_doc = {}                    # Information for child document when 'new child' is pressed.
+        self.current_photo = None              # The currently slown photo.
+        self.last_photo = None                 # The most recently retrieved photo from the database.
+        self.level = level                     # The logging level
+        self.readonly = readonly               # Whether or not the application is in readonly mode
+        self.root = self.w_fr.winfo_toplevel() # Root widget that contains this SuperWidget
+        self._delete = delete                  # The parent object's callback to run when delete is pressed.
+        self._newchild = newchild              # The parent object's callback to run when new child is pressed.
+        self._save = save                      # The parent object's callback to run when save is pressed.
+        self._show = show                      # The parent object's callback to run when show is pressed.
+        self.hardware = hardware               # The hardware manager object associated with this DataEntry
+        
         self.photomanager = mp.PhotoManager(level=self.level)
+        self.photo_blank = Image.new("RGB", (256, 256), (220, 218, 213))
 
         if prepare == True:
             self.prepare()
@@ -125,16 +129,35 @@ class DataEntry(SuperWidget):
         self.w_fr_photo = ttk.Frame(master=self.w_fr)
         self.w_fr_flags = ttk.Frame(master=self.w_fr)
         self.w_fr_body = ttk.Frame(master=self.w_fr)
-        self.w_fr_data = ttk.Frame(master=self.w_fr_body)
+        self.w_ca_data = tk.Canvas(master=self.w_fr_body, background="#DCDAD5", bd=0, highlightthickness=0, relief='ridge')
+        self.w_fr_data = ttk.Frame(master=self.w_ca_data)
         self.w_fr_foot = ttk.Frame(master=self.w_fr)
+        self.w_ca_data.create_window((0, 0), window=self.w_fr_data, anchor="nw", tags="frame")
 
-        self.w_fr.columnconfigure(index=0, weight=1000)
+        def redraw_canvas_window(*args):
+            self.w_ca_data.itemconfig('frame', width=self.w_ca_data.winfo_width())
+
+        def mouse_scroll(*args):
+            event, *_ = args
+            self.w_ca_data.yview_scroll(int(-1*(event.delta/120)), "units")
+
+        def mouse_enter_canvas(*args):
+            self.w_ca_data.bind_all("<MouseWheel>", mouse_scroll)
+
+        def mouse_exit_canvas(*args):
+            self.w_ca_data.unbind_all("<MouseWheel>")
+
+        self.w_ca_data.bind("<Configure>", redraw_canvas_window)
+        self.w_fr_data.bind('<Enter>', mouse_enter_canvas)
+        self.w_fr_data.bind('<Leave>', mouse_exit_canvas)
+
+        self.w_fr.columnconfigure(index=0, weight=1000, minsize=280)
         self.w_fr.columnconfigure(index=1, weight=1000)
         self.w_fr.columnconfigure(index=2, weight=1, minsize=16)
-        self.w_fr.rowconfigure(index=0, weight=1, minsize=25)
-        self.w_fr.rowconfigure(index=1, weight=500)
+        self.w_fr.rowconfigure(index=0, weight=1, minsize=24)
+        self.w_fr.rowconfigure(index=1, weight=1)
         self.w_fr.rowconfigure(index=2, weight=1000)
-        self.w_fr.rowconfigure(index=3, weight=1, minsize=25)
+        self.w_fr.rowconfigure(index=3, weight=1, minsize=24)
 
         self.w_fr_head.columnconfigure(index=0, weight=1000)
         self.w_fr_head.columnconfigure(index=1, weight=1, minsize=48)
@@ -144,14 +167,15 @@ class DataEntry(SuperWidget):
 
         self.w_fr_photo.columnconfigure(index=0, weight=1000)
         self.w_fr_photo.rowconfigure(index=0, weight=1000)
+        self.w_fr_photo.rowconfigure(index=1, weight=1, minsize=24)
 
         self.w_fr_flags.columnconfigure(index=0, weight=1000)
         self.w_fr_flags.columnconfigure(index=1, weight=1000)
         self.w_fr_flags.columnconfigure(index=2, weight=1000)
         self.w_fr_flags.columnconfigure(index=3, weight=1, minsize=16)
-        self.w_fr_flags.rowconfigure(index=0, weight=1, minsize=25)
+        self.w_fr_flags.rowconfigure(index=0, weight=1, minsize=24)
         self.w_fr_flags.rowconfigure(index=1, weight=1000)
-        self.w_fr_flags.rowconfigure(index=2, weight=1, minsize=25)
+        self.w_fr_flags.rowconfigure(index=2, weight=1, minsize=24)
 
         self.w_fr_body.columnconfigure(index=0, weight=1000)
         self.w_fr_body.rowconfigure(index=0, weight=1000)
@@ -175,6 +199,7 @@ class DataEntry(SuperWidget):
         self.w_bu_copyid = ttk.Button(master=self.w_fr_head, text="Copy ID", command=self.copyid)
         self.w_bu_back = ttk.Button(master=self.w_fr_head, text="Back", command=self.back)
         self.w_bu_photo = ttk.Button(master=self.w_fr_photo, text="Photo", command=self.photo)
+        self.w_bu_editphoto = ttk.Button(master=self.w_fr_photo, text="Edit Photo", command=self.photo)
         self.w_la_flags = ttk.Label(master=self.w_fr_flags, text="Flags")
         self.w_li_flags = tk.Listbox(master=self.w_fr_flags, selectmode=tk.SINGLE, relief=tk.GROOVE, exportselection=False)
         self.w_co_flags = ttk.Combobox(master=self.w_fr_flags, textvariable=self.w_var_flags, state="readonly")
@@ -182,18 +207,30 @@ class DataEntry(SuperWidget):
         self.w_bu_remove = ttk.Button(master=self.w_fr_flags, text="Remove", command=self.remove)
         self.w_la_data = []
         self.w_input_data = []
-        self.w_bu_edit = ttk.Button(master=self.w_fr_foot, text="Edit", command=self.edit)
-        self.w_bu_cancel = ttk.Button(master=self.w_fr_foot, text="Cancel", command=self.cancel)
+        self.w_bu_edit = ttk.Button(master=self.w_fr_foot, text="Edit",)
+        self.w_bu_cancel = ttk.Button(master=self.w_fr_foot, text="Cancel")
         self.w_co_cat = ttk.Combobox(master=self.w_fr_foot, values=self.cats, textvariable=self.w_var_cat, state="readonly")
-        self.w_bu_new = ttk.Button(master=self.w_fr_foot, text="New", command=self.new)
-        self.w_bu_save = ttk.Button(master=self.w_fr_foot, text="Save", command=self.save)
-        self.w_bu_delete = ttk.Button(master=self.w_fr_foot, text="Delete", command=self.delete)
+        self.w_bu_new = ttk.Button(master=self.w_fr_foot, text="New")
+        self.w_bu_save = ttk.Button(master=self.w_fr_foot, text="Save")
+        self.w_bu_delete = ttk.Button(master=self.w_fr_foot, text="Delete")
         self.w_co_cat.current(0)
-        self.show()
+
+        if self.readonly == False:
+            self.w_bu_edit.configure(command=self.edit)
+            self.w_bu_cancel.configure(command=self.cancel)
+            self.w_bu_new.configure(command=self.new)
+            self.w_bu_save.configure(command=self.save)
+            self.w_bu_delete.configure(command=self.delete)
 
         # Scrollbars
         self.w_sc_flags = ttk.Scrollbar(master=self.w_fr_flags, orient="vertical", command=self.w_li_flags.yview)
         self.w_li_flags.config(yscrollcommand=self.w_sc_flags.set)
+
+        self.w_sc_data = ttk.Scrollbar(master=self.w_fr, orient="vertical", command=self.w_ca_data.yview)
+        self.w_fr_data.bind("<Configure>", lambda e: self.w_ca_data.configure(scrollregion=self.w_ca_data.bbox("all")))
+        self.w_ca_data.configure(yscrollcommand=self.w_sc_data.set)
+
+        self.show()
 
 
     def _pack_children(self):
@@ -201,16 +238,20 @@ class DataEntry(SuperWidget):
         self.logger.debug(f"Packing and gridding widgets")
         self.w_fr_head.grid(column=0, row=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         self.w_fr_photo.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
-        self.w_fr_flags.grid(column=1, row=1, sticky="nsew", padx=2, pady=2)
+        self.w_fr_flags.grid(column=1, row=1, columnspan=2, sticky="nsew", padx=2, pady=2)
         self.w_fr_body.grid(column=0, row=2, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.w_fr_data.grid(column=0, row=0, sticky="nsew")
+        self.w_sc_data.grid(column=2, row=2, sticky="nsew", padx=1, pady=2)
         self.w_fr_foot.grid(column=0, row=3, columnspan=3, sticky="nsew", padx=2, pady=1)
+
+        self.w_ca_data.grid(column=0, row=0, sticky="nsew")
 
         self.w_la_title.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
         self.w_bu_generate_id.grid(column=1,row=0,sticky="nsew",padx=2,pady=2)
         self.w_bu_copyid.grid(column=2, row=0, sticky="nsew", padx=2, pady=2)
         self.w_bu_back.grid(column=3, row=0, sticky="nsew", padx=2, pady=2)
-        self.w_bu_photo.grid(column=0, row=0, sticky="nsew", padx=2, pady=2)
+        
+        self.w_bu_photo.grid(column=0, row=0, sticky="nsew", padx=2, pady=1)
+        self.w_bu_editphoto.grid(column=0, row=1, sticky="nsew", padx=2, pady=1)
 
         self.w_la_flags.grid(column=0, row=0, columnspan=4, sticky="nsew", padx=1, pady=1)
         self.w_li_flags.grid(column=0, row=1, columnspan=3, sticky="nsew", padx=1, pady=1)
@@ -326,7 +367,7 @@ class DataEntry(SuperWidget):
             window.attributes("-topmost", True)
             window.focus_force()
             window.title("ID Generation")
-            window.configure(background="#D9D9D9")
+            window.configure(background="#DCDAD5")
 
             msg = ttk.Label(master=window)
             if len(printers) > 0:
@@ -362,8 +403,10 @@ class DataEntry(SuperWidget):
         card_builder = card_gen.IDCardBuilder()
 
         self.id_card_printable = card_builder.generateIDCard(
+            #TODO: Change qrcode_id to be one of available Physical IDs, not _id
             qrcode_id=self.last_doc['_id'] if '_id' in self.last_doc else 'NILQRCODE',
             embedded_logo_path='assets/embedded-logo.png',
+            #TODO: Change barcode_id to be one of available Physical IDs, not _id
             barcode_id=self.last_doc['_id'] if '_id' in self.last_doc else 'NILBARCODE',
             name=self.last_doc['Display Name'] if 'Display Name' in self.last_doc else 'UNKNOWN NAME',
             secondary_texts=(
@@ -393,11 +436,26 @@ class DataEntry(SuperWidget):
         self.logger.info(f"{repr(id)} copied to clipboard")
 
 
+    def data_change(self, *args):
+        '''Callback for when an item's information in the data pane is modified.'''
+        if self.editing == False:
+            self.editing = True
+            self.logger.info(f"Item edited, setting edit mode to {self.editing}")
+
+
     def delete(self, *args):
         '''Callback for when the delete button is pressed'''
         self.logger.debug(f"Delete item button activated")
-        if self.yes_no("Delete Item","Are you sure you want to delete this item and all of its children?", always=True):
-            id = self.last_doc["_id"]
+        id = self.last_doc["_id"]
+        name = self.last_doc[self.db.schema_name(id=id)]
+
+        lock = self.db.schema_lock(id=id)
+        if self.last_doc.get(lock, 0) == 1:
+            messagebox.showwarning("Locked Item", f"Could not delete \"{name}\" ({id}) because item is locked.")
+            self.logger.debug(f"Not deleting item, as item is locked")
+            return
+
+        if self.yes_no("Delete Item",f"Are you sure you want to delete \"{name}\" ({id}) and all of its children?", always=True):
             parents = self.db.item_parents(item=id)
             if len(parents) > 0:
                 self.logger.info(f"Deleting item {id} and all its children")
@@ -414,8 +472,12 @@ class DataEntry(SuperWidget):
 
     def edit(self, *args):
         '''Callback for when the edit button is pressed'''
-        self.editing = True
-        self.logger.info(f"Edit button activated, setting edit mode to {self.editing}")
+        cat = self.last_doc.get('category','')
+        lock = self.db.schema_lock(cat=cat)
+        if self.last_doc.get(lock, 0) == 1:
+            if not self.yes_no("Locked Item",f"This item is locked. Are you sure you want to edit it?", always=True):
+                return
+
         for entry, buttona, buttonb, buttonc, hidden in zip(self.w_input_data, self.w_buttona_data, self.w_buttonb_data, self.w_buttonc_data, self.w_hidden_data):
             if hidden == None:
                 entry.config(state="normal")
@@ -426,6 +488,7 @@ class DataEntry(SuperWidget):
             if buttonc != None:
                 buttonc.config(state="normal")
         self.w_bu_photo.config(command=self.photo)
+        self.w_bu_editphoto.config(state="normal")
         self.w_bu_edit.config(state="disabled")
         self.w_bu_cancel.config(state="normal")
         self.w_bu_save.config(state="normal")
@@ -449,12 +512,14 @@ class DataEntry(SuperWidget):
                 self.logger.debug(f"Using prespecified guardian {self.guardian_doc.get('_id','_')}")
                 self.back_doc = self.guardian_doc
                 self.last_doc = {"category": self.child_doc["category"], self.child_doc["field"]: [self.child_doc["value"]]}
+                self.last_photo = None
                 self.child_doc = {}
                 self.guardian_doc = {}
             else:
                 self.back_doc = self.last_doc
                 self.logger.debug(f"No prespecified guardian for new item")
                 self.last_doc = {"category": self.w_var_cat.get()}
+                self.last_photo = None
             self.logger.debug(f"Back doc is now {self.back_doc.get('_id','_')}")
             self.logger.debug(f"Showing new item of category {self.last_doc['category']}")
             self.show()
@@ -504,14 +569,15 @@ class DataEntry(SuperWidget):
         window.attributes("-topmost", True)
         window.focus_force()
         window.title("Photo")
-        window.configure(background="#D9D9D9")
+        window.configure(background="#DCDAD5")
 
         def clear():
             '''Removes current photo from data pane.'''
             self.logger.debug(f"Photo clear button activated")
             self.current_photo = None
-            self.w_bu_photo.config(image="")
-            self.w_bu_photo.image = ""
+            img = ImageTk.PhotoImage(self.photo_blank)
+            self.w_bu_photo.config(image=img)
+            self.w_bu_photo.image = img
             self.logger.info(f"Photo cleared from data pane")
 
         def fetch_photo():
@@ -593,7 +659,7 @@ class DataEntry(SuperWidget):
                         result = round(80+random.random()*10, 2) 
                     if result != '':
                         msg.config(text=str(result))
-                    window.after(500, read_weight)
+                    window.after(100, read_weight)
 
                 def commit_weight(*args):
                     '''Inserts current weight into data pane.'''
@@ -705,7 +771,7 @@ class DataEntry(SuperWidget):
                 window.columnconfigure(1, weight=1000)
                 window.columnconfigure(2, weight=1000)
                 window.columnconfigure(3, weight=1000)
-                window.rowconfigure(0, weight=1, minsize=25)
+                window.rowconfigure(0, weight=1, minsize=24)
                 window.rowconfigure(1, weight=1000)
                 window.rowconfigure(2, weight=1000)
                 window.rowconfigure(3, weight=1000)
@@ -823,9 +889,12 @@ class DataEntry(SuperWidget):
         schema = self.db.schema_schema(cat=self.last_doc["category"])
         for index, (field, info) in enumerate(schema.items()):
             if self.w_hidden_data[index] == None:
-                value = self.w_var_data[index].get()
+                if info.get('type','') == 'multitext':
+                    value = self.w_input_data[index].get("1.0","end").rstrip()
+                else:
+                    value = self.w_var_data[index].get()
             else:
-                if info.get('type','') == 'list' and info.get('source') == 'PHYSIDS':
+                if info.get('type','') == 'list' and info.get('source','') == 'PHYSIDS':
                     physid = self.w_hidden_data[index]
                     value = ""
                 else:
@@ -859,8 +928,9 @@ class DataEntry(SuperWidget):
             self.last_doc = doc
             self.logger.info("Save completed")
             return True
-        messagebox.showwarning("Missing Information", "Could not save item because required fields are missing.")
-        self.logger.warning("Could not save item because required fields are missing")
+        missingfield = repr(self.db.schema_name(cat=self.last_doc['category']))
+        messagebox.showwarning("Missing Information", f"Could not save item because required field {missingfield} is empty.")
+        self.logger.warning(f"Could not save item because required field {missingfield} is empty")
         return False
 
 
@@ -899,6 +969,7 @@ class DataEntry(SuperWidget):
 
         self.editing = False
         self.w_bu_photo.config(command="")
+        self.w_bu_editphoto.config(state="disabled")
         self.w_bu_edit.config(state="disabled")
         self.w_bu_cancel.config(state="disabled")
         self.w_bu_save.config(state="disabled")
@@ -910,26 +981,51 @@ class DataEntry(SuperWidget):
 
         if len(self.last_doc) > 0:
             self.w_bu_edit.config(state="normal")
+
             cat = self.last_doc["category"]
             schema = self.db.schema_schema(cat=cat)
             title = f"{self.last_doc.get(self.db.schema_name(cat=cat), cat)} ({self.last_doc.get('_id','New')})"
             self.w_la_title.config(text=title)
-            self.w_fr_data.columnconfigure(index=0, weight=1000)
-            self.w_fr_data.columnconfigure(index=1, weight=1000)
-            self.w_fr_data.columnconfigure(index=2, weight=1000)
-            self.w_fr_data.columnconfigure(index=3, weight=1000)
-            self.w_fr_data.columnconfigure(index=4, weight=1000)
+            self.w_fr_data.columnconfigure(index=0, weight=1000, minsize=96)
+            self.w_fr_data.columnconfigure(index=1, weight=1000, minsize=96)
+            self.w_fr_data.columnconfigure(index=2, weight=1000, minsize=32)
+            self.w_fr_data.columnconfigure(index=3, weight=1000, minsize=32)
+            self.w_fr_data.columnconfigure(index=4, weight=1000, minsize=32)
 
             for index, (field, info) in enumerate(schema.items()):
                 value = self.last_doc.get(field, "")
-                var = tk.StringVar()
-                var.set(value)
                 label = ttk.Label(master=self.w_fr_data, text=field, justify=tk.LEFT, anchor="w")
-
                 w_type = info['type']
+
+                if w_type == "lock":
+                    var = tk.IntVar()
+                    if value in [0, 1]:
+                        var.set(value)
+                    else:
+                        var.set(0)
+                else:
+                    var = tk.StringVar()
+                    var.set(value)
+                var.trace("w", self.data_change)
 
                 if w_type == "text":
                     entry = ttk.Entry(master=self.w_fr_data, textvariable=var, state="disabled")
+                    buttona = None
+                    buttonb = None
+                    buttonc = None
+                    hidden = None
+
+                elif w_type == "multitext":
+                    entry = tk.Text(master=self.w_fr_data, wrap=tk.WORD, height=3)
+                    entry.insert("1.0", value)
+                    entry.config(state="disabled")
+                    buttona = None
+                    buttonb = None
+                    buttonc = None
+                    hidden = None
+
+                elif w_type == "lock":
+                    entry = ttk.Checkbutton(master=self.w_fr_data, text="Locked?", variable=var, state="disabled")
                     buttona = None
                     buttonb = None
                     buttonc = None
@@ -974,7 +1070,8 @@ class DataEntry(SuperWidget):
                         buttona = ttk.Button(master=self.w_fr_data, text="Show", state="normal")
                         buttona.bind("<Button-1>", lambda e: self.showlist(event=e, source="IDS"))
                         buttonc = ttk.Button(master=self.w_fr_data, text="Create", state="normal")
-                        buttonc.bind("<Button-1>", self.newchild)
+                        if self.readonly == False:
+                            buttonc.bind("<Button-1>", self.newchild)
                     elif source == "PHYSIDS":
                         buttonb.bind("<Button-1>", lambda e: self.readlist(event=e, source="PHYSIDS"))
                         buttonc = None
@@ -988,12 +1085,12 @@ class DataEntry(SuperWidget):
                     if self.last_doc.get('_id','') != "":
                         children = self.db.container_children_all(container=self.last_doc["_id"], cat=info['cat'], result="DOC")
                         target = info['target']
-                        default = info.get('default', 0)
                         items = []
                         defaulted = False
                         for child in children:
                             value = child.get(target, "")
                             if value == "":
+                                default = self.db.schema_schema(cat=child['category'])[target].get('default', 0)
                                 value = default
                                 defaulted = True
                             items.append(float(value))
@@ -1050,11 +1147,13 @@ class DataEntry(SuperWidget):
                 self.w_buttonb_data.append(buttonb)
                 self.w_buttonc_data.append(buttonc)
                 self.w_hidden_data.append(hidden)
-            
+
             if self.current_photo != None:
                 img = ImageTk.PhotoImage(self.current_photo)
-                self.w_bu_photo.config(image=img)
-                self.w_bu_photo.image = img
+            else:
+                img = ImageTk.PhotoImage(self.photo_blank)
+            self.w_bu_photo.config(image=img)
+            self.w_bu_photo.image = img
 
             flags = self.last_doc.get("flags", [])
             flags.sort()
@@ -1063,7 +1162,7 @@ class DataEntry(SuperWidget):
             if len(flags) > 0:
                 self.w_li_flags.selection_set(0)
 
-            # Correct tab order
+            # Correct size and tab order
             for entry, buttona, buttonb, buttonc in zip(self.w_input_data, self.w_buttona_data, self.w_buttonb_data, self.w_buttonc_data):
                 if entry != None:
                     entry.lift()
@@ -1104,30 +1203,14 @@ class DataEntry(SuperWidget):
     def __del__(self):
         '''Runs when DataEntry object is deleted.'''
         self.photomanager.destroy()
-        self.logger.debug("DataEntry object destroyed")
 
 
 # ----------------------------------------------------------------------------
 
 class SearchTree(SuperWidget):
-    '''A SuperWidget representing a searchable tree.
-    
-    base: The id of the tree's root node.
-    cats: The categories which may be searched using this SearchTree.
-    db: The database object which the widget uses for database transactions.
-    headings: A mapping of column names -> column IDs in the search tree.
-    logger: The logger object used for logging.
-    master: The widget that the SearchTree's component widgets will be instantiated under.
-    ops: The operations that can be used in searches.
-    search_result: The contents of the last search result.
-    selection: The last selected element of the tree.
-    summables: A list of summable fields defined in the database schema.
-    summation: Whether or not to sum summable fields in the tree.
-    style: The style to use for the tree's appearence.
-    _select: If present, a callback function that triggers when a tree item is selected.
-    '''
+    '''A SuperWidget representing a searchable tree.'''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, autoopen: bool = False, cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, simple: bool = False, yesno: Callable = None, hardware: hw.Hardware = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, autoopen: bool = False, cats: list = [], level: str = "NOTSET", prepare: bool = True, readonly: bool = False, select: Callable = None, simple: bool = False, yesno: Callable = None, hardware: hw.Hardware = None):
         '''Constructs a SearchTree object.
         
         master: The widget that the SearchTree's component widgets will be instantiated under.
@@ -1146,25 +1229,28 @@ class SearchTree(SuperWidget):
         '''
         super().__init__(master=master, db=db, level=level)
 
-        self.cats = cats
-        self.ops = ["=", "<", ">", "≤", "≥", "≠", "≈"]
-
-        self._select = select
-
-        self.autoopen = autoopen
-        self.base = base
-        self.dragstarttree = None
-        self.dragstartid = None
-        self.headings = {}
-        self.last_selector = {}
-        self.selection = None
-        self.search_result = None
-        self.simple = simple
-        self.summables = self.db.schema_sums()
-        self.summation = False
-        self.yes_no = yesno
-
-        self.hardware = hardware
+        self.cats = cats                               # A list of item categories that can be selected
+        self.ops = ["=", "<", ">", "≤", "≥", "≠", "≈"] # The operators available to use in searches
+        self._select = select                          # A callback which triggers when a tree node is selected
+        self.altheld = False                           # Whether or not the alt key is currently being held
+        self.ctrlheld = False                          # Whether or not the ctrl key is currently being held
+        self.autoopen = autoopen                       # The starting value of autoopen
+        self.base = base                               # The current base of the tree
+        self.mindragtime = 0.2                         # The minimum time (in seconds) a drag must last to count
+        self.dragstarttime = None                      # The time a drag was started
+        self.dragstarttree = None                      # The SearchTree a drag and drop originated from
+        self.dragstartid = None                        # The ID of the item at the start of a drag and drop
+        self.headings = {}                             # The tree headings when summation is turned on
+        self.last_selector = {}                        # The previous search selector
+        self.readonly = readonly                       # Whether or not the application is in readonly mode
+        self.root = self.w_fr.winfo_toplevel()         # The root widget that contains this SuperWidget
+        self.selection = None                          # The currently selected item
+        self.search_result = None                      # The previous search result
+        self.simple = simple                           # Whether or not to hide auto-open and summation
+        self.summables = self.db.schema_sums()         # List of summable fields
+        self.summation = False                         # Whether or not summation is currently turned on
+        self.yes_no = yesno                            # A callback which leads to a DataEntry's yes_no()
+        self.hardware = hardware                       # The hardware manager
 
         if prepare == True:
             self.prepare()
@@ -1176,12 +1262,12 @@ class SearchTree(SuperWidget):
         self.logger.debug(f"Preparing widgets")
         self.w_fr_search = ttk.Frame(master=self.w_fr)
 
-        self.w_fr.columnconfigure(0, weight=500)
+        self.w_fr.columnconfigure(0, weight=1000, minsize=96)
         self.w_fr.columnconfigure(1, weight=1, minsize=16)
-        self.w_fr.columnconfigure(2, weight=1000)
-        self.w_fr.columnconfigure(3, weight=1000)
+        self.w_fr.columnconfigure(2, weight=1000, minsize=48)
+        self.w_fr.columnconfigure(3, weight=1000, minsize=48)
         self.w_fr.columnconfigure(4, weight=1, minsize=16)
-        self.w_fr.rowconfigure(0, weight=1, minsize=25)
+        self.w_fr.rowconfigure(0, weight=1, minsize=24)
         self.w_fr.rowconfigure(1, weight=1000)
         self.w_fr.rowconfigure(2, weight=1, minsize=17)
 
@@ -1229,8 +1315,15 @@ class SearchTree(SuperWidget):
         self.w_tr_tree.bind("<Button-3>", self.tree_rebase_mouse)
         self.w_tr_tree.bind("<Control-r>", self.tree_rebase_keyboard)
 
-        self.w_tr_tree.bind("<ButtonPress-1>", self.dragstart)
-        self.w_tr_tree.bind("<ButtonRelease-1>", self.dragstop)
+        self.root.bind("<KeyPress-Alt_L>", self.altpress, add="+")
+        self.root.bind("<KeyRelease-Alt_L>", self.altrelease, add="+")
+        self.root.bind("<KeyPress-Control_L>", self.ctrlpress, add="+")
+        self.root.bind("<KeyRelease-Control_L>", self.ctrlrelease, add="+")
+
+        if self.readonly == False:
+            self.w_tr_tree.bind("<ButtonPress-1>", self.dragstart)
+            self.w_tr_tree.bind("<B1-Motion>", self.dragmid)
+            self.w_tr_tree.bind("<ButtonRelease-1>", self.dragstop)
 
         self.w_co_cat.current(0)
         self.w_co_field.current(1)
@@ -1283,61 +1376,119 @@ class SearchTree(SuperWidget):
             self.w_ch_summation.grid(column=3, row=2, columnspan=2, sticky="nsew", padx=1, pady=1)
 
 
+    def altpress(self, *args):
+        '''Callback for when alt is pressed down.'''
+        self.altheld = True
+
+    
+    def altrelease(self, *args):
+        '''Callback for when alt is released.'''
+        self.altheld = False
+
+
+    def ctrlpress(self, *args):
+        '''Callback for when ctrl is pressed down.'''
+        self.ctrlheld = True
+
+    
+    def ctrlrelease(self, *args):
+        '''Callback for when ctrl is released.'''
+        self.ctrlheld = False
+
+
     def dragstart(self, *args):
         '''Callback for when the mouse is clicked down on the tree.'''
-        event, = args
-        tree = event.widget
-        self.dragstartid = tree.identify_row(event.y)
-        self.dragstarttree = tree.SearchTree
-        self.logger.debug(f"Mouse clicked on tree. Root xy: {tree.winfo_pointerxy()}; Tree: {tree}; Tree xy: {(event.x, event.y)}; Row: {repr(self.dragstartid)}")
-    
+        if self.ctrlheld == True:
+            event, = args
+            tree = event.widget
+            self.dragstarttime = time.time()
+            self.dragstartid = tree.identify_row(event.y)
+            self.dragstarttree = tree.SearchTree
+            self.logger.debug(f"Mouse clicked on tree. Root xy: {tree.winfo_pointerxy()}; Tree: {tree}; Tree xy: {(event.x, event.y)}; Row: {repr(self.dragstartid)}")
+
+
+    def dragmid(self, *args):
+        '''Callback for when the mouse is mid-drag'''
+        if self.dragstartid != None:
+            self.root.configure(cursor="target")
+
 
     def dragstop(self, *args):
         '''Callback for when the mouse is released after clicking down on the tree.'''
-        event, = args
-        mx, my = event.widget.winfo_pointerxy()
-        tree = self.w_fr.winfo_containing(mx, my)
-        self.logger.debug(f"Mouse released. Root xy: {(mx, my)}; Target tree: {tree}; Start ID: {repr(self.dragstartid)}")
+        self.root.configure(cursor="")
+        if self.ctrlheld == True:
+            event, = args
+            dragendtime = time.time()
+            mx, my = event.widget.winfo_pointerxy()
+            tree = self.w_fr.winfo_containing(mx, my)
+            dragtime = dragendtime - self.dragstarttime
 
-        if tree != None and tree.winfo_class() == "Treeview" and self.dragstartid not in [None, ""] and self.dragstarttree not in [None, ""]:
-            dragendtree = tree.SearchTree
-            x = mx - tree.winfo_rootx()
-            y = my - tree.winfo_rooty()
-            dragendid = tree.identify_row(y)
-            self.logger.debug(f"Mouse released cont. Target tree xy: {(x, y)}; Target row: {repr(dragendid)}")
-            
-            if self.dragstartid != dragendid and dragendid not in [None, ""] and dragendtree not in [None, ""]:
-                if self.yes_no == None or (self.dragstarttree.w_var_autoopen.get() == 0 and dragendtree.w_var_autoopen.get() == 0):
-                    permitted = True
-                else:
-                    permitted = self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to move an item?")
-                
-                if permitted == True:
-                    target = self.dragstartid
-                    source, *_ = self.db.item_parents(item=target)
-                    destination = dragendid
-                    self.logger.info(f"Moving {target} from {source} to {destination} via D&D")
+            if dragtime > self.mindragtime:
+                self.logger.debug(f"Mouse released. Time: {dragtime}; Root xy: {(mx, my)}; Target tree: {tree}; Start ID: {repr(self.dragstartid)}")
 
-                    recur_risk_list = self.db.item_parents(item=destination)
-                    self.logger.debug(f"Recursion risk list: {recur_risk_list}")
-                    if target not in recur_risk_list:
-                        self.db.container_move(from_con=source, to_con=destination, item=target)
-                        self.dragstarttree.tree_refresh(selection=source)
-                        dragendtree.tree_refresh(selection=destination)
-                        self.dragstarttree.tree_focus(goal=source, rebase=True)
-                        dragendtree.tree_focus(goal=destination, rebase=True)
-                        self.dragstarttree.tree_open(node=source)
-                        dragendtree.tree_open(node=destination)
-                        self.logger.debug(f"Move completed")
+                if tree != None and tree.winfo_class() == "Treeview" and self.dragstartid not in [None, ""] and self.dragstarttree not in [None, ""]:
+                    dragendtree = tree.SearchTree
+                    x = mx - tree.winfo_rootx()
+                    y = my - tree.winfo_rooty()
+                    dragendid = tree.identify_row(y)
+                    self.logger.debug(f"Mouse released cont. Target tree xy: {(x, y)}; Target row: {repr(dragendid)}")
+                    
+                    if self.dragstartid != dragendid and dragendid not in [None, ""] and dragendtree not in [None, ""]:
+                        if self.yes_no == None or (self.dragstarttree.w_var_autoopen.get() == 0 and dragendtree.w_var_autoopen.get() == 0):
+                            permitted = True
+                        else:
+                            permitted = self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to move an item?")
+                        
+                        target = self.dragstartid
+                        target_doc = self.db.item_get(id=target)
+                        name = target_doc[self.db.schema_name(id=target)]
+                        lock = self.db.schema_lock(id=target)
+                        if target_doc.get(lock, 0) == 1:
+                            messagebox.showwarning("Locked Item", f"Could not move \"{name}\" ({target}) because item is locked.")
+                            self.logger.debug("Did not perform move, as target item is locked")
+                            self.dragstartttime = None
+                            self.dragstarttree = None
+                            self.dragstartid = None
+                            return
+
+                        if permitted == True:
+                            source, *_ = self.db.item_parents(item=target)
+                            destination = dragendid
+                            if source != destination:
+                                self.logger.info(f"Moving {target} from {source} to {destination} via D&D")
+
+                                recur_risk_list = [destination]+self.db.item_parents_all(item=destination)
+                                self.logger.debug(f"Recursion risk list: {recur_risk_list}")
+                                if target not in recur_risk_list:
+                                    self.db.container_move(from_con=source, to_con=destination, item=target)
+                                    if self.dragstarttree == dragendtree:
+                                        dragendtree.tree_refresh(selection=destination)
+                                        dragendtree.tree_focus(goal=source, rebase=True, dragreset=False)
+                                        dragendtree.tree_focus(goal=destination, rebase=True, dragreset=False)
+                                        dragendtree.tree_open(node=source, dragreset=False)
+                                        dragendtree.tree_open(node=destination, dragreset=False)
+                                    else:
+                                        self.dragstarttree.tree_refresh(selection=source)
+                                        dragendtree.tree_refresh(selection=destination)
+                                        self.dragstarttree.tree_focus(goal=source, rebase=True, dragreset=False)
+                                        dragendtree.tree_focus(goal=destination, rebase=True, dragreset=False)
+                                        self.dragstarttree.tree_open(node=source, dragreset=False)
+                                        dragendtree.tree_open(node=destination, dragreset=False)
+                                    self.logger.debug(f"Move completed")
+                                else:
+                                    self.logger.warning("Did not perform move, as it would create an infinite loop")
+                            else:
+                                self.logger.debug(f"Did not perform move, as start and end container were the same")
+                        else:
+                            self.logger.debug(f"Did not perform move, as user declined")
                     else:
-                        self.logger.warning("Did not perform move, as it would create an infinite loop")
+                        self.logger.debug(f"No further action. Drag did not start and end on distinct valid rows")
                 else:
-                    self.logger.debug(f"Did not perform move, as user declined")
+                    self.logger.debug(f"No further action. Drag did not start and end on a tree")
             else:
-                self.logger.debug(f"No further action. Drag did not start and end on distinct valid rows")
-        else:
-            self.logger.debug(f"No further action. Drag did not start and end on a tree")
+                self.logger.debug(f"Mouse released, but no further action. Drag lasted {dragtime}, which is less than {self.mindragtime}")
         
+        self.dragstartttime = None
         self.dragstarttree = None
         self.dragstartid = None
 
@@ -1346,7 +1497,6 @@ class SearchTree(SuperWidget):
         '''Callback for when the narrow button is pressed.'''
         self.logger.info("Narrow button activated")
         self.search(preselector=self.last_selector)
-
 
 
     def scan(self, *args):
@@ -1359,7 +1509,7 @@ class SearchTree(SuperWidget):
         window.attributes("-topmost", True)
         window.focus_force()
         window.title("Scan")
-        window.configure(background="#D9D9D9")
+        window.configure(background="#DCDAD5")
 
         def getNFCorBarcode():
             result = ''
@@ -1417,7 +1567,7 @@ class SearchTree(SuperWidget):
         find_button.grid(column=0, row=3, sticky="nsew", padx=2, pady=2)
 
 
-    def search(self, preselector: dict = {}):
+    def search(self, *args, preselector: dict = {}):
         '''Callback for when the search button is pressed.'''
         self.logger.debug("Search button activated")
         cat = self.w_var_cat.get()
@@ -1433,7 +1583,7 @@ class SearchTree(SuperWidget):
             "≠": {"$ne": value},
             "≈": {"$regex": value}
             }[op]
-        self.logger.debug(f"Searching; Category: {cat}; Field: {field}: Op: {op}; Value: {value}")
+        self.logger.info(f"Searching; Category: {cat}; Field: {field}: Op: {op}; Value: {value}")
 
         selector = preselector.copy()
         selector[field] = opvalue
@@ -1501,12 +1651,16 @@ class SearchTree(SuperWidget):
         self.tree_refresh()
 
 
-    def tree_focus(self, goal: str, rebase: bool = False):
+    def tree_focus(self, goal: str, rebase: bool = False, dragreset: bool = True):
         '''Selects a node in the tree, opening parent nodes as required.
         
         goal: The node to select.
         rebase: If true, will rebase in attempt to find focus item.
+        dragreset: If true, invalidates any ongoing drag and drop operations.
         '''
+        if dragreset == True:
+            self.dragstartid = None
+            self.dragstarttree = None
         self.logger.debug(f"Attempting to focus on node {goal}")
         path = self.db.item_parents_all(item=goal)
         path.reverse()
@@ -1514,7 +1668,7 @@ class SearchTree(SuperWidget):
         while True:
             for step in path:
                 if self.w_tr_tree.exists(item=step):
-                    self.tree_open(node=step)
+                    self.tree_open(node=step, dragreset=dragreset)
             if self.w_tr_tree.exists(item=goal):
                 self.w_tr_tree.selection_set(goal)
                 self.w_tr_tree.see(item=goal)
@@ -1617,33 +1771,41 @@ class SearchTree(SuperWidget):
         '''Callback for when an item in the tree is selected.'''
         event, = args
         self.selection = event.widget.selection()
-        if self._select != None and self.w_var_autoopen.get() == 1:
+        if self._select != None and (self.w_var_autoopen.get() == 1 or self.altheld == True):
             if self.yes_no == None:
                 permitted = True
             else:
                 permitted = self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to open an item?")
             if permitted == True:
                 if len(self.selection) == 1:
-                    id, = self.selection
-                    self.logger.debug(f"Node {id} was selected")
-                    doc = self.db.item_get(id=id, lazy=True)
+                    sid, = self.selection
+                    self.logger.debug(f"Node {sid} was selected")
+                    doc = self.db.item_get(id=sid, lazy=True)
                     self._select(doc, self)
                 else:
-                    self.logger.warning(f"Multiple nodes were selected")
+                    self.logger.warning(f"Multiple or zero nodes were selected")
             else:
                 self.logger.debug(f"Node was selected but item was not opened, as user declined")
+        else:
+            self.logger.debug(f"Node was selected, but autoopen was disabled.")
 
 
     def tree_close(self, *args):
         '''Callback which triggers when a tree node is closed.'''
+        self.dragstartid = None
+        self.dragstarttree = None
         pass
 
 
-    def tree_open(self, node: str = None):
+    def tree_open(self, node: str = None, dragreset: bool = True):
         '''Open a node on the tree view.
         
         node: The node to open. If omitted, opens currently selected node.
+        dragreset: If true, invalidates any ongoing drag and drop operations.
         '''
+        if dragreset == True:
+            self.dragstartid = None
+            self.dragstarttree = None
         self.selection = self.w_tr_tree.selection()
         if node != None:
             id = node
@@ -1653,20 +1815,30 @@ class SearchTree(SuperWidget):
             self.logger.debug(f"Opening focused node {id}")
         elif len(self.selection) == 1:
             id, = self.selection
-            self.logger.debug(f"Opening selected node {id}")
+            self.logger.info(f"Opening selected node {id}")
         else:
             self.logger.warning(f"Could not open any nodes, as none were selected")
             return
 
+        # Do not open node if it's already open
+        if self.w_tr_tree.item(id, 'open') == 1:
+            return
+
         children = self.db.container_children(container=id, result="DOC")
         children.sort(key=lambda doc: (doc["category"], doc[self.db.schema_name(cat=doc["category"])]))
-        self.w_tr_tree.delete(*self.w_tr_tree.get_children(item=id))
-        for child in children:
-            child_id = child["_id"]
-            child_name = child[self.db.schema_name(id=child_id)]
-            self.tree_insert(parent=id, iid=child_id, text=child_name)
-            self.tree_sum(node=child_id)
-        self.w_tr_tree.item(item=id, open=True)
+        
+        # Try/except here prevents strange behavior if the targeted node isn't in the tree
+        try:
+            self.w_tr_tree.delete(*self.w_tr_tree.get_children(item=id))
+            for child in children:
+                child_id = child["_id"]
+                child_name = child[self.db.schema_name(id=child_id)]
+                self.tree_insert(parent=id, iid=child_id, text=child_name)
+                self.tree_sum(node=child_id)
+            self.w_tr_tree.item(item=id, open=True)
+        except Exception as e:
+            self.logger.error(f"Unable to open {id}")
+            self.logger.error(e)
 
 
     def tree_sum(self, node: str):
@@ -1675,7 +1847,7 @@ class SearchTree(SuperWidget):
         node: The node to display sums of.
         '''
         if self.summation == True:
-            self.logger.debug("Summing node {node}")
+            self.logger.debug(f"Summing node {node}")
             schema = self.db.schema_schema(id=node)
             values = [""]*(len(self.summables)+1)
             doc = self.db.item_get(id=node)
@@ -1684,33 +1856,49 @@ class SearchTree(SuperWidget):
             for field, info in schema.items():
                 if field in self.summables:
                     defaulted = False
-
+                    
+                    # Sum fields
                     if info['type'] == "sum":
-                        children = [child for child in all_children if child['category'] in info['cat']]
-                        target = info['target']
-                        default = info.get('default', 0)
+                        print(f"{node}:{field} is sum")
                         items = []
-                        for child in children:
-                            value = child.get(target, "")
-                            if value == "":
-                                value = default
-                                defaulted = True
-                            items.append(float(value))
+                        target = info['target']
+                        print(f"{node}:{field} target is {target}")
+                        for child in all_children:
+                            child_cat = child['category']
+                            print(f"{node} child {child['_id']} is a {child_cat}")
+                            if child_cat in info['cat']:
+                                child_schema = self.db.schema_schema(cat=child_cat)
+                                default = child_schema[target].get('default', 0)
+                                print(f"{node} child {child['_id']} has a default of {default}")
+                                value = child.get(target, '')
+                                print(f"{node} child {child['_id']} has a value of {value}")
+                                if value == '':
+                                    value = default
+                                    defaulted = True
+                                items.append(float(value))
+                                print(f"{node}:{field}'s items is now {items}")
                         itemsum = f"{sum(items):.1f}" if len(items) > 0 else ""
+                        print(f"{node}:{field}'s total is {itemsum}")
+                    
+                    # Count fields
                     elif info['type'] == "count":
                         children = [child for child in all_children if child['category'] in info['cat']]
                         itemsum = len(children)
+                    
+                    # Unknown summations
                     else:
                         value = doc.get(field, "")
                         if value == "":
                             value = info.get('default', 0)
                             defaulted = True
                         itemsum = f"{float(value):.1f}"
-
+                    
+                    # Display sum
                     if defaulted == True:
                         itemsum += "*"
                     values[self.headings[field]] = itemsum
 
+            # Flag summation
             all_flags = []
             for child in [doc]+all_children:
                 flags = child.get("flags",[])
@@ -1722,11 +1910,6 @@ class SearchTree(SuperWidget):
             values[len(self.summables)] = minilist
 
             self.w_tr_tree.item(item=node, values=values)
-
-
-    def __del__(self):
-        '''Runs when SearchTree object is deleted.'''
-        self.logger.debug("SearchTree object destroyed")
 
 
 # ----------------------------------------------------------------------------
@@ -1745,7 +1928,7 @@ class ContainerManager(SuperWidget):
     select: If present, a callback function that triggers when a tree item is selected.
     '''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, topbase: dict, botbase: dict,  *, bookmarks: str = "bookmarks.json", cats: list = [], level: str = "NOTSET", prepare: bool = True, select: Callable = None, yesno: Callable = None, hardware: hw.Hardware = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, topbase: dict, botbase: dict,  *, bookmarks: str = "bookmarks.json", cats: list = [], level: str = "NOTSET", prepare: bool = True, readonly: bool = False, select: Callable = None, yesno: Callable = None, hardware: hw.Hardware = None):
         '''Constructs a ContainerManager object.
         
         master: The widget that the ContainerManager's component widgets will be instantiated under.
@@ -1766,10 +1949,10 @@ class ContainerManager(SuperWidget):
         self.botbase = botbase
         self.cats = cats
         self.level = level
+        self.readonly = readonly
         self.select = select
         
         self.yes_no = yesno
-
         self.hardware = hardware
 
         self.bookmarks_path = bookmarks
@@ -1793,20 +1976,24 @@ class ContainerManager(SuperWidget):
         self.w_bu_bm2 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["2"]["name"], command=lambda *_: self.bookmark(preset="2"))
         self.w_bu_bm3 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["3"]["name"], command=lambda *_: self.bookmark(preset="3"))
         self.w_bu_bm4 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["4"]["name"], command=lambda *_: self.bookmark(preset="4"))
-        self.w_bu_bm1.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="1"), add="+")
-        self.w_bu_bm2.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="2"), add="+")
-        self.w_bu_bm3.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="3"), add="+")
-        self.w_bu_bm4.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="4"), add="+")
         self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, autoopen=True, cats=self.cats, level=self.level, prepare=True, select=self.select, yesno=self.yes_no, hardware=self.hardware)
-        self.w_bu_move_item = ttk.Button(master=self.w_fr, text="⇓ ⇓ ⇓", command=lambda *_: self.move(), style="large.TButton")
-        self.w_bu_move_subs = ttk.Button(master=self.w_fr, text="⇑ ⇑ ⇑", command=lambda *_: self.move(reverse=True), style="large.TButton")
+        self.w_bu_move_item = ttk.Button(master=self.w_fr, text="⇓ ⇓ ⇓", style="large.TButton")
+        self.w_bu_move_subs = ttk.Button(master=self.w_fr, text="⇑ ⇑ ⇑", style="large.TButton")
         self.w_se_bottom = SearchTree(master=self.w_fr, db=self.db, base=self.botbase, cats=self.cats, level=self.level, prepare=True, select=self.select, yesno=self.yes_no)
+
+        if self.readonly == False:
+            self.w_bu_move_item.configure(command=lambda *_: self.move())
+            self.w_bu_move_subs.configure(command=lambda *_: self.move(reverse=True))
+            self.w_bu_bm1.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="1"), add="+")
+            self.w_bu_bm2.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="2"), add="+")
+            self.w_bu_bm3.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="3"), add="+")
+            self.w_bu_bm4.bind("<Shift-Button-1>", lambda *_: self.bookmark_change(preset="4"), add="+")
 
         self.w_fr.columnconfigure(0, weight=1000)
         self.w_fr.columnconfigure(1, weight=1000)
         self.w_fr.rowconfigure(0, weight=1, minsize=17)
         self.w_fr.rowconfigure(1, weight=1000)
-        self.w_fr.rowconfigure(2, weight=1, minsize=25)
+        self.w_fr.rowconfigure(2, weight=1, minsize=24)
         self.w_fr.rowconfigure(3, weight=1000)
 
         self.w_fr_bookmarks.columnconfigure(0, weight=1000)
@@ -1818,16 +2005,18 @@ class ContainerManager(SuperWidget):
         root = self.w_fr.winfo_toplevel()
         root.bind("<Control-s>", lambda *_: self.w_se_top.w_tr_tree.focus_set(), add="+")
         root.bind("<Control-d>", lambda *_: self.w_se_bottom.w_tr_tree.focus_set(), add="+")
-        root.bind("<Control-Down>", lambda *_: self.w_bu_move_item.invoke(), add="+")
-        root.bind("<Control-Up>", lambda *_: self.w_bu_move_subs.invoke(), add="+")
         root.bind("<Control-Key-1>", lambda *_: self.w_bu_bm1.invoke(), add="+")
         root.bind("<Control-Key-2>", lambda *_: self.w_bu_bm2.invoke(), add="+")
         root.bind("<Control-Key-3>", lambda *_: self.w_bu_bm3.invoke(), add="+")
         root.bind("<Control-Key-4>", lambda *_: self.w_bu_bm4.invoke(), add="+")
-        root.bind("<Control-Shift-KeyPress-!>", lambda *_: self.bookmark_change(preset="1"), add="+")
-        root.bind("<Control-Shift-KeyPress-@>", lambda *_: self.bookmark_change(preset="2"), add="+")
-        root.bind("<Control-Shift-KeyPress-#>", lambda *_: self.bookmark_change(preset="3"), add="+")
-        root.bind("<Control-Shift-KeyPress-$>", lambda *_: self.bookmark_change(preset="4"), add="+")
+
+        if self.readonly == False:
+            root.bind("<Control-Down>", lambda *_: self.w_bu_move_item.invoke(), add="+")
+            root.bind("<Control-Up>", lambda *_: self.w_bu_move_subs.invoke(), add="+")
+            root.bind("<Control-Shift-KeyPress-!>", lambda *_: self.bookmark_change(preset="1"), add="+")
+            root.bind("<Control-Shift-KeyPress-@>", lambda *_: self.bookmark_change(preset="2"), add="+")
+            root.bind("<Control-Shift-KeyPress-#>", lambda *_: self.bookmark_change(preset="3"), add="+")
+            root.bind("<Control-Shift-KeyPress-$>", lambda *_: self.bookmark_change(preset="4"), add="+")
 
 
     def _pack_children(self):
@@ -1945,6 +2134,20 @@ class ContainerManager(SuperWidget):
         reverse: If true, container movement is bottom to top.
         '''
         self.logger.debug(f"Move {'down' if reverse == False else 'up'} button activated")
+
+        if reverse == False:
+            target, *_ = self.w_se_top.selection
+        else:
+            target, *_ = self.w_se_bottom.selection
+
+        target_doc = self.db.item_get(id=target)
+        name = target_doc[self.db.schema_name(id=target)]
+        lock = self.db.schema_lock(id=target)
+        if target_doc.get(lock, 0) == 1:
+            messagebox.showwarning("Locked Item", f"Could not move \"{name}\" ({target}) because item is locked.")
+            self.logger.debug("Did not perform move, as target item is locked")
+            return
+
         if self.yes_no == None or (self.w_se_top.w_var_autoopen.get() == 0 and self.w_se_bottom.w_var_autoopen.get() == 0):
             permitted = True
         else:
@@ -1952,16 +2155,14 @@ class ContainerManager(SuperWidget):
 
         if permitted == True:
             if reverse == False:
-                target, *_ = self.w_se_top.selection
                 source, *_ = self.db.item_parents(item=target)
                 destination, *_ = self.w_se_bottom.selection
             else:
-                target, *_ = self.w_se_bottom.selection
                 source, *_ = self.db.item_parents(item=target)
                 destination, *_ = self.w_se_top.selection
             self.logger.info(f"Moving {target} from {source} to {destination} via button")
 
-            recur_risk_list = [destination]+self.db.item_parents(item=destination)
+            recur_risk_list = [destination]+self.db.item_parents_all(item=destination)
             self.logger.debug(f"Recursion risk list: {recur_risk_list}")
             if target not in recur_risk_list:
                 self.db.container_move(from_con=source, to_con=destination, item=target)
@@ -2030,11 +2231,6 @@ class ContainerManager(SuperWidget):
         return (top, bot)
 
 
-    def __del__(self):
-        '''Runs when ContainerManager object is deleted.'''
-        self.logger.debug("ContainerManager object destroyed")
-
-
 # ----------------------------------------------------------------------------
 
 class StatusBar(SuperWidget):
@@ -2069,7 +2265,3 @@ class StatusBar(SuperWidget):
         self.logger.debug(f"Packing and gridding widgets")
         self.w_status.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-
-    def __del__(self):
-        '''Runs when StatusBar object is deleted.'''
-        self.logger.debug("StatusBar object destroyed")

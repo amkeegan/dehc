@@ -32,13 +32,8 @@ class PhotoManager:
         if result == True:
             self.logger.debug(f"Photo captured")
             img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-            img.thumbnail(size=(300, 300))
+            img.thumbnail(size=(256, 256))
         else:
             self.logger.warning(f"Photo capture failed")
         return img
-
-
-    def __del__(self):
-        '''Runs when PhotoManager object is deleted.'''
-        self.logger.debug("PhotoManager object destroyed")
 
