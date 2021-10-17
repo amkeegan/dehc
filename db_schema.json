@@ -75,9 +75,10 @@
             "Origin":              {"index": 8, "type": "text", "regex": ".*", "required": false},
             "Destination":         {"index": 9, "type": "text", "regex": ".*", "required": false},
             "Capacity (KG)":       {"index": 10, "type": "text", "regex": ".*", "required": false},
-            "Weight (KG)":         {"index": 11, "type": "sum",  "cat": ["Person", "Bag"], "target": "Weight (KG)", "default": 82, "required": false},
-            "Souls":               {"index": 12, "type": "count", "cat": ["Person"], "required": false},
-            "Notes":               {"index": 13, "type": "text", "regex": ".*", "required": false}
+            "Seats (Souls)":       {"index": 11, "type": "text", "regex": ".*", "required": false},
+            "Weight (KG)":         {"index": 12, "type": "sum",  "cat": ["Person", "Bag"], "target": "Weight (KG)", "default": 82, "required": false},
+            "Souls":               {"index": 13, "type": "count", "cat": ["Person"], "required": false},
+            "Notes":               {"index": 14, "type": "text", "regex": ".*", "required": false}
         },
         "flags": ["Arrived", "Departed", "Ready"],
         "keys": ["Display Name"]
@@ -98,6 +99,9 @@
         {
             "Display Name": {"index": 0, "type": "text", "regex": ".*", "required": true},
             "Responsible":  {"index": 1, "type": "text", "regex": ".*", "required": false},
+            "Lat":  {"index": 1, "type": "text", "regex": ".*", "required": false},
+            "Lon":  {"index": 1, "type": "text", "regex": ".*", "required": false},                        
+            "Capacity (Souls)":  {"index": 1, "type": "text", "regex": ".*", "required": false},            
             "Notes":        {"index": 2, "type": "text", "regex": ".*", "required": false}
         },
         "keys": ["Display Name"]

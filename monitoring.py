@@ -84,6 +84,11 @@ if __name__ == "__main__": # Multiprocessing library complains if this guard isn
     #pprint.pprint(stations)
     containers_current_people = {}
     while True:
+        #all_containers = db.container_children_all_dict(db.items_query(cat="Evacuation")[0]['_id'])
+        #pprint.pprint(all_containers)
+        #total_count = count_people(all_containers)
+        #print()
+        stations = db.items_list(cat="Station")
         print("Time %s "  % (datetime.now()))
         for station in stations:
             containers = db.container_children_all_dict(station['_id'])
@@ -91,7 +96,7 @@ if __name__ == "__main__": # Multiprocessing library complains if this guard isn
             id_list = [] #note this is passed to and mucked with by the list_people function
             ppl_leaving = 0
             ppl_entering = 0
-            list_people(containers,id_list)
+            list_people(containers,id_list) #note id_list is passed to and mucked with by the list_people function, recusion baby
             if station['_id'] not in containers_current_people:
                 containers_current_people[station['_id']] = list()
             else:
@@ -114,11 +119,48 @@ if __name__ == "__main__": # Multiprocessing library complains if this guard isn
 
             try:
                 cursor.execute(
-                "INSERT INTO container_stats (record_time,container_id,container_name,item_total) VALUES (now(),?,?,?)", 
-                (station['_id'],station['Display Name'],cont_ppl))
+                "INSERT INTO container_stats (record_time,container_id,container_name,item_total,items_in,items_out) VALUES (now(),?,?,?,?,?)", 
+                (station['_id'],station['Display Name'],cont_ppl,ppl_entering,ppl_leaving))
             except mariadb.Error as e: 
                 print(f"Error: {e}")
-        #conn.commit()        
+        conn.commit()        
 
-        time.sleep(10)
+        vessels = db.items_list(cat="Vessel")
+        print("Time %s "  % (datetime.now()))
+        for vessel in vessels:
+            containers = db.container_children_all_dict(vessel['_id'])
+            #cont_ppl = count_people(containers)
+            id_list = [] #note this is passed to and mucked with by the list_people function
+            ppl_leaving = 0
+            ppl_entering = 0
+            list_people(containers,id_list) #note id_list is passed to and mucked with by the list_people function, recusion baby
+            if vessel['_id'] not in containers_current_people:
+                containers_current_people[vessel['_id']] = list()
+            else:
+                #need to skip counting everybody as entering on the first run through
+                for current_person in containers_current_people[vessel['_id']]:
+                    if current_person not in id_list:
+                        print("Leaving : " + current_person)
+                        ppl_leaving += 1
+
+                for current_person in id_list:
+                    if current_person not in containers_current_people[vessel['_id']]:
+                        print("Entering : " + current_person)
+                        ppl_entering += 1                
+
+            containers_current_people[vessel['_id']] = id_list
+
+            cont_ppl = len(id_list)
+            #pprint.pprint(id_list)
+            print("Id %s Name : %s Qty %s : Enter %s : Leave %s" % (vessel['_id'], vessel['Display Name'], cont_ppl,ppl_entering,ppl_leaving))
+
+            try:
+                cursor.execute(
+                "INSERT INTO container_stats (record_time,container_id,container_name,item_total,items_in,items_out) VALUES (now(),?,?,?,?,?)", 
+                (vessel['_id'],vessel['Display Name'],cont_ppl,ppl_entering,ppl_leaving))
+            except mariadb.Error as e: 
+                print(f"Error: {e}")
+        conn.commit()        
+
+        time.sleep(60)
         #input()
