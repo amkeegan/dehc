@@ -8,12 +8,13 @@ import mods.database as md
 
 # ----------------------------------------------------------------------------
 
-DBVERSION = "211015"
+DBVERSION = "211018"
 parser = argparse.ArgumentParser(description='Inserts data into the DEHC database.')
 parser.add_argument('persons', type=int, help="number of persons to add to the database", metavar="PERSONS")
 parser.add_argument('vessels', type=int, help="number of vessels to add to the database", metavar="VESSELS")
-parser.add_argument('-d','--drop', help="if included, drops databases instead of deleting files from them", action='store_true')
 parser.add_argument('-a','--auth', type=str, default="db_auth.json", help="relative path to database authentication file", metavar="PATH")
+parser.add_argument('-d','--drop', help="if included, drops databases instead of deleting files from them", action='store_true')
+# '-h' brings up help
 parser.add_argument('-n','--name', type=str, default="dehc", help="which database namespace to use", metavar="NAME")
 parser.add_argument('-s','--sche', type=str, default="db_schema.json", help="relative path to database schema file", metavar="PATH")
 parser.add_argument('-v','--vers', type=str, default=DBVERSION, help="schema version to expect", metavar="VERS")
@@ -137,16 +138,16 @@ def create_vessel(**kwargs):
 
 # ----------------------------------------------------------------------------
 
-evac = {"Display Name": "DEHC"}
+evac = {"Display Name": "DEHC", "Locked": 1}
 stat = [
-    {"Display Name": "1. Ingest"},
-    {"Display Name": "2. DFAT Office"},
-    {"Display Name": "3. Medical"},
-    {"Display Name": "4. Clean Hold"},
-    {"Display Name": "5. Airside"},
-    {"Display Name": "Departed"},
-    {"Display Name": "Unassigned"},
-    {"Display Name": "Withdrawn"}
+    {"Display Name": "1. Ingest", "Locked": 1},
+    {"Display Name": "2. DFAT Office", "Locked": 1},
+    {"Display Name": "3. Medical", "Locked": 1},
+    {"Display Name": "4. Clean Hold", "Locked": 1},
+    {"Display Name": "5. Airside", "Locked": 1},
+    {"Display Name": "6. Departed", "Locked": 1},
+    {"Display Name": "0. Unassigned", "Locked": 1},
+    {"Display Name": "7. Withdrawn", "Locked": 1}
 ]
 lane = [
     {"Display Name": "Lane 1"},
@@ -157,14 +158,16 @@ lane = [
 ]
 pers = [create_person() for _ in range(0, args.persons)]
 vess = [create_vessel() for _ in range(0, args.vessels)]
+recy = {"Display Name": "Recycle Bin", "Locked": 1}
 
 evac = db.item_create("Evacuation", evac)
 stat = db.items_create("Station", stat)
 lane = db.items_create("Lane", lane)
 pers = db.items_create("Person", pers)
 vess = db.items_create("Vessel", vess)
+recy = db.item_create("Trash", recy)
 
-db.container_adds(container=evac, items=stat)
+db.container_adds(container=evac, items=stat+[recy])
 db.container_adds(container=stat[0], items=lane)
 db.container_adds(container=stat[6], items=pers)
 db.container_adds(container=stat[4], items=vess)

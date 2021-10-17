@@ -84,17 +84,20 @@ class SuperWidget:
 class DataEntry(SuperWidget):
     '''A SuperWidget representing a data entry pane.'''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, level: str = "NOTSET", newchild: Callable = None, prepare: bool = True, readonly: bool = False, save: Callable = None, show: Callable = None, hardware: hw.Hardware = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, level: str = "NOTSET", newchild: Callable = None, prepare: bool = True, readonly: bool = False, save: Callable = None, show: Callable = None, trash: str = None, hardware: hw.Hardware = None):
         '''Constructs a DataEntry object.
         
         master: The widget that the DataEntry's component widgets will be instantiated under.
+        db: The DEHCDatabase object associated with this DataEntry.
         cats: The categories of items that can be created using the New button.
         delete: If present, a callback function that triggers when an item is deleted.
-        hardware: The hardware manager associated with this DataEntry.
         level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
+        newchild: If present, a callback function that triggers when 'create' is pressed in a guardian field.
+        prepare: If true, automatically prepares widgets for packing.
         save: If present, a callback function that triggers when an item is saved.
         show: If present, a callback function that triggers when 'show' or 'back' is pressed in the data pane.
-        prepare: If true, automatically prepares widgets for packing.
+        trash: The document corresponding to the recycle bin.
+        hardware: The hardware manager associated with this DataEntry.
         '''
         super().__init__(master=master, db=db, level=level)
 
@@ -109,6 +112,7 @@ class DataEntry(SuperWidget):
         self.level = level                     # The logging level
         self.readonly = readonly               # Whether or not the application is in readonly mode
         self.root = self.w_fr.winfo_toplevel() # Root widget that contains this SuperWidget
+        self.trash = trash                     # The UUID of the recycle bin
         self._delete = delete                  # The parent object's callback to run when delete is pressed.
         self._newchild = newchild              # The parent object's callback to run when new child is pressed.
         self._save = save                      # The parent object's callback to run when save is pressed.
@@ -447,27 +451,50 @@ class DataEntry(SuperWidget):
         '''Callback for when the delete button is pressed'''
         self.logger.debug(f"Delete item button activated")
         id = self.last_doc["_id"]
-        name = self.last_doc[self.db.schema_name(id=id)]
-
         lock = self.db.schema_lock(id=id)
-        if self.last_doc.get(lock, 0) == 1:
-            messagebox.showwarning("Locked Item", f"Could not delete \"{name}\" ({id}) because item is locked.")
-            self.logger.debug(f"Not deleting item, as item is locked")
-            return
-
-        if self.yes_no("Delete Item",f"Are you sure you want to delete \"{name}\" ({id}) and all of its children?", always=True):
-            parents = self.db.item_parents(item=id)
-            if len(parents) > 0:
-                self.logger.info(f"Deleting item {id} and all its children")
-                self.db.item_delete(id=id, all=True, recur=True)
-                self.last_doc = {}
-                self.show()
-                if self._delete != None:
-                    self._delete(id, parents)
-            else:
-                self.logger.debug("Can't delete top level item")
+        name = self.last_doc[self.db.schema_name(id=id)]
+        parents  = self.db.item_parents(item=id)
+        if len(parents) >= 1:
+            source, *_ = parents
         else:
-            self.logger.debug(f"Not deleting item, as user declined")
+            source = None
+        trash = self.trash["_id"]
+        
+        if source == trash:
+            if self.last_doc.get(lock, 0) == 1:
+                messagebox.showwarning("Locked Item", f"Could not delete \"{name}\" ({id}) because item is locked.")
+                self.logger.debug(f"Not deleting item, as item is locked")
+                return
+            if self.yes_no("Delete Item",f"Are you sure you want to delete \"{name}\" ({id}) and all of its children?", always=True):
+                if len(parents) >= 1:
+                    self.logger.info(f"Deleting item {id} and all its children")
+                    self.db.item_delete(id=id, all=True, recur=True)
+                    self.last_doc = {}
+                    self.show()
+                    if self._delete != None:
+                        self._delete(id, parents)
+                else:
+                    self.logger.debug("Can't delete top level item")
+            else:
+                self.logger.debug(f"Not deleting item, as user declined")
+        
+        else:
+            if self.last_doc.get(lock, 0) == 1:
+                messagebox.showwarning("Locked Item", f"Could not move \"{name}\" ({id}) to the recycle bin because item is locked.")
+                self.logger.debug(f"Not deleting item, as item is locked")
+                return
+            if self.yes_no("Delete Item",f"Are you sure you want to move \"{name}\" ({id}) and all of its children to the recycle bin?", always=True):
+                if len(parents) >= 1:
+                    self.logger.info(f"Recycling item {id} and all its children")
+                    self.db.container_move(from_con=source, to_con=trash, item=id)
+                    self.last_doc = {}
+                    self.show()
+                    if self._delete != None:
+                        self._delete(id, parents)
+                else:
+                    self.logger.debug("Can't recycle top level item")
+            else:
+                self.logger.debug(f"Not recycling item, as user declined")
 
 
     def edit(self, *args):
@@ -1452,7 +1479,11 @@ class SearchTree(SuperWidget):
                             return
 
                         if permitted == True:
-                            source, *_ = self.db.item_parents(item=target)
+                            parents  = self.db.item_parents(item=target)
+                            if len(parents) >= 1:
+                                source, *_ = parents
+                            else:
+                                source = None
                             destination = dragendid
                             if source != destination:
                                 self.logger.info(f"Moving {target} from {source} to {destination} via D&D")
