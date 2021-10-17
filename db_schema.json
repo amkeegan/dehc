@@ -132,5 +132,14 @@
             "Locked":       {"type": "lock", "required": false}
         },
         "keys": ["Display Name"]
+    },
+    "Trash":
+    {
+        "fields":
+        {
+            "Display Name": {"type": "text", "regex": ".*", "required": true},
+            "Locked":       {"type": "lock", "required": false}
+        },
+        "keys": ["Display Name"]
     }
 }

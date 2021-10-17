@@ -49,6 +49,7 @@ class EMS():
         '''Constructs the frames and widgets of the EMS.'''
         self.logger.debug(f"Preparing widgets")
         base, *_ = self.db.items_query(cat="Evacuation", fields=["_id", "Display Name"])
+        trash, *_ = self.db.items_query(cat="Trash", fields=["_id", "Display Name"])
 
         self.style = ttk.Style(self.root)
         self.style.theme_use("clam")
@@ -64,7 +65,7 @@ class EMS():
         self.root.bind_class("TButton", "<Return>", lambda event: event.widget.invoke(), add="+")
         self.root.bind_class("TCheckbutton", "<Return>", lambda event: event.widget.invoke(), add="+")
 
-        self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, delete=self.delete, level=self.level, newchild=self.new_child, prepare=True, readonly=self.readonly, save=self.save, show=self.show, hardware=self.hardware)
+        self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, delete=self.delete, level=self.level, newchild=self.new_child, prepare=True, readonly=self.readonly, save=self.save, show=self.show, trash=trash, hardware=self.hardware)
         self.cm = mw.ContainerManager(master=self.root, db=self.db, topbase=base, botbase=base, bookmarks=self.bookmarks, cats=self.cats, level=self.level, prepare=True, readonly=self.readonly, select=self.item_select, yesno=self.de.yes_no, hardware=self.hardware)
         self.bu_refresh = ttk.Button(master=self.root, text="Refresh", command=self.refresh_button)
         self.sb = mw.StatusBar(master=self.root, db=self.db, level=self.level, prepare=True)
