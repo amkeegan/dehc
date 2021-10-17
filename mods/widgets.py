@@ -979,6 +979,13 @@ class DataEntry(SuperWidget):
         self.w_co_flags.config(state="disabled")
         self.logger.debug(f"Data pane buttons are now disabled")
 
+        if self.current_photo != None:
+            img = ImageTk.PhotoImage(self.current_photo)
+        else:
+            img = ImageTk.PhotoImage(self.photo_blank)
+        self.w_bu_photo.config(image=img)
+        self.w_bu_photo.image = img
+
         if len(self.last_doc) > 0:
             self.w_bu_edit.config(state="normal")
 
@@ -1147,13 +1154,6 @@ class DataEntry(SuperWidget):
                 self.w_buttonb_data.append(buttonb)
                 self.w_buttonc_data.append(buttonc)
                 self.w_hidden_data.append(hidden)
-
-            if self.current_photo != None:
-                img = ImageTk.PhotoImage(self.current_photo)
-            else:
-                img = ImageTk.PhotoImage(self.photo_blank)
-            self.w_bu_photo.config(image=img)
-            self.w_bu_photo.image = img
 
             flags = self.last_doc.get("flags", [])
             flags.sort()
@@ -1593,15 +1593,17 @@ class SearchTree(SuperWidget):
         fields = ["_id", name]
         sort = [{key: 'asc'} for key in self.db.schema_keys(cat=cat)]
         self.search_result = self.db.items_query(cat=cat, selector=selector, fields=fields, sort=sort)
+
+        self.w_li_search.config(state="normal")
         self.w_li_search.delete(0, "end")
         
         if len(self.search_result) > 0:
-            self.w_li_search.config(state="normal")
             for index, result in enumerate(self.search_result):
                 self.w_li_search.insert(index, result[name])
         else:
             self.w_li_search.insert("end", "No results found")
             self.w_li_search.config(state="disabled")
+
         self.logger.debug(f"Search returned {len(self.search_result)} results")
 
 
@@ -1824,7 +1826,7 @@ class SearchTree(SuperWidget):
         if self.w_tr_tree.item(id, 'open') == 1:
             return
 
-        children = self.db.container_children(container=id, result="DOC")
+        children = [child for child in self.db.container_children(container=id, result="DOC") if child != None]
         children.sort(key=lambda doc: (doc["category"], doc[self.db.schema_name(cat=doc["category"])]))
         
         # Try/except here prevents strange behavior if the targeted node isn't in the tree
@@ -2154,11 +2156,14 @@ class ContainerManager(SuperWidget):
             permitted = self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to move an item?")
 
         if permitted == True:
+            parents  = self.db.item_parents(item=target)
+            if len(parents) >= 1:
+                source, *_ = parents
+            else:
+                source = None
             if reverse == False:
-                source, *_ = self.db.item_parents(item=target)
                 destination, *_ = self.w_se_bottom.selection
             else:
-                source, *_ = self.db.item_parents(item=target)
                 destination, *_ = self.w_se_top.selection
             self.logger.info(f"Moving {target} from {source} to {destination} via button")
 

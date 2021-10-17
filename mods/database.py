@@ -625,7 +625,8 @@ class DEHCDatabase:
         '''
         self.logger.info(f"Moving {item} from {from_con} to {to_con}")
         self.container_add(container=to_con, item=item, lazy=lazy)
-        self.container_remove(container=from_con, item=item, lazy=lazy)
+        if from_con != None:
+            self.container_remove(container=from_con, item=item, lazy=lazy)
         self.logger.debug(f"Done moving {item} from {from_con} to {to_con}")
 
 
@@ -639,7 +640,8 @@ class DEHCDatabase:
         '''
         self.logger.info(f"Moving {len(items)} items from {from_con} to {to_con}")
         self.container_adds(container=to_con, items=items)
-        self.container_removes(container=from_con, items=items, lazy=lazy)
+        if from_con != None:
+            self.container_removes(container=from_con, items=items, lazy=lazy)
         self.logger.debug(f"Done moving {len(items)} items from {from_con} to {to_con}")
 
 

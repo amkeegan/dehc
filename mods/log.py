@@ -37,7 +37,7 @@ def get(name: str, level: str = "NOTSET"):
     logger = logging.getLogger(name=name)
     
     handler = logging.StreamHandler()
-    handler_file = logging.FileHandler(f"logs/{LOGTIME}.log")
+    handler_file = logging.FileHandler(filename=f"logs/{LOGTIME}.log", encoding="utf-8")
     formatter =  logging.Formatter(fmt="%(asctime)s %(name)s.%(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S %z")
     level = LEVELS[level]
 
