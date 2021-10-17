@@ -16,11 +16,12 @@ else:
 
 if __name__ == "__main__": # Multiprocessing library complains if this guard isn't used
     
-    DBVERSION = "211018"
+    DBVERSION = "211018A"
     parser = argparse.ArgumentParser(description='Starts the Digital Evacuation Handling Center')
     parser.add_argument('-a','--auth', type=str, default="db_auth.json", help="relative path to database authentication file", metavar="PATH")
     parser.add_argument('-b','--book', type=str, default="bookmarks.json", help="relative path to EMS screen bookmarks", metavar="PATH")
     parser.add_argument('-f','--forc', help="if included, forces the app to use the local copy of the database schema", action='store_true')
+    parser.add_argument('-O','--ovdb', help="if included, Overrides database version detection, development only, you will lose data", action='store_true')
     # '-h' brings up help
     parser.add_argument('-l','--logg', type=str, default="DEBUG", help="minimum level of logging messages that are printed: DEBUG, INFO, WARNING, ERROR, CRITICAL, or NONE", choices=["DEBUG","INFO","WARNING","ERROR","CRITICAL","NONE"], metavar="LEVL")
     parser.add_argument('-n','--name', type=str, default="dehc", help="which database namespace to use", metavar="NAME")
@@ -47,7 +48,7 @@ if __name__ == "__main__": # Multiprocessing library complains if this guard isn
     if args.forc == True:
         logger.warning(f"Application will load schema from '{args.auth}' save it to the database")
 
-    db = md.DEHCDatabase(config=args.auth, version=args.vers, forcelocal=args.forc, level=args.logg, namespace=args.name, schema=args.sche, quickstart=True)
+    db = md.DEHCDatabase(config=args.auth, version=args.vers,overridedbversion=args.ovdb, forcelocal=args.forc, level=args.logg, namespace=args.name, schema=args.sche, quickstart=True)
     app = ae.EMS(db=db, bookmarks=args.book, level=args.logg, readonly=args.read, autorun=True, hardware=hardware)
 
     if hardware is not None:

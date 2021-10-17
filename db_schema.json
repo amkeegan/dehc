@@ -1,7 +1,7 @@
 {
     "#":
     {
-        "version": "211018"
+        "version": "211018A"
     },
     "Person":
     {
@@ -82,6 +82,9 @@
             "Destination":         {"type": "text", "regex": ".*", "required": false},
             "Capacity (KG)":       {"type": "text", "regex": ".*", "required": false},
             "Weight (KG)":         {"type": "sum",  "cat": ["Person", "Luggage"], "target": "Weight (KG)", "required": false},
+            "Lat":                 {"index": 1, "type": "text", "regex": ".*", "required": false},
+            "Lon":                 {"index": 1, "type": "text", "regex": ".*", "required": false},                        
+            "Capacity (Souls)":    {"index": 1, "type": "text", "regex": ".*", "required": false},              
             "Souls":               {"type": "count", "cat": ["Person"], "required": false},
             "Notes":               {"type": "multitext", "regex": ".*", "required": false},
             "Locked":              {"type": "lock", "required": false}
@@ -93,11 +96,14 @@
     {
         "fields":
         {
-            "Display Name": {"type": "text", "regex": ".*", "required": true},
-            "Responsible":  {"type": "text", "regex": ".*", "required": false},
-            "Souls":        {"type": "count", "cat": ["Person"], "required": false},
-            "Notes":        {"type": "multitext", "regex": ".*", "required": false},
-            "Locked":       {"type": "lock", "required": false}
+            "Display Name":         {"type": "text", "regex": ".*", "required": true},
+            "Responsible":          {"type": "text", "regex": ".*", "required": false},
+            "Souls":                {"type": "count", "cat": ["Person"], "required": false},
+            "Lat":                  {"index": 1, "type": "text", "regex": ".*", "required": false},
+            "Lon":                  {"index": 1, "type": "text", "regex": ".*", "required": false},                        
+            "Capacity (Souls)":     {"index": 1, "type": "text", "regex": ".*", "required": false},                 
+            "Notes":                {"type": "multitext", "regex": ".*", "required": false},            
+            "Locked":               {"type": "lock", "required": false}
         },
         "keys": ["Display Name"]
     },
@@ -105,11 +111,14 @@
     {
         "fields":
         {
-            "Display Name": {"type": "text", "regex": ".*", "required": true},
-            "Responsible":  {"type": "text", "regex": ".*", "required": false},
-            "Souls":        {"type": "count", "cat": ["Person"], "required": false},
-            "Notes":        {"type": "multitext", "regex": ".*", "required": false},
-            "Locked":       {"type": "lock", "required": false}
+            "Display Name":     {"type": "text", "regex": ".*", "required": true},
+            "Responsible":      {"type": "text", "regex": ".*", "required": false},
+            "Souls":            {"type": "count", "cat": ["Person"], "required": false},
+            "Lat":              {"index": 1, "type": "text", "regex": ".*", "required": false},
+            "Lon":              {"index": 1, "type": "text", "regex": ".*", "required": false},                        
+            "Capacity (Souls)": {"index": 1, "type": "text", "regex": ".*", "required": false},                  
+            "Notes":            {"type": "multitext", "regex": ".*", "required": false},
+            "Locked":           {"type": "lock", "required": false}
         },
         "keys": ["Display Name"]
     },
