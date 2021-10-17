@@ -434,7 +434,7 @@ class DEHCDatabase:
     schema_path: Path to .json file containing database schema.
     '''
 
-    def __init__(self, *, config: str, version: str, forcelocal: bool = False, level: str = "NOTSET", namespace: str = "dehc", quickstart: bool = False, schema: str = "db_schema.json"):
+    def __init__(self, *, config: str, version: str, forcelocal: bool = False,overridedbversion: bool = False, level: str = "NOTSET", namespace: str = "dehc", quickstart: bool = False, schema: str = "db_schema.json"):
         '''Constructs a DEHCDatabase object.
 
         config: Required. Path to .json file containing database server credentials.
@@ -461,6 +461,7 @@ class DEHCDatabase:
         self.limit = 1000000
 
         self.forcelocal = forcelocal
+        self.overridedbversion = overridedbversion
         self.schema = {}
         self.schema_path = schema
         self.version = version
@@ -1399,7 +1400,10 @@ class DEHCDatabase:
                 loaded_schema = json.loads(f.read())
 
         if loaded_schema["#"]["version"] != self.version:
-            raise RuntimeError("Schema version doesn't match what the application was expecting.")
+            if (self.overridedbversion==True):
+                self.logger.warning("Schema version doesn't match what the application was expecting, Program version %s DB Version %s." % (self.version,loaded_schema["#"]["version"]))
+            else:
+                raise RuntimeError("Schema version doesn't match what the application was expecting, Program version %s DB Version %s." % (self.version,loaded_schema["#"]["version"]))
 
         for key, value in self.schema.items():
             if "/" in key:
