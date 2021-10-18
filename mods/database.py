@@ -434,7 +434,7 @@ class DEHCDatabase:
     schema_path: Path to .json file containing database schema.
     '''
 
-    def __init__(self, *, config: str, version: str, forcelocal: bool = False,overridedbversion: bool = False, level: str = "NOTSET", namespace: str = "dehc", quickstart: bool = False, schema: str = "db_schema.json"):
+    def __init__(self, *, config: str, version: str, forcelocal: bool = False, level: str = "NOTSET", namespace: str = "dehc", overridedbversion: bool = False, schema: str = "db_schema.json", updateschema: bool = False, quickstart: bool = False):
         '''Constructs a DEHCDatabase object.
 
         config: Required. Path to .json file containing database server credentials.
@@ -470,7 +470,8 @@ class DEHCDatabase:
             self.schema_load(schema=self.schema_path)
             self.databases_create(lazy=True)
             self.index_prepare()
-            self.schema_save()
+            if updateschema:
+                self.schema_save()
             self.logger.debug(f"Completed quickstart")
 
 
@@ -1389,23 +1390,24 @@ class DEHCDatabase:
         
         schema: Path to local .json file containing database schema.
         '''
-        self.logger.debug(f"Loading database schema")
+        id = "schema/"+self.version
+        self.logger.debug(f"Loading database schema {id}")
 
-        if self.forcelocal == False and self.db.document_exists(dbname=self.db_configs, id="schema") == True:
-            self.logger.info(f"Loading database schema from database")
-            loaded_schema = self.db.document_get(dbname=self.db_configs, id="schema")
+        if self.forcelocal == False and self.db.document_exists(dbname=self.db_configs, id=id) == True:
+            self.logger.info(f"Loading database schema {id} from database")
+            loaded_schema = self.db.document_get(dbname=self.db_configs, id=id)
             del loaded_schema['_id']
             del loaded_schema['_rev']
         else:
-            self.logger.info(f"Loading database schema from {schema}")
+            self.logger.info(f"Loading database schema {id} from {schema}")
             with open(schema, "r") as f:
                 loaded_schema = json.loads(f.read())
 
         if loaded_schema["#"]["version"] != self.version:
             if (self.overridedbversion==True):
-                self.logger.warning("Schema version doesn't match what the application was expecting, Program version %s DB Version %s." % (self.version,loaded_schema["#"]["version"]))
+                self.logger.warning("Schema version doesn't match what the application was expecting, Program version: %s; DB Version: %s." % (self.version, loaded_schema["#"]["version"]))
             else:
-                raise RuntimeError("Schema version doesn't match what the application was expecting, Program version %s DB Version %s." % (self.version,loaded_schema["#"]["version"]))
+                raise RuntimeError("Schema version doesn't match what the application was expecting, Program version: %s; DB Version %s." % (self.version, loaded_schema["#"]["version"]))
 
         for key, value in self.schema.items():
             if "/" in key:
@@ -1449,11 +1451,12 @@ class DEHCDatabase:
 
     def schema_save(self):
         '''Saves database schema to the database.'''
-        self.logger.debug(f"Saving database schema")
-        if self.db.document_exists(dbname=self.db_configs, id="schema"):
-            self.db.document_edit(dbname=self.db_configs, doc=self.schema, id="schema")
+        id = "schema/"+self.version
+        self.logger.info(f"Saving database schema {id}")
+        if self.db.document_exists(dbname=self.db_configs, id=id):
+            self.db.document_edit(dbname=self.db_configs, doc=self.schema, id=id)
         else:
-            self.db.document_create(dbname=self.db_configs, doc=self.schema, id="schema")
+            self.db.document_create(dbname=self.db_configs, doc=self.schema, id=id)
         self.logger.debug(f"Done saving database schema")
 
 

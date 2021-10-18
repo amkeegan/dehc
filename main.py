@@ -16,18 +16,20 @@ else:
 
 if __name__ == "__main__": # Multiprocessing library complains if this guard isn't used
     
-    DBVERSION = "211018A"
+    DBVERSION = "211018B"
     parser = argparse.ArgumentParser(description='Starts the Digital Evacuation Handling Center')
     parser.add_argument('-a','--auth', type=str, default="db_auth.json", help="relative path to database authentication file", metavar="PATH")
     parser.add_argument('-b','--book', type=str, default="bookmarks.json", help="relative path to EMS screen bookmarks", metavar="PATH")
     parser.add_argument('-f','--forc', help="if included, forces the app to use the local copy of the database schema", action='store_true')
-    parser.add_argument('-O','--ovdb', help="if included, Overrides database version detection, development only, you will lose data", action='store_true')
     # '-h' brings up help
     parser.add_argument('-l','--logg', type=str, default="DEBUG", help="minimum level of logging messages that are printed: DEBUG, INFO, WARNING, ERROR, CRITICAL, or NONE", choices=["DEBUG","INFO","WARNING","ERROR","CRITICAL","NONE"], metavar="LEVL")
     parser.add_argument('-n','--name', type=str, default="dehc", help="which database namespace to use", metavar="NAME")
     parser.add_argument('-r','--read', help="if included, opens the app in read-only mode", action='store_true')
     parser.add_argument('-s','--sche', type=str, default="db_schema.json", help="relative path to database schema file", metavar="PATH")
+    parser.add_argument('-u','--upda', help="if included, the app will save the loaded schema to the database during quickstart", action='store_true')
     parser.add_argument('-v','--vers', type=str, default=DBVERSION, help="schema version to expect", metavar="VERS")
+    parser.add_argument('-x','--xgui', help="if included, the gui won't be started", action='store_true')
+    parser.add_argument('-O','--ovdb', help="if included, disables database version detection. Use with caution, as it may result in lost data", action='store_true')
     args = parser.parse_args()
 
     # ----------------------------------------------------------------------------
@@ -48,8 +50,10 @@ if __name__ == "__main__": # Multiprocessing library complains if this guard isn
     if args.forc == True:
         logger.warning(f"Application will load schema from '{args.auth}' save it to the database")
 
-    db = md.DEHCDatabase(config=args.auth, version=args.vers,overridedbversion=args.ovdb, forcelocal=args.forc, level=args.logg, namespace=args.name, schema=args.sche, quickstart=True)
-    app = ae.EMS(db=db, bookmarks=args.book, level=args.logg, readonly=args.read, autorun=True, hardware=hardware)
+    db = md.DEHCDatabase(config=args.auth, version=args.vers, forcelocal=args.forc, level=args.logg, namespace=args.name, overridedbversion=args.ovdb, schema=args.sche, updateschema=args.upda, quickstart=True)
+
+    if args.xgui == False:
+        app = ae.EMS(db=db, bookmarks=args.book, level=args.logg, readonly=args.read, autorun=True, hardware=hardware)
 
     if hardware is not None:
         hardware.terminateProcesses()

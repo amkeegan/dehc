@@ -48,8 +48,22 @@ class EMS():
     def prepare(self):
         '''Constructs the frames and widgets of the EMS.'''
         self.logger.debug(f"Preparing widgets")
-        base, *_ = self.db.items_query(cat="Evacuation", fields=["_id", "Display Name"])
-        trash, *_ = self.db.items_query(cat="Trash", fields=["_id", "Display Name"])
+
+        evacuations = self.db.items_query(cat="Evacuation", fields=["_id", "Display Name"])
+        if len(evacuations) == 1:
+            self.logger.debug(f"Found 1 Evacuation.")
+            base, = evacuations
+        else:
+            self.logger.error(f"Found {len(evacuations)} Evacuations.")
+            raise RuntimeError("Expected one Evacuation in the database.")
+        
+        trashes = self.db.items_query(cat="Trash", fields=["_id", "Display Name"])
+        if len(trashes) == 1:
+            self.logger.debug(f"Found 1 Trash.")
+            trash, = trashes
+        else:
+            self.logger.error(f"Found {len(evacuations)} Trashes.")
+            raise RuntimeError(f"Expected one Trash in the database.")
 
         self.style = ttk.Style(self.root)
         self.style.theme_use("clam")

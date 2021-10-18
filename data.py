@@ -8,19 +8,21 @@ import mods.database as md
 
 # ----------------------------------------------------------------------------
 
-DBVERSION = "211018"
+DBVERSION = "211018B"
 parser = argparse.ArgumentParser(description='Inserts data into the DEHC database.')
 parser.add_argument('persons', type=int, help="number of persons to add to the database", metavar="PERSONS")
 parser.add_argument('vessels', type=int, help="number of vessels to add to the database", metavar="VESSELS")
 parser.add_argument('-a','--auth', type=str, default="db_auth.json", help="relative path to database authentication file", metavar="PATH")
 parser.add_argument('-d','--drop', help="if included, drops databases instead of deleting files from them", action='store_true')
+parser.add_argument('-f','--forc', help="if included, forces the app to use the local copy of the database schema", action='store_true')
 # '-h' brings up help
 parser.add_argument('-n','--name', type=str, default="dehc", help="which database namespace to use", metavar="NAME")
 parser.add_argument('-s','--sche', type=str, default="db_schema.json", help="relative path to database schema file", metavar="PATH")
 parser.add_argument('-v','--vers', type=str, default=DBVERSION, help="schema version to expect", metavar="VERS")
+parser.add_argument('-O','--ovdb', help="if included, disables database version detection. Use with caution, as it may result in lost data", action='store_true')
 args = parser.parse_args()
 
-db = md.DEHCDatabase(config=args.auth, version=args.vers, level="DEBUG", namespace=args.name, quickstart=False, schema=args.sche)
+db = md.DEHCDatabase(config=args.auth, version=args.vers, forcelocal=args.forc, level="DEBUG", namespace=args.name, overridedbversion=args.ovdb, schema=args.sche, quickstart=False)
 
 db.schema_load(schema=args.sche)
 if args.drop == True:
