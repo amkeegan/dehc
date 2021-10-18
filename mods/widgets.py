@@ -630,6 +630,7 @@ class DataEntry(SuperWidget):
                 self.logger.warning("Could not take photo. Webcam may be unavailable")
             window.destroy()
             self.logger.debug(f"Closed photo window")
+            self.data_change()
 
         self.logger.debug(f"Preparing photo window widgets")
         photoframe = ttk.Label(master=window)
@@ -695,6 +696,7 @@ class DataEntry(SuperWidget):
                     entry.insert(0, msg.cget('text'))
                     window.destroy()
                     self.logger.debug(f"Close read window")
+                    self.data_change()
 
                 self.logger.debug(f"Prepare read window widgets")
                 msg = ttk.Label(master=window)
@@ -758,7 +760,6 @@ class DataEntry(SuperWidget):
                     else:
                         self.logger.debug(f"Did not add {id} / {name} to ID name list, as it was already there")
 
-
                 def removename():
                     '''Callback when tree <- list button is pressed.'''
                     self.logger.debug(f"Remove button activated in ID name list window")
@@ -771,7 +772,6 @@ class DataEntry(SuperWidget):
                     else:
                         self.logger.debug(f"Did not remove any IDs from name list, as nothing was selected")
 
-
                 def submit(*args):
                     '''Submits current list to the data pane.'''
                     self.logger.debug(f"Submit button activated in ID name list window")
@@ -783,6 +783,7 @@ class DataEntry(SuperWidget):
                     self.logger.info(f"Pushed ids to date pane: {listids} / {values}")
                     window.destroy()
                     self.logger.debug(f"List field's read window closed")
+                    self.data_change()
 
                 self.logger.debug(f"Prepare read window widgets")
                 tree = SearchTree(master=window, db=self.db, base=base, cats=self.cats, level=self.level, prepare=True, simple=True, hardware=self.hardware)
@@ -862,6 +863,7 @@ class DataEntry(SuperWidget):
                     self.logger.info(f"Pushed physical ids to date pane: {values}")
                     window.destroy()
                     self.logger.debug(f"List field's read window closed")
+                    self.data_change()
 
                 self.logger.debug(f"Prepare read window widgets")
                 idvar = tk.StringVar()
@@ -1376,6 +1378,8 @@ class SearchTree(SuperWidget):
         self.tree_refresh()
         self.w_tr_tree.selection_set(self.base["_id"])
         self.w_tr_tree.focus(self.base["_id"])
+        self.tree_open(self.base["_id"])
+        self.w_tr_tree.see(item=self.base["_id"])
 
 
     def _pack_children(self):
@@ -1697,7 +1701,6 @@ class SearchTree(SuperWidget):
         self.logger.debug(f"Attempting to focus on node {goal}")
         path = self.db.item_parents_all(item=goal)
         path.reverse()
-        old_base = self.base
         while True:
             for step in path:
                 if self.w_tr_tree.exists(item=step):
@@ -1707,18 +1710,24 @@ class SearchTree(SuperWidget):
                 self.w_tr_tree.see(item=goal)
                 self.w_tr_tree.focus_set()
                 self.w_tr_tree.focus(item=goal)
-            elif rebase == True and len(path) > 0:
-                if self.base != path[0]:
-                    new_base = self.db.item_get(id=path[0])
-                    self.base = new_base
-                    self.logger.debug(f"Rebasing to find node {goal}")
-                    self.tree_refresh()
-                    continue
+                self.logger.debug(f"Focused on node {goal}")
+            elif rebase == True:
+                if len(path) > 0:
+                    if self.base != path[0]:
+                        new_base = self.db.item_get(id=path[0])
+                        self.base = new_base
+                        self.logger.debug(f"Rebasing to find node {goal}")
+                        self.tree_refresh(selection=goal)
+                        continue
+                    else:
+                        new_base = self.db.item_get(id=goal)
+                        self.base = new_base
+                        self.tree_refresh(selection=goal)
                 else:
-                    self.base = old_base
-                    self.tree_refresh()
+                    new_base = self.db.item_get(id=goal)
+                    self.base = new_base
+                    self.tree_refresh(selection=goal)
             break
-        self.logger.debug(f"Focused on node {goal}")
 
 
     def tree_get(self):
@@ -1780,6 +1789,7 @@ class SearchTree(SuperWidget):
             self.base = self.db.item_get(id=target)
         self.tree_refresh()
         self.tree_open(target)
+        self.w_tr_tree.see(item=target)
 
 
     def tree_refresh(self, selection: tuple = None):
@@ -1789,7 +1799,7 @@ class SearchTree(SuperWidget):
         if selection == None:
             self.selection = self.w_tr_tree.selection()
         else:
-            self.selection = selection
+            self.selection = [selection]
         self.w_tr_tree.delete(*self.w_tr_tree.get_children(item=""))
         if self.db.item_exists(id=base_id):
             base_name = self.base[self.db.schema_name(id=base_id)]
@@ -1869,6 +1879,7 @@ class SearchTree(SuperWidget):
                 self.tree_insert(parent=id, iid=child_id, text=child_name)
                 self.tree_sum(node=child_id)
             self.w_tr_tree.item(item=id, open=True)
+            self.w_tr_tree.see(item=id)
         except Exception as e:
             self.logger.error(f"Unable to open {id}")
             self.logger.error(e)

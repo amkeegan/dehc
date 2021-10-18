@@ -62,7 +62,7 @@ class EMS():
             self.logger.debug(f"Found 1 Trash.")
             trash, = trashes
         else:
-            self.logger.error(f"Found {len(evacuations)} Trashes.")
+            self.logger.error(f"Found {len(trashes)} Trashes.")
             raise RuntimeError(f"Expected one Trash in the database.")
 
         self.style = ttk.Style(self.root)
