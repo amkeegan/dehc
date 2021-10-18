@@ -1,6 +1,7 @@
 '''The script that starts the main DEHC application.'''
 
 import argparse
+import pprint
 import sys
 
 if sys.version_info.major == 3 and sys.version_info.minor == 9:

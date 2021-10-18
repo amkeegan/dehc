@@ -1269,6 +1269,16 @@ class DEHCDatabase:
         return res
 
 
+    def orphans_list(self, container: str):
+        '''Returns a list of all items NOT contained by a container.
+        
+        container: The container used as reference.
+        '''
+        items = [container]+self.container_children_all(container=container)
+        orphans = [item['_id'] for item in self.items_list(fields=["_id"]) if item['_id'] not in items]
+        return orphans
+
+
     def photo_delete(self, item: str):
         '''Deletes the photo, associated with an item, from the database.
         
