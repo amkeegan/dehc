@@ -2198,11 +2198,13 @@ class ContainerManager(SuperWidget):
         '''
         self.logger.debug(f"Move {'down' if reverse == False else 'up'} button activated")
 
+        t1 = time.time()
         if reverse == False:
             target, *_ = self.w_se_top.selection
         else:
             target, *_ = self.w_se_bottom.selection
 
+        t2 = time.time()
         target_doc = self.db.item_get(id=target)
         name = target_doc[self.db.schema_name(id=target)]
         lock = self.db.schema_lock(id=target)
@@ -2211,11 +2213,13 @@ class ContainerManager(SuperWidget):
             self.logger.debug("Did not perform move, as target item is locked")
             return
 
+        t3 = time.time()
         if self.yes_no == None or (self.w_se_top.w_var_autoopen.get() == 0 and self.w_se_bottom.w_var_autoopen.get() == 0):
             permitted = True
         else:
             permitted = self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to move an item?")
 
+        t4 = time.time()
         if permitted == True:
             parents  = self.db.item_parents(item=target)
             if len(parents) >= 1:
@@ -2228,11 +2232,14 @@ class ContainerManager(SuperWidget):
                 destination, *_ = self.w_se_top.selection
             self.logger.info(f"Moving {target} from {source} to {destination} via button")
 
+            t5 = time.time()
             recur_risk_list = [destination]+self.db.item_parents_all(item=destination)
             self.logger.debug(f"Recursion risk list: {recur_risk_list}")
             if target not in recur_risk_list:
+                t6 = time.time()
                 self.db.container_move(from_con=source, to_con=destination, item=target)
 
+                t7 = time.time()
                 if reverse == False:
                     self.refresh(topselection=source, bottomselection=destination)
                     self.highlight(botitem=destination)
@@ -2241,6 +2248,7 @@ class ContainerManager(SuperWidget):
                     self.refresh(topselection=destination, bottomselection=source)
                     self.highlight(botitem=source)
                     self.highlight(item=destination)
+                t8 = time.time()
                 self.open()
                 self.botopen()
                 self.logger.debug(f"Move completed")
@@ -2248,6 +2256,8 @@ class ContainerManager(SuperWidget):
                 self.logger.warning("Did not perform move, as it would create an infinite loop")
         else:
             self.logger.debug("Did not perform move, as user declined")
+        t9 = time.time()
+        print(f"t2-t1: {t2-t1}, t3-t2: {t3-t2}, t4-t3: {t4-t3}, t5-t4: {t5-t4}, t6-t5: {t6-t5}, t7-t6: {t7-t6}, t8-t7: {t8-t7}, t9-t8: {t9-t8}")
 
 
     # This functionality is currently inaccessible since there's no button tied to it
