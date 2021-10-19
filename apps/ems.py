@@ -30,6 +30,7 @@ class EMS():
         self.db = db                      # The associated DEHCDatabase object
         self.cats = self.db.schema_cats() # The item categories available to the EMS application
         self.cats.remove("Evacuation")
+        self.cats.remove("Trash")
         self.hardware = hardware          # The associated hardware manager
         self.root = tk.Tk()               # The root Tkinter widget of the application
         self.readonly = readonly          # Whether the app is in readonly or not

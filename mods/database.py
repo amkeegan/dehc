@@ -680,7 +680,10 @@ class DEHCDatabase:
         result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
         '''
         self.logger.debug(f"Finding children of {len(containers)} containers")
-        selector = {'container': {'$in': containers}}
+        if len(containers) > 1:
+            selector = {'container': {'$in': containers}}
+        else:
+            selector = {'container': {'$eq': containers[0]}}
         fields = ['_id', 'child']
         sort = [{'container': 'asc'}, {'child': 'asc'}]
         query = self.containers_query(selector=selector, fields=fields, sort=sort)
@@ -1149,7 +1152,10 @@ class DEHCDatabase:
         result: "ITEM" to return item ids, "CON" to return container ids, "DOC" to return item documents.
         '''
         self.logger.debug(f"Finding parents of {len(items)} items")
-        selector = {'child': {'$in': items}}
+        if len(items) > 1:
+            selector = {'child': {'$in': items}}
+        else:
+            selector = {'child': {'$eq': items[0]}}
         fields = ['_id', 'container']
         sort = [{'child': 'asc'}, {'container': 'asc'}]
         query = self.containers_query(selector=selector, fields=fields, sort=sort)

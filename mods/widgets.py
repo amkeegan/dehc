@@ -359,7 +359,6 @@ class DataEntry(SuperWidget):
             self.logger.debug(f"Not reverting data pane, as user declined")
 
 
-
     def show_id_window(self):
         '''...'''
         printers = hw.listPrinters()
@@ -1764,8 +1763,8 @@ class SearchTree(SuperWidget):
         values: The values to put in the nodes's columns.
         '''
         self.w_tr_tree.insert(parent=parent, index=1000000, iid=iid, text=text, values=values)
-        if len(self.db.container_children(container=iid)) > 0:
-            self.w_tr_tree.insert(parent=iid, index=1000000, iid=iid+"_stub")
+        #if len(self.db.container_children(container=iid)) > 0:
+        self.w_tr_tree.insert(parent=iid, index=1000000, iid=iid+"_stub")
 
 
     def tree_rebase_keyboard(self, *args):
