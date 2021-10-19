@@ -152,8 +152,12 @@ class DataEntry(SuperWidget):
             self.w_ca_data.unbind_all("<MouseWheel>")
 
         self.w_ca_data.bind("<Configure>", redraw_canvas_window)
+        self.w_ca_data.bind("<Double-Button-1>", lambda *_: self.w_bu_edit.invoke())
         self.w_fr_data.bind('<Enter>', mouse_enter_canvas)
         self.w_fr_data.bind('<Leave>', mouse_exit_canvas)
+
+        self.root.bind('<Control-s>', lambda *_: self.w_bu_save.invoke())
+        self.root.bind('<Control-n>', lambda *_: self.w_bu_new.invoke())
 
         self.w_fr.columnconfigure(index=0, weight=1000, minsize=280)
         self.w_fr.columnconfigure(index=1, weight=1000)
@@ -794,6 +798,10 @@ class DataEntry(SuperWidget):
                 addbut = ttk.Button(master=window, text="Add", command=addname)
                 removebut = ttk.Button(master=window, text="Remove", command=removename)
                 submitbut = ttk.Button(master=window, text="Update", command=submit)
+                tree.w_tr_tree.focus_set()
+
+                window.bind("<Return>", lambda *_: addname(), add="+")
+                window.bind("<Shift-Return>", lambda *_: submit(), add="+")
 
                 window.columnconfigure(0, weight=1000)
                 window.columnconfigure(1, weight=1000)
@@ -877,6 +885,9 @@ class DataEntry(SuperWidget):
                 submitbut = ttk.Button(master=window, text="Update", command=submit)
                 identry.focus()
 
+                window.bind("<Return>", lambda *_: addid(), add="+")
+                window.bind("<Shift-Return>", lambda *_: submit(), add="+")
+
                 window.columnconfigure(0, weight=1000)
                 window.columnconfigure(1, weight=1000)
                 window.rowconfigure(0, weight=1000)
@@ -955,6 +966,7 @@ class DataEntry(SuperWidget):
             self.back_doc = self.last_doc
             self.logger.debug(f"Back doc is now {self.back_doc.get('_id','_')}")
             self.last_doc = doc
+            self.w_bu_cancel.invoke()
             self.logger.info("Save completed")
             return True
         missingfield = repr(self.db.schema_name(cat=self.last_doc['category']))
@@ -1164,16 +1176,22 @@ class DataEntry(SuperWidget):
                     if button == None:
                         missing += 1
                 
+                label.bind("<Double-Button-1>", lambda *_: self.w_bu_edit.invoke())
+                entry.bind("<Double-Button-1>", lambda *_: self.w_bu_edit.invoke())
+
                 label.grid(column=0, row=index, sticky="nsew", padx=1, pady=1)
                 entry.grid(column=1, row=index, columnspan=missing+1, sticky="nsew", padx=1, pady=1)
                 if buttona != None:
+                    buttona.bind("<Double-Button-1>", lambda *_: self.w_bu_edit.invoke())
                     buttona.grid(column=missing+2, row=index, sticky="nsew", padx=1, pady=1)
                 if buttonb != None:
+                    buttonb.bind("<Double-Button-1>", lambda *_: self.w_bu_edit.invoke())
                     if buttonc == None:
                         buttonb.grid(column=4, row=index, sticky="nsew", padx=1, pady=1)
                     else:
                         buttonb.grid(column=3, row=index, sticky="nsew", padx=1, pady=1)
                 if buttonc != None:
+                    buttonc.bind("<Double-Button-1>", lambda *_: self.w_bu_edit.invoke())
                     buttonc.grid(column=4, row=index, sticky="nsew", padx=1, pady=1)
 
                 self.w_var_data.append(var)
@@ -1994,6 +2012,7 @@ class ContainerManager(SuperWidget):
         self.cats = cats
         self.level = level
         self.readonly = readonly
+        self.root = self.w_fr.winfo_toplevel()
         self.select = select
         
         self.yes_no = yesno
@@ -2046,21 +2065,22 @@ class ContainerManager(SuperWidget):
         self.w_fr_bookmarks.columnconfigure(3, weight=1000)
         self.w_fr_bookmarks.rowconfigure(0, weight=1000)
 
-        root = self.w_fr.winfo_toplevel()
-        root.bind("<Control-s>", lambda *_: self.w_se_top.w_tr_tree.focus_set(), add="+")
-        root.bind("<Control-d>", lambda *_: self.w_se_bottom.w_tr_tree.focus_set(), add="+")
-        root.bind("<Control-Key-1>", lambda *_: self.w_bu_bm1.invoke(), add="+")
-        root.bind("<Control-Key-2>", lambda *_: self.w_bu_bm2.invoke(), add="+")
-        root.bind("<Control-Key-3>", lambda *_: self.w_bu_bm3.invoke(), add="+")
-        root.bind("<Control-Key-4>", lambda *_: self.w_bu_bm4.invoke(), add="+")
+        self.root.bind("<Control-q>", lambda *_: self.w_se_top.w_tr_tree.focus_set(), add="+")
+        self.root.bind("<Control-w>", lambda *_: self.w_se_bottom.w_tr_tree.focus_set(), add="+")
+        self.root.bind("<Control-Key-1>", lambda *_: self.w_bu_bm1.invoke(), add="+")
+        self.root.bind("<Control-Key-2>", lambda *_: self.w_bu_bm2.invoke(), add="+")
+        self.root.bind("<Control-Key-3>", lambda *_: self.w_bu_bm3.invoke(), add="+")
+        self.root.bind("<Control-Key-4>", lambda *_: self.w_bu_bm4.invoke(), add="+")
 
         if self.readonly == False:
-            root.bind("<Control-Down>", lambda *_: self.w_bu_move_item.invoke(), add="+")
-            root.bind("<Control-Up>", lambda *_: self.w_bu_move_subs.invoke(), add="+")
-            root.bind("<Control-Shift-KeyPress-!>", lambda *_: self.bookmark_change(preset="1"), add="+")
-            root.bind("<Control-Shift-KeyPress-@>", lambda *_: self.bookmark_change(preset="2"), add="+")
-            root.bind("<Control-Shift-KeyPress-#>", lambda *_: self.bookmark_change(preset="3"), add="+")
-            root.bind("<Control-Shift-KeyPress-$>", lambda *_: self.bookmark_change(preset="4"), add="+")
+            self.root.bind("<Control-Down>", lambda *_: self.w_bu_move_item.invoke(), add="+")
+            self.root.bind("<Control-Up>", lambda *_: self.w_bu_move_subs.invoke(), add="+")
+            self.root.bind("<Control-Shift-KeyPress-!>", lambda *_: self.bookmark_change(preset="1"), add="+")
+            self.root.bind("<Control-Shift-KeyPress-@>", lambda *_: self.bookmark_change(preset="2"), add="+")
+            self.root.bind("<Control-Shift-KeyPress-#>", lambda *_: self.bookmark_change(preset="3"), add="+")
+            self.root.bind("<Control-Shift-KeyPress-$>", lambda *_: self.bookmark_change(preset="4"), add="+")
+        
+        self.root.bind("<F5>", lambda *_: self.refresh())
 
 
     def _pack_children(self):
