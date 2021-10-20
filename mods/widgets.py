@@ -1,6 +1,7 @@
 '''The module containing objects that create and manage groups of tkinter widgets.'''
 
 import json
+import re
 import time
 
 from PIL import Image, ImageTk
@@ -939,7 +940,17 @@ class DataEntry(SuperWidget):
                 else:
                     value = self.w_hidden_data[index]
             if info['required'] == True and value == "":
+                messagebox.showwarning("Missing Information", f"Could not save item because required field \"{field}\" is empty.")
+                self.logger.warning(f"Could not save item because required field \"{field}\" is empty")
                 break
+            regex = info.get('regex', None)
+            print(field, regex, value)
+            if regex != None:
+                print(bool(re.match(regex, value)))
+                if not re.match(regex, value):
+                    messagebox.showwarning("Incorrect Information", f"Could not save item because field \"{field}\" fails validation.")
+                    self.logger.warning(f"Could not save item because field \"{field}\" fails validation.")
+                    break
             doc[field] = value
         else:
             self.editing = False
@@ -968,9 +979,6 @@ class DataEntry(SuperWidget):
             self.w_bu_cancel.invoke()
             self.logger.info("Save completed")
             return True
-        missingfield = repr(self.db.schema_name(cat=self.last_doc['category']))
-        messagebox.showwarning("Missing Information", f"Could not save item because required field {missingfield} is empty.")
-        self.logger.warning(f"Could not save item because required field {missingfield} is empty")
         return False
 
 

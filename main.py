@@ -1,7 +1,6 @@
 '''The script that starts the main DEHC application.'''
 
 import argparse
-import pprint
 import sys
 
 if sys.version_info.major == 3 and sys.version_info.minor == 9:
@@ -17,7 +16,7 @@ else:
 
 if __name__ == "__main__": # Multiprocessing library complains if this guard isn't used
     
-    DBVERSION = "211018B"
+    DBVERSION = "211020"
     parser = argparse.ArgumentParser(description='Starts the Digital Evacuation Handling Center')
     parser.add_argument('-a','--auth', type=str, default="db_auth.json", help="relative path to database authentication file", metavar="PATH")
     parser.add_argument('-b','--book', type=str, default="bookmarks.json", help="relative path to EMS screen bookmarks", metavar="PATH")
