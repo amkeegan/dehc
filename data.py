@@ -8,7 +8,7 @@ import mods.database as md
 
 # ----------------------------------------------------------------------------
 
-DBVERSION = "211020"
+DBVERSION = "211020B"
 parser = argparse.ArgumentParser(description='Inserts data into the DEHC database.')
 parser.add_argument('persons', type=int, help="number of persons to add to the database", metavar="PERSONS")
 parser.add_argument('vessels', type=int, help="number of vessels to add to the database", metavar="VESSELS")
@@ -99,13 +99,8 @@ def create_person(**kwargs):
         "Destination Address": destadd,
         "Home Contact": homecon,
         "Destination Contact": destcon,
-        "Guardian(s)": "",
-        "Luggage": "",
         "Weight (KG)": weight,
         "Authority To Release Information?": atri,
-        "Accommodation": "",
-        "Dietary Requirements": "",
-        "Notes": ""
     }
     provided = {field: value for field, value in kwargs.items()}
     doc.update(provided)
@@ -132,7 +127,6 @@ def create_vessel(**kwargs):
         "Origin": origin,
         "Destination": dest,
         "Capacity (KG)": str(random.randint(5,25)*1000),
-        "Notes": ""
     }
     provided = {field: value for field, value in kwargs.items()}
     doc.update(provided)

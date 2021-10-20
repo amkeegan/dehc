@@ -1699,7 +1699,6 @@ class SearchTree(SuperWidget):
             self.logger.warning(f"Multiple search items were selected")
 
 
-
     def summation_toggle(self, *args):
         '''Callback for when the summation checkbox is toggled.'''
         state = self.w_var_summation.get()
@@ -1713,7 +1712,10 @@ class SearchTree(SuperWidget):
             self.w_tr_tree.config(show="tree headings")
         else:
             self.logger.error(f"Summation toggled to unknown state {state}")
-        self.tree_refresh()
+        if self.yes_no == None or self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to open an item?"):
+            self.tree_refresh()
+        else:
+            self.logger.debug(f"Summation was clicked, but user declined.")
 
 
     def tree_focus(self, goal: str, rebase: bool = False, dragreset: bool = True):
