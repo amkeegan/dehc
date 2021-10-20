@@ -1309,9 +1309,9 @@ class DEHCDatabase:
         '''
         self.logger.debug(f"Fetching photo of {item} as base64")
         name = "photo-"+item
-        if self.db.document_exists(dbname="files", id=name) == True:
+        if self.db.document_exists(dbname=self.db_files, id=name) == True:
             self.logger.debug(f"Done fetching photo of {item} as base64")
-            return self.db.document_get(dbname="files", id=name)['photo']            
+            return self.db.document_get(dbname=self.db_files, id=name)['photo']            
         else:
             self.logger.debug(f"Done fetching photo of {item} as base64")
             return None
