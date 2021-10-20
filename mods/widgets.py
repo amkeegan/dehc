@@ -271,10 +271,10 @@ class DataEntry(SuperWidget):
 
         self.w_bu_edit.grid(column=0, row=0, sticky="nsew", padx=1, pady=1)
         self.w_bu_cancel.grid(column=1, row=0, sticky="nsew", padx=1, pady=1)
-        self.w_co_cat.grid(column=2, row=0, sticky="nsew", padx=1, pady=1)
-        self.w_bu_new.grid(column=3, row=0, sticky="nsew", padx=1, pady=1)
-        self.w_bu_save.grid(column=4, row=0, sticky="nsew", padx=1, pady=1)
-        self.w_bu_delete.grid(column=5, row=0, sticky="nsew", padx=1, pady=1)
+        self.w_bu_save.grid(column=2, row=0, sticky="nsew", padx=1, pady=1)
+        self.w_bu_delete.grid(column=3, row=0, sticky="nsew", padx=1, pady=1)
+        self.w_bu_new.grid(column=4, row=0, sticky="nsew", padx=(10,1), pady=1)
+        self.w_co_cat.grid(column=5, row=0, sticky="nsew", padx=1, pady=1)
 
 
     def yes_no(self, title: str, message: str, always: bool = False):
@@ -1699,7 +1699,6 @@ class SearchTree(SuperWidget):
             self.logger.warning(f"Multiple search items were selected")
 
 
-
     def summation_toggle(self, *args):
         '''Callback for when the summation checkbox is toggled.'''
         state = self.w_var_summation.get()
@@ -1713,7 +1712,10 @@ class SearchTree(SuperWidget):
             self.w_tr_tree.config(show="tree headings")
         else:
             self.logger.error(f"Summation toggled to unknown state {state}")
-        self.tree_refresh()
+        if self.yes_no == None or self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to open an item?"):
+            self.tree_refresh()
+        else:
+            self.logger.debug(f"Summation was clicked, but user declined.")
 
 
     def tree_focus(self, goal: str, rebase: bool = False, dragreset: bool = True):
