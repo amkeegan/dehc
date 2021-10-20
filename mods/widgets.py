@@ -271,10 +271,10 @@ class DataEntry(SuperWidget):
 
         self.w_bu_edit.grid(column=0, row=0, sticky="nsew", padx=1, pady=1)
         self.w_bu_cancel.grid(column=1, row=0, sticky="nsew", padx=1, pady=1)
-        self.w_co_cat.grid(column=2, row=0, sticky="nsew", padx=1, pady=1)
-        self.w_bu_new.grid(column=3, row=0, sticky="nsew", padx=1, pady=1)
-        self.w_bu_save.grid(column=4, row=0, sticky="nsew", padx=1, pady=1)
-        self.w_bu_delete.grid(column=5, row=0, sticky="nsew", padx=1, pady=1)
+        self.w_bu_save.grid(column=2, row=0, sticky="nsew", padx=1, pady=1)
+        self.w_bu_delete.grid(column=3, row=0, sticky="nsew", padx=1, pady=1)
+        self.w_bu_new.grid(column=4, row=0, sticky="nsew", padx=(10,1), pady=1)
+        self.w_co_cat.grid(column=5, row=0, sticky="nsew", padx=1, pady=1)
 
 
     def yes_no(self, title: str, message: str, always: bool = False):
