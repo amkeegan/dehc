@@ -7,19 +7,29 @@ import mods.database as md
 
 # ----------------------------------------------------------------------
 
-level = "WARNING" # Logging level
-n = 2000          # Number of documents to insert
-f = 12            # Number of fetches to make
-q = 12            # Number of queries to make
-
-# ----------------------------------------------------------------------
+# PREAMBLE
 
 t0 = time.time()
 
-# PREAMBLE
+n = 2000          # Number of documents to insert
+f = 20           # Number of fetches to make
+q = 20           # Number of queries to make
 
-dehc = md.DEHCDatabase(config="db_auth.json", level=level, quickstart=True)
+dehc = md.DEHCDatabase(
+    config="db_auth.json", 
+    version="211020", 
+    forcelocal=True, 
+    level="CRITICAL",
+    namespace="test",
+    overridedbversion=False,
+    schema="db_schema.json",
+    updateschema=False,
+    quickstart=False)
 db = dehc.db
+
+dehc.schema_load(schema="db_schema.json")
+dehc.databases_delete(lazy=True)
+dehc.databases_create(lazy=True)
 
 def rand_name():
     s = [random.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(6)]
@@ -40,7 +50,7 @@ t1 = time.time()
 
 # INSERTING
 
-ids = dehc.items_create(cat="person", docs=docs)
+ids = dehc.items_create(cat="test-person", docs=docs)
 t2 = time.time()
 
 # FETCHING ONE
@@ -49,7 +59,7 @@ for i in range(f):
     dehc.item_get(id=ids[i])
 t3 = time.time()
 for i in range(f):
-    db.document_get(dbname="items", id=ids[i])
+    db.document_get(dbname="test-items", id=ids[i])
 t4 = time.time()
 
 # FETCHING ALL
@@ -58,32 +68,32 @@ for _ in range(f):
     dehc.items_list()
 t5 = time.time()
 for _ in range(f):
-    db.documents_list(dbname="items", limit=n)
+    db.documents_list(dbname="test-items", limit=n)
 t6 = time.time()
 
 # QUERY
 
-dehc.items_query(cat="person", selector={'ID':{"$eq": docs[0]['ID']}}, fields=["name", "ID"], sort=[{"ID": "asc"}])
-dehc.items_query(cat="person", selector={'IDS':{"$all": [docs[0]['IDS'][0]]}}, fields=["name", "IDS"], sort=[{"IDS": "asc"}])
-dehc.items_query(cat="person", selector={'ID':{"$eq": docs[0]['ID']}}, fields=["name", "ID"], sort=[{"Name": "asc"}])
-dehc.items_query(cat="person", selector={'IDS':{"$all": [docs[0]['IDS'][0]]}}, fields=["name", "IDS"], sort=[{"Name": "asc"}])
+dehc.items_query(cat="Person", selector={'ID':{"$eq": docs[0]['ID']}}, fields=["name", "ID"], sort=[{"ID": "asc"}])
+dehc.items_query(cat="Person", selector={'IDS':{"$all": [docs[0]['IDS'][0]]}}, fields=["name", "IDS"], sort=[{"IDS": "asc"}])
+dehc.items_query(cat="Person", selector={'ID':{"$eq": docs[0]['ID']}}, fields=["name", "ID"], sort=[{"Name": "asc"}])
+dehc.items_query(cat="Person", selector={'IDS':{"$all": [docs[0]['IDS'][0]]}}, fields=["name", "IDS"], sort=[{"Name": "asc"}])
 
 t7 = time.time()
 
 for i in range(q):
-    dehc.items_query(cat="person", selector={'ID':{"$eq": docs[i]['ID']}}, fields=["_id", "ID"], sort=[{"ID": "asc"}])
+    dehc.items_query(cat="Person", selector={'ID':{"$eq": docs[i]['ID']}}, fields=["_id", "ID"], sort=[{"ID": "asc"}])
 t8 = time.time()
 
 for i in range(q):
-    dehc.items_query(cat="person", selector={'ID':{"$eq": docs[i]['ID']}}, fields=["_id", "ID"], sort=[{"Name": "asc"}])
+    dehc.items_query(cat="Person", selector={'ID':{"$eq": docs[i]['ID']}}, fields=["_id", "ID"], sort=[{"Name": "asc"}])
 t9 = time.time()
 
 for i in range(q):
-    dehc.items_query(cat="person", selector={'IDS':{"$all": [docs[i]['IDS'][0]]}}, fields=["_id", "IDS"], sort=[{"IDS": "asc"}])
+    dehc.items_query(cat="Person", selector={'IDS':{"$all": [docs[i]['IDS'][0]]}}, fields=["_id", "IDS"], sort=[{"IDS": "asc"}])
 ta = time.time()
 
 for i in range(q):
-    dehc.items_query(cat="person", selector={'IDS':{"$all": [docs[i]['IDS'][0]]}}, fields=["_id", "IDS"], sort=[{"Name": "asc"}])
+    dehc.items_query(cat="Person", selector={'IDS':{"$all": [docs[i]['IDS'][0]]}}, fields=["_id", "IDS"], sort=[{"Name": "asc"}])
 tb = time.time()
 
 # RESULTS
@@ -100,7 +110,7 @@ print(f"Querying ID (indexed by Name) in {n} documents {q} times: {round(t9-t8, 
 print(f"Querying list of IDs (indexed by IDS) in {n} documents {q} times: {round(ta-t9, places)} seconds")
 print(f"Querying list of IDs (indexed by Name) in {n} documents {q} times: {round(tb-ta, places)} seconds")
 
-input("Breakpoint. Press enter to delete database and finish.")
+input("Breakpoint. Press enter to delete databases and finish.")
 
 # POSTAMBLE
 
