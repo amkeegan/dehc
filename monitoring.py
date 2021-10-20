@@ -86,6 +86,29 @@ if __name__ == "__main__": # Multiprocessing library complains if this guard isn
     containers_current_people = {}
     monitored_containter_types = ["Station","Vessel","Lane"]
     while True:
+        vessels = db.container_children_all("Station/45340ee567a8",cat="Vessel",result="DOC") 
+        #pprint(vessels)
+        print("Vessels in Airside")
+        for vessel in vessels:
+            #pprint(vessel)                        
+            cap_soul = 0
+            if "Capacity (Souls)" in vessel: #not all vessels have capacity listed                
+                if vessel["Capacity (Souls)"].isnumeric():
+                    cap_soul = vessel["Capacity (Souls)"] # not all listings are numbers                                    
+                
+            souls = len(db.container_children_all(vessel["_id"],cat="Person") )
+            
+            print(vessel["_id"] + " " + vessel["Display Name"] + " " + str(souls) + " of " + str(cap_soul)) 
+            try:
+                cursor.execute("DELETE FROM vessel_stats WHERE record_time < DATE_SUB(NOW(), INTERVAL 10 SECOND)") #OUT WITH THE OLD
+                cursor.execute(
+                "INSERT INTO vessel_stats (record_time,container_id,display_name,max_souls,current_souls) VALUES (now(),?,?,?,?)", 
+                (vessel["_id"],vessel['Display Name'],cap_soul,souls))
+            except mariadb.Error as e: 
+                print(f"Error: {e}")
+        conn.commit()               
+
+        quit()
         #all_containers = db.container_children_all_dict(db.items_query(cat="Evacuation")[0]['_id'])
         #pprint.pprint(all_containers)
         #total_count = count_people(all_containers)
@@ -129,6 +152,10 @@ if __name__ == "__main__": # Multiprocessing library complains if this guard isn
                 except mariadb.Error as e: 
                     print(f"Error: {e}")
             conn.commit()    
+
+            # update vessels currently in airside
+
+
         time.sleep(60)
         #input()    
 
