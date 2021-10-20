@@ -625,15 +625,11 @@ class DEHCDatabase:
         item: The UUID of the item.
         lazy: If true, won't error if from_con doesn't exist, or to_con already exists.
         '''
-        t1 = time.time()
         self.logger.info(f"Moving {item} from {from_con} to {to_con}")
         self.container_add(container=to_con, item=item, lazy=lazy)
-        t2 = time.time()
         if from_con != None:
             self.container_remove(container=from_con, item=item, lazy=lazy)
         self.logger.debug(f"Done moving {item} from {from_con} to {to_con}")
-        t3 = time.time()
-        print(f"t2-t1: {t2-t1}, t3-t2: {t3-t2}")
 
 
     def container_moves(self, from_con: str, to_con: str, items: list, lazy: bool = False):
