@@ -168,11 +168,4 @@ db.container_adds(container=stat[0], items=lane)
 db.container_adds(container=stat[6], items=pers)
 db.container_adds(container=stat[4], items=vess)
 
-secret_stat = db.item_create("Station", {"Display Name": "Secret Station"})
-secret_lane = db.item_create("Lane", {"Display Name": "Secret Lane"})
-secret_pers = db.item_create("Person", create_person())
-
-db.container_add(container=secret_stat, item=secret_lane)
-db.container_add(container=secret_lane, item=secret_pers)
-
 sys.exit(0)

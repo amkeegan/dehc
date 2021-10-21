@@ -1,5 +1,7 @@
 '''The module containing the evacuation management system, used for ingest, etc.'''
 
+import json
+
 import tkinter as tk
 from tkinter import ttk
 
@@ -13,7 +15,7 @@ import mods.dehc_hardware as hw
 class EMS():
     '''A class which represents the EMS application.'''
 
-    def __init__(self, db: md.DEHCDatabase, *, bookmarks: str = "bookmarks.json", level: str = "NOTSET", readonly: bool = False, autorun: bool = False, hardware: hw.Hardware = None):
+    def __init__(self, db: md.DEHCDatabase, *, bookmarks: str = "bookmarks.json", godmode: bool = False, level: str = "NOTSET", readonly: bool = False, web: str = "web_auth.json", autorun: bool = False, hardware: hw.Hardware = None):
         '''Constructs an EMS object.
         
         db: The database object which the app uses for database transactions.
@@ -29,11 +31,18 @@ class EMS():
         self.bookmarks = bookmarks        # The filepath to the bookmarks.json file
         self.db = db                      # The associated DEHCDatabase object
         self.cats = self.db.schema_cats() # The item categories available to the EMS application
-        self.cats.remove("Evacuation")
-        self.cats.remove("Trash")
+        self.godmode = godmode            # Whether or not the application is in 'god mode' (admin mode)
         self.hardware = hardware          # The associated hardware manager
         self.root = tk.Tk()               # The root Tkinter widget of the application
         self.readonly = readonly          # Whether the app is in readonly or not
+        self.web = web                    # The filepath to the web server authentication file
+
+        self.cats.remove("Evacuation")
+        self.cats.remove("Trash")
+        if self.godmode == False:
+            self.cats.remove("Station")
+            self.cats.remove("Lane")
+            self.cats.remove("Vessel")
 
         self.root.title(f"EMS ({self.db.namespace} @ {self.db.db.data['url']})")
         self.root.state('zoomed')
@@ -80,7 +89,7 @@ class EMS():
         self.root.bind_class("TButton", "<Return>", lambda event: event.widget.invoke(), add="+")
         self.root.bind_class("TCheckbutton", "<Return>", lambda event: event.widget.invoke(), add="+")
 
-        self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, delete=self.delete, level=self.level, newchild=self.new_child, prepare=True, readonly=self.readonly, save=self.save, show=self.show, trash=trash, hardware=self.hardware)
+        self.de = mw.DataEntry(master=self.root, db=self.db, cats=self.cats, delete=self.delete, godmode=self.godmode, level=self.level, newchild=self.new_child, prepare=True, readonly=self.readonly, save=self.save, show=self.show, trash=trash, web=self.web, hardware=self.hardware)
         self.cm = mw.ContainerManager(master=self.root, db=self.db, topbase=base, botbase=base, bookmarks=self.bookmarks, cats=self.cats, level=self.level, prepare=True, readonly=self.readonly, select=self.item_select, yesno=self.de.yes_no, hardware=self.hardware)
         self.bu_refresh = ttk.Button(master=self.root, text="Refresh", command=self.refresh_button)
         self.sb = mw.StatusBar(master=self.root, db=self.db, level=self.level, prepare=True)

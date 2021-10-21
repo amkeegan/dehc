@@ -3,6 +3,7 @@
 import json
 import re
 import time
+import webbrowser
 
 from PIL import Image, ImageTk
 import tkinter as tk
@@ -85,7 +86,7 @@ class SuperWidget:
 class DataEntry(SuperWidget):
     '''A SuperWidget representing a data entry pane.'''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, level: str = "NOTSET", newchild: Callable = None, prepare: bool = True, readonly: bool = False, save: Callable = None, show: Callable = None, trash: str = None, hardware: hw.Hardware = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, godmode: bool = False, level: str = "NOTSET", newchild: Callable = None, prepare: bool = True, readonly: bool = False, save: Callable = None, show: Callable = None, trash: str = None, web: str = "web_auth.json", hardware: hw.Hardware = None):
         '''Constructs a DataEntry object.
         
         master: The widget that the DataEntry's component widgets will be instantiated under.
@@ -106,6 +107,7 @@ class DataEntry(SuperWidget):
         self.editing = False                   # Whether or not the user is currently editing a document.
         self.back_doc = {}                     # The document to return to when the back button is pressed.
         self.last_doc = {}                     # The most recently selected and retrieved document from the database.
+        self.godmode = godmode                 # Whether or not the application is in 'god mode' (admin mode)
         self.guardian_doc = {}                 # The guardian's document when 'new child' is pressed.
         self.child_doc = {}                    # Information for child document when 'new child' is pressed.
         self.current_photo = None              # The currently slown photo.
@@ -114,6 +116,7 @@ class DataEntry(SuperWidget):
         self.readonly = readonly               # Whether or not the application is in readonly mode
         self.root = self.w_fr.winfo_toplevel() # Root widget that contains this SuperWidget
         self.trash = trash                     # The UUID of the recycle bin
+        self.web = web                         # The filepath to the web server authentication file
         self._delete = delete                  # The parent object's callback to run when delete is pressed.
         self._newchild = newchild              # The parent object's callback to run when new child is pressed.
         self._save = save                      # The parent object's callback to run when save is pressed.
@@ -195,6 +198,8 @@ class DataEntry(SuperWidget):
         self.w_fr_foot.columnconfigure(index=3, weight=1000)
         self.w_fr_foot.columnconfigure(index=4, weight=1000)
         self.w_fr_foot.columnconfigure(index=5, weight=1000)
+        if self.godmode == True:
+            self.w_fr_foot.columnconfigure(index=6, weight=1000)
         self.w_fr_foot.rowconfigure(index=0, weight=1000)
 
         # Variables
@@ -218,18 +223,22 @@ class DataEntry(SuperWidget):
         self.w_input_data = []
         self.w_bu_edit = ttk.Button(master=self.w_fr_foot, text="Edit",)
         self.w_bu_cancel = ttk.Button(master=self.w_fr_foot, text="Cancel")
-        self.w_co_cat = ttk.Combobox(master=self.w_fr_foot, values=self.cats, textvariable=self.w_var_cat, state="readonly")
-        self.w_bu_new = ttk.Button(master=self.w_fr_foot, text="New")
         self.w_bu_save = ttk.Button(master=self.w_fr_foot, text="Save")
         self.w_bu_delete = ttk.Button(master=self.w_fr_foot, text="Delete")
+        self.w_bu_new = ttk.Button(master=self.w_fr_foot, text="New")
+        self.w_co_cat = ttk.Combobox(master=self.w_fr_foot, values=self.cats, textvariable=self.w_var_cat, state="readonly")
+        if self.godmode == True:
+            self.w_bu_admin = ttk.Button(master=self.w_fr_foot, text="Admin")
         self.w_co_cat.current(0)
 
         if self.readonly == False:
             self.w_bu_edit.configure(command=self.edit)
             self.w_bu_cancel.configure(command=self.cancel)
-            self.w_bu_new.configure(command=self.new)
             self.w_bu_save.configure(command=self.save)
             self.w_bu_delete.configure(command=self.delete)
+            self.w_bu_new.configure(command=self.new)
+            if self.godmode == True:
+                self.w_bu_admin.configure(command=self.admin)
 
         # Scrollbars
         self.w_sc_flags = ttk.Scrollbar(master=self.w_fr_flags, orient="vertical", command=self.w_li_flags.yview)
@@ -250,7 +259,7 @@ class DataEntry(SuperWidget):
         self.w_fr_flags.grid(column=1, row=1, columnspan=2, sticky="nsew", padx=2, pady=2)
         self.w_fr_body.grid(column=0, row=2, columnspan=2, sticky="nsew", padx=2, pady=2)
         self.w_sc_data.grid(column=2, row=2, sticky="nsew", padx=1, pady=2)
-        self.w_fr_foot.grid(column=0, row=3, columnspan=3, sticky="nsew", padx=2, pady=1)
+        self.w_fr_foot.grid(column=0, row=3, columnspan=2, sticky="nsew", padx=2, pady=1)
 
         self.w_ca_data.grid(column=0, row=0, sticky="nsew")
 
@@ -273,8 +282,11 @@ class DataEntry(SuperWidget):
         self.w_bu_cancel.grid(column=1, row=0, sticky="nsew", padx=1, pady=1)
         self.w_bu_save.grid(column=2, row=0, sticky="nsew", padx=1, pady=1)
         self.w_bu_delete.grid(column=3, row=0, sticky="nsew", padx=1, pady=1)
-        self.w_bu_new.grid(column=4, row=0, sticky="nsew", padx=(10,1), pady=1)
+        self.w_bu_new.grid(column=4, row=0, sticky="nsew", padx=(8,1), pady=1)
         self.w_co_cat.grid(column=5, row=0, sticky="nsew", padx=1, pady=1)
+        if self.godmode == True:
+            pass
+            self.w_bu_admin.grid(column=6, row=0, sticky="nsew", padx=(8,1), pady=1)
 
 
     def yes_no(self, title: str, message: str, always: bool = False):
@@ -327,6 +339,50 @@ class DataEntry(SuperWidget):
             self.logger.info(f"Inserted {flag} into flag list")
         else:
             self.logger.debug(f"Did not insert {flag} into flag list, as it was already there")
+
+
+    def admin(self, *args):
+        '''Callback for when the admin button is pressed.'''
+        self.logger.debug(f"Admin button activated")
+        window = tk.Toplevel()
+        window.attributes("-topmost", True)
+        window.focus_force()
+        window.title("Item Administration")
+        window.configure(background="#DCDAD5")
+
+        with open(self.web, "r") as f:
+            webfile = json.loads(f.read())
+            url = webfile['url']
+
+        def buttona(*args):
+            id = self.last_doc.get("_id","")
+            if id != "":
+                webbrowser.open(f"{url}/gatecheck?contid={id}")
+
+        def buttonb(*args):
+            webbrowser.open(f"{url}/function?somedataname=somedata&someotherdataname=someotherdata")
+
+        def buttonc(*args):
+            webbrowser.open(f"{url}/function?somedataname=somedata&someotherdataname=someotherdata")
+
+        def buttond(*args):
+            webbrowser.open(f"{url}/function?somedataname=somedata&someotherdataname=someotherdata")
+
+        w_bu_a = ttk.Button(master=window, text="Gate Check", command=buttona)
+        w_bu_b = ttk.Button(master=window, text="Button B", command=buttonb)
+        w_bu_c = ttk.Button(master=window, text="Button C", command=buttonc)
+        w_bu_d = ttk.Button(master=window, text="Button D", command=buttond)
+
+        window.columnconfigure(index=0, weight=1000)
+        window.rowconfigure(index=0, weight=1000)
+        window.rowconfigure(index=1, weight=1000)
+        window.rowconfigure(index=2, weight=1000)
+        window.rowconfigure(index=3, weight=1000)
+
+        w_bu_a.grid(column=0, row=0, sticky="nsew", padx=2, pady=2)
+        w_bu_b.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
+        w_bu_c.grid(column=0, row=2, sticky="nsew", padx=2, pady=2)
+        w_bu_d.grid(column=0, row=3, sticky="nsew", padx=2, pady=2)
 
 
     def back(self, *args):
@@ -504,6 +560,10 @@ class DataEntry(SuperWidget):
     def edit(self, *args):
         '''Callback for when the edit button is pressed'''
         cat = self.last_doc.get('category','')
+        if cat not in self.cats:
+            messagebox.showwarning("Permission Denied","This item can only be edited by an administrator.")
+            return
+
         lock = self.db.schema_lock(cat=cat)
         if self.last_doc.get(lock, 0) == 1:
             if not self.yes_no("Locked Item",f"This item is locked. Are you sure you want to edit it?", always=True):
@@ -944,9 +1004,7 @@ class DataEntry(SuperWidget):
                 self.logger.warning(f"Could not save item because required field \"{field}\" is empty")
                 break
             regex = info.get('regex', None)
-            print(field, regex, value)
             if regex != None:
-                print(bool(re.match(regex, value)))
                 if not re.match(regex, value):
                     messagebox.showwarning("Incorrect Information", f"Could not save item because field \"{field}\" fails validation.")
                     self.logger.warning(f"Could not save item because field \"{field}\" fails validation.")
@@ -1932,19 +1990,14 @@ class SearchTree(SuperWidget):
                     
                     # Sum fields
                     if info['type'] == "sum":
-                        print(f"{node}:{field} is sum")
                         items = []
                         target = info['target']
-                        print(f"{node}:{field} target is {target}")
                         for child in all_children:
                             child_cat = child['category']
-                            print(f"{node} child {child['_id']} is a {child_cat}")
                             if child_cat in info['cat']:
                                 child_schema = self.db.schema_schema(cat=child_cat)
                                 default = child_schema[target].get('default', 0)
-                                print(f"{node} child {child['_id']} has a default of {default}")
                                 value = child.get(target, '')
-                                print(f"{node} child {child['_id']} has a value of {value}")
                                 if value == '':
                                     value = default
                                     defaulted = True
@@ -1952,9 +2005,7 @@ class SearchTree(SuperWidget):
                                     items.append(float(value))
                                 except:
                                     items.append(0.0)
-                                print(f"{node}:{field}'s items is now {items}")
                         itemsum = f"{sum(items):.1f}" if len(items) > 0 else ""
-                        print(f"{node}:{field}'s total is {itemsum}")
                     
                     # Count fields
                     elif info['type'] == "count":
