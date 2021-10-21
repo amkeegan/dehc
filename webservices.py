@@ -91,21 +91,10 @@ class MyServer(BaseHTTPRequestHandler):
 
     def gate_check_clearence(self,container_id,evacuee_id):
         cleared_to_evac = False
-        url_data = parse_qs(urlparse(self.path).query)
-        #print(url_data['contid'][0])
-        evacuees = db.container_children_all(container=container_id, result="DOC")
-        #print(evacuees)
-        #if url_data['physid'][0] in evacuees:
-        #    print("ok")
-        
-        for evacuee in evacuees:
-            print(evacuee['_id'])
-            if evacuee['_id'] == evacuee_id:
+        evacuees = db.container_children_all(container=container_id, result="ITEM")
+        if evacuee_id in evacuees:
                 print("evac ok")
-                cleared_to_evac = True
-                break
-                
-        
+                cleared_to_evac = True                      
         return cleared_to_evac
 
     def lookup_item_html(self,item_id):                
@@ -159,25 +148,28 @@ class MyServer(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(bytes("<html><head><title>Gate Check</title></head>", "utf-8"))
         #print(self.path)        
-
+        
         #items = db.container_children(container=url_data['physid'][0], result="DOC")
+        clearance = False
+        evacuee_data = {"Display Name" : "Not Found"} #needs a blank init otherwise it'll throw an error if they aren't in the list
         try:
-            clearance =  self.gate_check_clearence(container_id,evacuee_id)
-            evacuee_data = {"Display Name" : "Not Found"} #needs a blank init otherwise it'll throw an error if they aren't in the list
-
             evacuee_data = db.get_item_by_any_id(evacuee_id)
-            if clearance:
-                
-                self.wfile.write(bytes(self.gate_check_html_replacer(True,evacuee_data,container_id,"#0aa832"), "utf-8"))
-                #self.wfile.write(bytes("<p>You accessed path: %s</p>" % self.path, "utf-8"))
-                #0aa832
-                pass
-            else:
-                self.wfile.write(bytes(self.gate_check_html_replacer(False,evacuee_data,container_id,"red"), "utf-8"))
-            self.wfile.write(bytes("</body></html>", "utf-8"))
-
+            evacuee_id = evacuee_data["_id"]            
+            clearance =  self.gate_check_clearence(container_id,evacuee_id)
         except:
             pass
+        
+        if clearance:
+            self.wfile.write(bytes(self.gate_check_html_replacer(True,evacuee_data,container_id,"#0aa832"), "utf-8"))
+            #self.wfile.write(bytes("<p>You accessed path: %s</p>" % self.path, "utf-8"))
+            #0aa832
+            pass
+        else:
+            self.wfile.write(bytes(self.gate_check_html_replacer(False,evacuee_data,container_id,"red"), "utf-8"))
+        self.wfile.write(bytes("</body></html>", "utf-8"))
+
+      
+            
 
 
     def wash_item(self,desired,evacuee):

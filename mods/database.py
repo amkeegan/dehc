@@ -915,7 +915,7 @@ class DEHCDatabase:
             try:
                 return self.item_get(self.ids_find(searchID)[0]) 
             except:
-                return False
+                 raise ValueError("Item not found")
             
             
 
