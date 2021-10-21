@@ -7,9 +7,7 @@ import base64
 import mimetypes
 import mods.database as md
 import mods.log as ml
-import ssl
 
-import io
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse,parse_qs
@@ -159,17 +157,17 @@ class MyServer(BaseHTTPRequestHandler):
         self.send_header("Content-type", "text/html")
         self.end_headers()
         self.wfile.write(bytes("<html><head><title>Evacuate?</title></head>", "utf-8"))
-        print(self.path)
+        #print(self.path)
         
 
         #items = db.container_children(container=url_data['physid'][0], result="DOC")
 
         clearance =  self.gate_check_clearence(container_id,evacuee_id)
         evacuee_data = {"Display Name" : "Not Found"} #needs a blank init otherwise it'll throw an error if they aren't in the list
-        try:
-            evacuee_data = db.item_get(evacuee_id)
-        except:
-            pass
+        #try:
+        evacuee_data = db.item_get(evacuee_id)
+        #except:
+        #    pass
 
         if clearance:
             
@@ -229,7 +227,8 @@ class MyServer(BaseHTTPRequestHandler):
             #    self.end_headers() 
 
         elif path == "/gatecheck":
-            try:
+                logger.debug("Gatecheck run")
+            #try:
                 contid = " "
                 physid = " "
                 if "contid" in url_data:
@@ -238,9 +237,9 @@ class MyServer(BaseHTTPRequestHandler):
                     physid = url_data['physid'][0]
 
                 self.gate_check_html(contid,physid)
-            except:
-                self.send_response(500)
-                self.end_headers() 
+            #except:
+            #    self.send_response(500)
+            #    self.end_headers() 
         elif path == "/lookupitem":
             try:
                 self.lookup_item_html(url_data['physid'][0])
@@ -270,6 +269,7 @@ print(time.asctime(), "Server Starts - %s:%s" % (hostName, hostPort))
 
 try:
     myServer.serve_forever()
+
 except KeyboardInterrupt:
     pass
 

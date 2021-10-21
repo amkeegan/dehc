@@ -4,8 +4,8 @@ import base64
 import io
 import json
 import random
-import time
-import requests
+#import time
+
 from ibmcloudant import CouchDbSessionAuthenticator
 from ibmcloudant.cloudant_v1 import CloudantV1, BulkDocs, Document, IndexDefinition, IndexField
 from PIL import Image
@@ -42,7 +42,6 @@ class Database:
         self.logger.debug(f"Finished loading database connection config")
 
         auth = CouchDbSessionAuthenticator(username=self.data['user'], password=self.data['pass'])
-        self.httpAdapter = requests.adapters.HTTPAdapter(pool_connections=15, pool_maxsize=100)
         self.client = CloudantV1(authenticator=auth)
         #self.client.http_adapter = self.httpAdapter
         self.client.set_http_config({'timeout': 10})
