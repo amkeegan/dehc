@@ -906,16 +906,15 @@ class DEHCDatabase:
         returns False on failure
 
         searchID: the any flavour ID to search for
-        
         ''' 
         self.get_item_by_any_id()
         try:
-            return self.item_get(searchID)      #cross our fingers hey
+            return self.item_get(id=searchID)      #cross our fingers hey
         except:
             try:
                 return self.item_get(self.ids_find(searchID)[0]) 
             except:
-                 raise ValueError("Item not found")
+                 return False
             
             
 

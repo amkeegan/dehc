@@ -33,7 +33,6 @@ class EMS():
         self.cats = self.db.schema_cats() # The item categories available to the EMS application
         self.godmode = godmode            # Whether or not the application is in 'god mode' (admin mode)
         self.hardware = hardware          # The associated hardware manager
-        self.root = tk.Tk()               # The root Tkinter widget of the application
         self.readonly = readonly          # Whether the app is in readonly or not
         self.web = web                    # The filepath to the web server authentication file
 
@@ -44,6 +43,7 @@ class EMS():
             self.cats.remove("Lane")
             self.cats.remove("Vessel")
 
+        self.root = tk.Tk()
         self.root.title(f"EMS ({self.db.namespace} @ {self.db.db.data['url']})")
         self.root.state('zoomed')
         self.root.configure(background="#DCDAD5")
@@ -101,6 +101,22 @@ class EMS():
         self.root.columnconfigure(2, weight=1000)
 
 
+    def pack(self):
+        '''Packs & grids children frames and widgets of the EMS.'''
+        self.logger.debug(f"Packing and gridding widgets")
+        self.cm.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.de.grid(column=2, row=0, sticky="nsew", padx=2, pady=2)
+        self.bu_refresh.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
+        self.sb.grid(column=1, row=1, columnspan=2, sticky="nsew", padx=2, pady=2)
+
+
+    def run(self):
+        '''Enters the root's main loop, drawing the app screen.'''
+        self.logger.info(f"Starting main UI loop")
+        self.root.mainloop()
+        self.logger.info(f"Ending main UI loop")
+
+
     def new_child(self, target: str):
         '''Callback for when new child is pressed in the data pane.'''
         parents = self.db.item_parents(item=target)
@@ -111,15 +127,6 @@ class EMS():
                 parent = self.active.w_tr_tree.parent(target)
             self.active.tree_focus(goal=parent, rebase=True)
             self.active.tree_open()
-
-
-    def pack(self):
-        '''Packs & grids children frames and widgets of the EMS.'''
-        self.logger.debug(f"Packing and gridding widgets")
-        self.cm.grid(column=0, row=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.de.grid(column=2, row=0, sticky="nsew", padx=2, pady=2)
-        self.bu_refresh.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
-        self.sb.grid(column=1, row=1, columnspan=2, sticky="nsew", padx=2, pady=2)
 
 
     def refresh_button(self, *args):
@@ -135,13 +142,6 @@ class EMS():
     def refresh(self):
         '''Refreshes the trees.'''
         self.cm.refresh(active=self.active)
-
-
-    def run(self):
-        '''Enters the root's main loop, drawing the app screen.'''
-        self.logger.info(f"Starting main UI loop")
-        self.root.mainloop()
-        self.logger.info(f"Ending main UI loop")
 
 
     def item_select(self, *args):
