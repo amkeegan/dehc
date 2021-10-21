@@ -908,7 +908,7 @@ class DEHCDatabase:
         searchID: the any flavour ID to search for
         
         ''' 
-
+        self.get_item_by_any_id()
         try:
             return self.item_get(searchID)      #cross our fingers hey
         except:

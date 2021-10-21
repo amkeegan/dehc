@@ -12,8 +12,8 @@ let scanning = false;
 
 qrcode.callback = res => {
   if (res) {
-    outputData.innerText = "https://10.8.0.50:9000/lookupuser?physid=" + res;
-    window.open("https://10.8.0.50:9000/lookupitem?physid=" + res,"_self")
+    outputData.innerText = "https://accdehct1.thecreativeelement.com.au/dweb/lookupuser?physid=" + res;
+    window.open("https://accdehct1.thecreativeelement.com.au/dweb/lookupitem?physid=" + res,"_self")
     scanning = false;
 
     video.srcObject.getTracks().forEach(track => {
