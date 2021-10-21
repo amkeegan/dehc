@@ -177,7 +177,7 @@ class Database:
             remote_doc = {}
             self.logger.debug(f"Could not fetch document {dbname} {id}")
         return remote_doc
-
+    
 
     def documents_create(self, dbname: str, docs: list, ids: list):
         '''Creates multiple documents at once, returning their ids.
@@ -901,6 +901,26 @@ class DEHCDatabase:
         self.logger.debug(f"Done finding physical IDs associated with {item}")
         return [row['physid'] for row in res]
 
+    def get_item_by_any_id(self,searchID: str):
+        '''Returns item doc when given any ID either _id or physicalID.
+        returns False on failure
+
+        searchID: the any flavour ID to search for
+        
+        ''' 
+
+        try:
+            return self.item_get(searchID)      #cross our fingers hey
+        except:
+            try:
+                return self.item_get(self.ids_find(searchID)[0]) 
+            except:
+                return False
+            
+            
+
+
+        
 
     def index_prepare(self):
         '''Prepares certain known indexes used by database queries.'''
