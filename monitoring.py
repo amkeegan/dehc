@@ -66,7 +66,7 @@ if __name__ == "__main__": # Multiprocessing library complains if this guard isn
     try:
         conn = mariadb.connect(
             user="dehc_admin",
-            password="Creative1",
+            password="Creative",
             host=args.mysqlserv,
             port=3306,
             database="vps_dehc"
@@ -86,11 +86,13 @@ if __name__ == "__main__": # Multiprocessing library complains if this guard isn
     stations = db.items_list(cat="Station")
     #pprint.pprint(stations)
     containers_current_people = {}
-    monitored_containter_types = ["Station","Vessel","Lane"]
+    monitored_containter_types = ["Station","Vessel","Lane"]    
     while True:
-        vessels = db.container_children_all("Station/45340ee567a8",cat="Vessel",result="DOC")
-        #pprint(vessels)
+        airside = db.items_query(cat="Station", selector={'Display Name': {'$eq':'5. Airside'}}, fields=["_id"])[0]["_id"] #fun times, get this each loop so when the db is restarted it just rolls with it.
+        vessels = db.container_children_all(airside,cat="Vessel",result="DOC")
+        
         print("Vessels in Airside")
+        cursor.execute("DELETE FROM vessel_stats") #OUT WITH THE OLD
         for vessel in vessels:
             #pprint(vessel)
             cap_soul = 0
@@ -101,13 +103,12 @@ if __name__ == "__main__": # Multiprocessing library complains if this guard isn
             souls = len(db.container_children_all(vessel["_id"],cat="Person") )
 
             print(vessel["_id"] + " " + vessel["Display Name"] + " " + str(souls) + " of " + str(cap_soul))
-            try:
-                cursor.execute("DELETE FROM vessel_stats WHERE record_time < DATE_SUB(NOW(), INTERVAL 10 SECOND)") #OUT WITH THE OLD
-                cursor.execute(
-                "INSERT INTO vessel_stats (record_time,container_id,display_name,max_souls,current_souls) VALUES (now(),?,?,?,?)",
-                (vessel["_id"],vessel['Display Name'],cap_soul,souls))
-            except mariadb.Error as e:
-                print(f"Error: {e}")
+            
+                
+            cursor.execute(
+            "INSERT INTO vessel_stats (record_time,container_id,display_name,max_souls,current_souls) VALUES (now(),?,?,?,?)",
+            (vessel["_id"],vessel['Display Name'],cap_soul,souls))
+            
         conn.commit()
 
 #        quit()
