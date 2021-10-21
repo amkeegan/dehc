@@ -28,12 +28,16 @@ def busy(func):
     '''
     def wrapper(self, *args, **kwargs):
         global busystatus
-        if busystatus == False:
-            busystatus = True
-            self.statusbar.w_status.configure(text="Working...")
-            self.root.update_idletasks()
+        if busystatus == True:
             func(self, *args, **kwargs)
-            self.statusbar.w_status.configure(text="Done")
+        else:
+            busystatus = True
+            self.statusbar.w_status.configure(text="App is working...", background="#fcf0cf")
+            self.root.configure(cursor="clock")
+            self.root.update_idletasks() # Redraws screen to reflect changes
+            func(self, *args, **kwargs)
+            self.statusbar.w_status.configure(text="Done", background="#dcdad5")
+            self.root.configure(cursor="")
             busystatus = False
     return wrapper
 
@@ -129,13 +133,15 @@ class StatusBar(SuperWidget):
     def prepare(self):
         '''Constructs the frames and widgets of the StatusBar.'''
         self.logger.debug(f"Preparing widgets")
-        self.w_status = ttk.Label(master=self.w_fr, text="", justify=tk.LEFT, anchor="w")
+        self.w_status = tk.Label(master=self.w_fr, text="", justify=tk.LEFT, anchor="w", font="Arial 9 bold", background='#dcdad5')
+        self.w_time = tk.Label(master=self.w_fr, text="Server Online", justify=tk.RIGHT, anchor="e", font="Arial 9 bold", background='#dcdad5')
         
     
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the StatusBar.'''
         self.logger.debug(f"Packing and gridding widgets")
-        self.w_status.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.w_status.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(3,0), pady=(0,1))
+        self.w_time.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(0,3), pady=(0,1))
 
 
 # ----------------------------------------------------------------------------
@@ -218,6 +224,7 @@ class DataEntry(SuperWidget):
         self.w_fr_data.bind('<Enter>', mouse_enter_canvas)
         self.w_fr_data.bind('<Leave>', mouse_exit_canvas)
 
+        self.root.bind('<Control-e>', lambda *_: self.w_bu_edit.invoke())
         self.root.bind('<Control-s>', lambda *_: self.w_bu_save.invoke())
         self.root.bind('<Control-n>', lambda *_: self.w_bu_new.invoke())
 
@@ -448,6 +455,7 @@ class DataEntry(SuperWidget):
         #w_bu_d.grid(column=0, row=3, sticky="nsew", padx=2, pady=2)
 
 
+    @busy
     def back(self, *args):
         '''Callback for when the back button is pressed.'''
         self.logger.debug(f"Back button activated")
@@ -469,6 +477,7 @@ class DataEntry(SuperWidget):
             self.logger.debug(f"Didn't go back, as user declined")
 
 
+    @busy
     def cancel(self, *args):
         '''Callback for when the cancel button is pressed.'''
         self.logger.debug(f"Cancel button activated")
@@ -570,6 +579,7 @@ class DataEntry(SuperWidget):
             self.logger.info(f"Item edited, setting edit mode to {self.editing}")
 
 
+    @busy
     def delete(self, *args):
         '''Callback for when the delete button is pressed'''
         self.logger.debug(f"Delete item button activated")
@@ -620,6 +630,7 @@ class DataEntry(SuperWidget):
                 self.logger.debug(f"Not recycling item, as user declined")
 
 
+    @busy
     def edit(self, *args):
         '''Callback for when the edit button is pressed'''
         cat = self.last_doc.get('category','')
@@ -655,9 +666,11 @@ class DataEntry(SuperWidget):
             if len(flags) > 0:
                 self.w_co_flags['values'] = flags
                 self.w_co_flags.current(0)
+        self.w_input_data[0].focus_set()
         self.logger.debug(f"Data pane buttons are now active")
 
 
+    @busy
     def new(self, *args):
         '''Callback for when the new button is pressed.'''
         self.logger.debug(f"New item button activated")
@@ -685,6 +698,7 @@ class DataEntry(SuperWidget):
             self.logger.debug(f"Did not open a new item, as user declined")
 
 
+    @busy
     def newchild(self, event: tk.Event):
         '''Callback for when the new child button is pressed.'''
         self.logger.debug(f"Create child button activated")
@@ -713,6 +727,7 @@ class DataEntry(SuperWidget):
             self.logger.debug(f"Did not create new child, as parent has no id")
 
 
+    @busy
     def photo(self, *args):
         '''Callback for when the photo is pressed.'''
         self.logger.debug(f"Photo button activated")
@@ -1046,6 +1061,7 @@ class DataEntry(SuperWidget):
         self.data_change()
 
 
+    @busy
     def save(self, *args):
         '''Callback for when the save button is pressed.'''
         self.logger.debug(f"Save button activated")
@@ -1105,6 +1121,7 @@ class DataEntry(SuperWidget):
         return False
 
 
+    @busy
     def show(self, doc: dict = None):
         '''Displays a new document.
         
@@ -1356,6 +1373,7 @@ class DataEntry(SuperWidget):
         self.logger.debug("Current show completed")
 
 
+    @busy
     def showlist(self, event: tk.Event, source: str):
         '''Callback for when the 'show' button is pressed for a given list field.
         
@@ -1390,7 +1408,7 @@ class DataEntry(SuperWidget):
 class SearchTree(SuperWidget):
     '''A SuperWidget representing a searchable tree.'''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, autoopen: bool = False, cats: list = [], level: str = "NOTSET", prepare: bool = True, readonly: bool = False, select: Callable = None, simple: bool = False, yesno: Callable = None, hardware: hw.Hardware = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, base: dict, *, autoopen: bool = False, cats: list = [], level: str = "NOTSET", prepare: bool = True, readonly: bool = False, select: Callable = None, simple: bool = False, statusbar: StatusBar = None, yesno: Callable = None, hardware: hw.Hardware = None):
         '''Constructs a SearchTree object.
         
         master: The widget that the SearchTree's component widgets will be instantiated under.
@@ -1427,6 +1445,7 @@ class SearchTree(SuperWidget):
         self.selection = None                          # The currently selected item
         self.search_result = None                      # The previous search result
         self.simple = simple                           # Whether or not to hide auto-open and summation
+        self.statusbar = statusbar                     # The status bar associated with this object
         self.summables = self.db.schema_sums()         # List of summable fields
         self.summation = False                         # Whether or not summation is currently turned on
         self.yes_no = yesno                            # A callback which leads to a DataEntry's yes_no()
@@ -1594,10 +1613,12 @@ class SearchTree(SuperWidget):
         if self.dragstartid != None:
             self.root.configure(cursor="target")
 
-
+    @busy
     def dragstop(self, *args):
         '''Callback for when the mouse is released after clicking down on the tree.'''
-        self.root.configure(cursor="")
+        if self.root['cursor'] == "target":
+            self.root.configure(cursor="")
+
         if self.ctrlheld == True:
             event, = args
             dragendtime = time.time()
@@ -1681,6 +1702,7 @@ class SearchTree(SuperWidget):
         self.dragstartid = None
 
 
+    @busy
     def narrow(self, *args):
         '''Callback for when the narrow button is pressed.'''
         self.logger.info("Narrow button activated")
@@ -1755,6 +1777,7 @@ class SearchTree(SuperWidget):
         find_button.grid(column=0, row=3, sticky="nsew", padx=2, pady=2)
 
 
+    @busy
     def search(self, *args, preselector: dict = {}):
         '''Callback for when the search button is pressed.'''
         self.logger.debug("Search button activated")
@@ -1811,6 +1834,7 @@ class SearchTree(SuperWidget):
         self.w_co_field.current(1)
 
 
+    @busy
     def search_select(self, *args):
         '''Callback for when an item in the search is selected.'''
         event, = args
@@ -1824,6 +1848,7 @@ class SearchTree(SuperWidget):
             self.logger.warning(f"Multiple search items were selected")
 
 
+    @busy
     def summation_toggle(self, *args):
         '''Callback for when the summation checkbox is toggled.'''
         state = self.w_var_summation.get()
@@ -1843,6 +1868,7 @@ class SearchTree(SuperWidget):
             self.logger.debug(f"Summation was clicked, but user declined.")
 
 
+    @busy
     def tree_focus(self, goal: str, rebase: bool = False, dragreset: bool = True):
         '''Selects a node in the tree, opening parent nodes as required.
         
@@ -1924,6 +1950,7 @@ class SearchTree(SuperWidget):
         self.tree_rebase(target=target)
 
 
+    @busy
     def tree_rebase(self, target: str):
         '''Rebase the tree to be based on the target.
         
@@ -1947,6 +1974,7 @@ class SearchTree(SuperWidget):
         self.w_tr_tree.see(item=target)
 
 
+    @busy
     def tree_refresh(self, selection: tuple = None):
         '''Refreshes the tree view.'''
         self.logger.debug(f"Refreshing the tree")
@@ -1965,6 +1993,7 @@ class SearchTree(SuperWidget):
                 self.tree_focus(goal=focus, rebase=True)
 
 
+    @busy
     def tree_select(self, *args):
         '''Callback for when an item in the tree is selected.'''
         event, = args
@@ -1994,6 +2023,7 @@ class SearchTree(SuperWidget):
         self.dragstarttree = None
 
 
+    @busy
     def tree_open(self, node: str = None, dragreset: bool = True):
         '''Open a node on the tree view.
         
@@ -2039,6 +2069,7 @@ class SearchTree(SuperWidget):
             self.logger.error(e)
 
 
+    @busy
     def tree_sum(self, node: str):
         '''Sums and displays summable fields of a node.
         
@@ -2122,7 +2153,7 @@ class ContainerManager(SuperWidget):
     select: If present, a callback function that triggers when a tree item is selected.
     '''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, topbase: dict, botbase: dict,  *, bookmarks: str = "bookmarks.json", cats: list = [], level: str = "NOTSET", prepare: bool = True, readonly: bool = False, select: Callable = None, yesno: Callable = None, hardware: hw.Hardware = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, topbase: dict, botbase: dict,  *, bookmarks: str = "bookmarks.json", cats: list = [], level: str = "NOTSET", prepare: bool = True, readonly: bool = False, select: Callable = None, statusbar: StatusBar = None, yesno: Callable = None, hardware: hw.Hardware = None):
         '''Constructs a ContainerManager object.
         
         master: The widget that the ContainerManager's component widgets will be instantiated under.
@@ -2146,6 +2177,7 @@ class ContainerManager(SuperWidget):
         self.readonly = readonly
         self.root = self.w_fr.winfo_toplevel()
         self.select = select
+        self.statusbar = statusbar
         
         self.yes_no = yesno
         self.hardware = hardware
@@ -2171,10 +2203,10 @@ class ContainerManager(SuperWidget):
         self.w_bu_bm2 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["2"]["name"], command=lambda *_: self.bookmark(preset="2"))
         self.w_bu_bm3 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["3"]["name"], command=lambda *_: self.bookmark(preset="3"))
         self.w_bu_bm4 = ttk.Button(master=self.w_fr_bookmarks, text=self.bookmarks["4"]["name"], command=lambda *_: self.bookmark(preset="4"))
-        self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, autoopen=True, cats=self.cats, level=self.level, prepare=True, select=self.select, yesno=self.yes_no, hardware=self.hardware)
+        self.w_se_top = SearchTree(master=self.w_fr, db=self.db, base=self.topbase, autoopen=True, cats=self.cats, level=self.level, prepare=True, select=self.select, statusbar=self.statusbar, yesno=self.yes_no, hardware=self.hardware)
         self.w_bu_move_item = ttk.Button(master=self.w_fr, text="⇓ ⇓ ⇓", style="large.TButton")
         self.w_bu_move_subs = ttk.Button(master=self.w_fr, text="⇑ ⇑ ⇑", style="large.TButton")
-        self.w_se_bottom = SearchTree(master=self.w_fr, db=self.db, base=self.botbase, cats=self.cats, level=self.level, prepare=True, select=self.select, yesno=self.yes_no)
+        self.w_se_bottom = SearchTree(master=self.w_fr, db=self.db, base=self.botbase, cats=self.cats, level=self.level, prepare=True, select=self.select, statusbar=self.statusbar, yesno=self.yes_no)
 
         if self.readonly == False:
             self.w_bu_move_item.configure(command=lambda *_: self.move())
@@ -2251,6 +2283,7 @@ class ContainerManager(SuperWidget):
             self.w_se_bottom.base = newbase
 
 
+    @busy
     def bookmark(self, preset: str):
         '''Sets both trees to the settings described by a bookmark.
         
@@ -2283,6 +2316,7 @@ class ContainerManager(SuperWidget):
             self.logger.debug(f"Did not go to bookmark, as user declined")
 
 
+    @busy
     def bookmark_change(self, preset: str):
         '''Changes a bookmark to match the current top/bottom tree.
         
@@ -2324,6 +2358,7 @@ class ContainerManager(SuperWidget):
             self.w_se_top.tree_focus(goal=item, rebase=True)
 
 
+    @busy
     def move(self, reverse: bool = False):
         '''Callback for when the item move button is pressed.
         
