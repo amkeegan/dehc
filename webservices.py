@@ -7,9 +7,7 @@ import base64
 import mimetypes
 import mods.database as md
 import mods.log as ml
-import ssl
 
-import io
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse,parse_qs
@@ -77,7 +75,7 @@ class MyServer(BaseHTTPRequestHandler):
         except:
             photo = ""
             
-        ves = db.item_get(vessel_id)
+        ves = db.get_item_by_any_id(vessel_id)
 
         gate_check_html_replace["#vesselid#"] = vessel_id
         gate_check_html_replace["#photo#"] =   f'<img src="data:image/png;base64, {photo}" alt="Red dot" />'
@@ -93,21 +91,10 @@ class MyServer(BaseHTTPRequestHandler):
 
     def gate_check_clearence(self,container_id,evacuee_id):
         cleared_to_evac = False
-        url_data = parse_qs(urlparse(self.path).query)
-        #print(url_data['contid'][0])
-        evacuees = db.container_children_all(container=url_data['contid'][0], result="DOC")
-        #print(evacuees)
-        #if url_data['physid'][0] in evacuees:
-        #    print("ok")
-        
-        for evacuee in evacuees:
-            print(evacuee['_id'])
-            if evacuee['_id'] == evacuee_id:
+        evacuees = db.container_children_all(container=container_id, result="ITEM")
+        if evacuee_id in evacuees:
                 print("evac ok")
-                cleared_to_evac = True
-                break
-                
-        
+                cleared_to_evac = True                      
         return cleared_to_evac
 
     def lookup_item_html(self,item_id):                
@@ -118,7 +105,8 @@ class MyServer(BaseHTTPRequestHandler):
         
         item_data = {"Display Name" : "Not Found"} #needs a blank init otherwise it'll throw an error if they aren't in the list
         try:
-            item_data = db.item_get(item_id)
+            item_data = db.get_item_by_any_id(item_id)
+            item_id = item_data["_id"]
         except:
             pass
 
@@ -138,7 +126,7 @@ class MyServer(BaseHTTPRequestHandler):
                 data_pane += f"<tr><td rowspan=0>{key}</td><td></td></tr>"
                 for subitem in value:
                     print(subitem)
-                    sub_item_data = db.item_get(subitem)
+                    sub_item_data = db.get_item_by_any_id(subitem)
                     data_pane += f'''<tr><td></td><td><a href="https://10.8.0.50:9000/lookupitem?physid={subitem}">{sub_item_data['Display Name']}</a></td></tr>'''
                 data_pane += "</table>"
             else:
@@ -158,21 +146,20 @@ class MyServer(BaseHTTPRequestHandler):
         self.send_response(200)            
         self.send_header("Content-type", "text/html")
         self.end_headers()
-        self.wfile.write(bytes("<html><head><title>Evacuate?</title></head>", "utf-8"))
-        print(self.path)
+        self.wfile.write(bytes("<html><head><title>Gate Check</title></head>", "utf-8"))
+        #print(self.path)        
         
-
         #items = db.container_children(container=url_data['physid'][0], result="DOC")
-
-        clearance =  self.gate_check_clearence(container_id,evacuee_id)
+        clearance = False
         evacuee_data = {"Display Name" : "Not Found"} #needs a blank init otherwise it'll throw an error if they aren't in the list
         try:
-            evacuee_data = db.item_get(evacuee_id)
+            evacuee_data = db.get_item_by_any_id(evacuee_id)
+            evacuee_id = evacuee_data["_id"]            
+            clearance =  self.gate_check_clearence(container_id,evacuee_id)
         except:
             pass
-
+        
         if clearance:
-            
             self.wfile.write(bytes(self.gate_check_html_replacer(True,evacuee_data,container_id,"#0aa832"), "utf-8"))
             #self.wfile.write(bytes("<p>You accessed path: %s</p>" % self.path, "utf-8"))
             #0aa832
@@ -180,6 +167,10 @@ class MyServer(BaseHTTPRequestHandler):
         else:
             self.wfile.write(bytes(self.gate_check_html_replacer(False,evacuee_data,container_id,"red"), "utf-8"))
         self.wfile.write(bytes("</body></html>", "utf-8"))
+
+      
+            
+
 
     def wash_item(self,desired,evacuee):
         if desired in evacuee:
@@ -229,7 +220,8 @@ class MyServer(BaseHTTPRequestHandler):
             #    self.end_headers() 
 
         elif path == "/gatecheck":
-            try:
+                logger.debug("Gatecheck run")
+            #try:
                 contid = " "
                 physid = " "
                 if "contid" in url_data:
@@ -238,9 +230,9 @@ class MyServer(BaseHTTPRequestHandler):
                     physid = url_data['physid'][0]
 
                 self.gate_check_html(contid,physid)
-            except:
-                self.send_response(500)
-                self.end_headers() 
+            #except:
+            #    self.send_response(500)
+            #    self.end_headers() 
         elif path == "/lookupitem":
             try:
                 self.lookup_item_html(url_data['physid'][0])
@@ -270,6 +262,7 @@ print(time.asctime(), "Server Starts - %s:%s" % (hostName, hostPort))
 
 try:
     myServer.serve_forever()
+
 except KeyboardInterrupt:
     pass
 

@@ -4,8 +4,8 @@ import base64
 import io
 import json
 import random
-import time
-import requests
+#import time
+
 from ibmcloudant import CouchDbSessionAuthenticator
 from ibmcloudant.cloudant_v1 import CloudantV1, BulkDocs, Document, IndexDefinition, IndexField
 from PIL import Image
@@ -42,7 +42,6 @@ class Database:
         self.logger.debug(f"Finished loading database connection config")
 
         auth = CouchDbSessionAuthenticator(username=self.data['user'], password=self.data['pass'])
-        self.httpAdapter = requests.adapters.HTTPAdapter(pool_connections=15, pool_maxsize=100)
         self.client = CloudantV1(authenticator=auth)
         #self.client.http_adapter = self.httpAdapter
         self.client.set_http_config({'timeout': 10})
@@ -178,7 +177,7 @@ class Database:
             remote_doc = {}
             self.logger.debug(f"Could not fetch document {dbname} {id}")
         return remote_doc
-
+    
 
     def documents_create(self, dbname: str, docs: list, ids: list):
         '''Creates multiple documents at once, returning their ids.
@@ -902,6 +901,26 @@ class DEHCDatabase:
         self.logger.debug(f"Done finding physical IDs associated with {item}")
         return [row['physid'] for row in res]
 
+    def get_item_by_any_id(self,searchID: str):
+        '''Returns item doc when given any ID either _id or physicalID.
+        returns False on failure
+
+        searchID: the any flavour ID to search for
+        
+        ''' 
+
+        try:
+            return self.item_get(searchID)      #cross our fingers hey
+        except:
+            try:
+                return self.item_get(self.ids_find(searchID)[0]) 
+            except:
+                 raise ValueError("Item not found")
+            
+            
+
+
+        
 
     def index_prepare(self):
         '''Prepares certain known indexes used by database queries.'''
