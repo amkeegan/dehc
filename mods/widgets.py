@@ -16,6 +16,28 @@ import mods.photo as mp
 import mods.dehc_hardware as hw
 import mods.id_card_generation as card_gen
 
+
+# ----------------------------------------------------------------------------
+
+busystatus = False
+
+def busy(func):
+    '''A decorator used to indicate the program is busy to the user.
+    
+    Can only be used in objects with a 'statusbar' and 'root'.
+    '''
+    def wrapper(self, *args, **kwargs):
+        global busystatus
+        if busystatus == False:
+            busystatus = True
+            self.statusbar.w_status.configure(text="Working...")
+            self.root.update_idletasks()
+            func(self, *args, **kwargs)
+            self.statusbar.w_status.configure(text="Done")
+            busystatus = False
+    return wrapper
+
+
 # ----------------------------------------------------------------------------
 
 class SuperWidget:
@@ -71,7 +93,7 @@ class SuperWidget:
         self.logger.debug(f"Gridding self ({self.w_fr})")
         self.w_fr.grid(*args, **kwargs)
         self._pack_children()
-    
+
 
     def _pack_children(self):
         '''Packs & grids children frames and widgets of the SuperWidget.
@@ -83,10 +105,45 @@ class SuperWidget:
 
 # ----------------------------------------------------------------------------
 
+class StatusBar(SuperWidget):
+    '''A SuperWidget representing a database status bar.
+    
+    db: The database object which the widget uses for database transactions.
+    logger: The logger object used for logging.
+    master: The widget that the StatusBar's component widgets will be instantiated under.
+    '''
+
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, level: str = "NOTSET", prepare: bool = True):
+        '''Constructs a StatusBar object.
+        
+        master: The widget that the StatusBar's component widgets will be instantiated under.
+        level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
+        prepare: If true, automatically prepares widgets for packing.
+        '''
+        super().__init__(master=master, db=db, level=level)
+
+        if prepare == True:
+            self.prepare()
+
+
+    def prepare(self):
+        '''Constructs the frames and widgets of the StatusBar.'''
+        self.logger.debug(f"Preparing widgets")
+        self.w_status = ttk.Label(master=self.w_fr, text="", justify=tk.LEFT, anchor="w")
+        
+    
+    def _pack_children(self):
+        '''Packs & grids children frames and widgets of the StatusBar.'''
+        self.logger.debug(f"Packing and gridding widgets")
+        self.w_status.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+
+# ----------------------------------------------------------------------------
+
 class DataEntry(SuperWidget):
     '''A SuperWidget representing a data entry pane.'''
 
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, godmode: bool = False, level: str = "NOTSET", newchild: Callable = None, prepare: bool = True, readonly: bool = False, save: Callable = None, show: Callable = None, trash: str = None, web: str = "web_auth.json", hardware: hw.Hardware = None):
+    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, cats: list = [], delete: Callable = None, godmode: bool = False, level: str = "NOTSET", newchild: Callable = None, prepare: bool = True, readonly: bool = False, save: Callable = None, show: Callable = None, statusbar: StatusBar = None, trash: str = None, web: str = "web_auth.json", hardware: hw.Hardware = None):
         '''Constructs a DataEntry object.
         
         master: The widget that the DataEntry's component widgets will be instantiated under.
@@ -115,6 +172,7 @@ class DataEntry(SuperWidget):
         self.level = level                     # The logging level
         self.readonly = readonly               # Whether or not the application is in readonly mode
         self.root = self.w_fr.winfo_toplevel() # Root widget that contains this SuperWidget
+        self.statusbar = statusbar             # The status bar associated with this DataEntry
         self.trash = trash                     # The UUID of the recycle bin
         self.web = web                         # The filepath to the web server authentication file
         self._delete = delete                  # The parent object's callback to run when delete is pressed.
@@ -330,6 +388,7 @@ class DataEntry(SuperWidget):
             self.scales = None
 
 
+    @busy
     def add(self, *args):
         '''Callback for when the flag add button is pressed.'''
         self.logger.debug(f"Add flag button activated")
@@ -337,6 +396,7 @@ class DataEntry(SuperWidget):
         if flag not in self.w_li_flags.get(0, "end"):
             self.w_li_flags.insert("end", flag)
             self.logger.info(f"Inserted {flag} into flag list")
+            self.data_change()
         else:
             self.logger.debug(f"Did not insert {flag} into flag list, as it was already there")
 
@@ -385,6 +445,7 @@ class DataEntry(SuperWidget):
         w_bu_d.grid(column=0, row=3, sticky="nsew", padx=2, pady=2)
 
 
+    @busy
     def back(self, *args):
         '''Callback for when the back button is pressed.'''
         self.logger.debug(f"Back button activated")
@@ -406,6 +467,7 @@ class DataEntry(SuperWidget):
             self.logger.debug(f"Didn't go back, as user declined")
 
 
+    @busy
     def cancel(self, *args):
         '''Callback for when the cancel button is pressed.'''
         self.logger.debug(f"Cancel button activated")
@@ -507,6 +569,7 @@ class DataEntry(SuperWidget):
             self.logger.info(f"Item edited, setting edit mode to {self.editing}")
 
 
+    @busy
     def delete(self, *args):
         '''Callback for when the delete button is pressed'''
         self.logger.debug(f"Delete item button activated")
@@ -557,6 +620,7 @@ class DataEntry(SuperWidget):
                 self.logger.debug(f"Not recycling item, as user declined")
 
 
+    @busy
     def edit(self, *args):
         '''Callback for when the edit button is pressed'''
         cat = self.last_doc.get('category','')
@@ -595,6 +659,7 @@ class DataEntry(SuperWidget):
         self.logger.debug(f"Data pane buttons are now active")
 
 
+    @busy
     def new(self, *args):
         '''Callback for when the new button is pressed.'''
         self.logger.debug(f"New item button activated")
@@ -622,6 +687,7 @@ class DataEntry(SuperWidget):
             self.logger.debug(f"Did not open a new item, as user declined")
 
 
+    @busy
     def newchild(self, event: tk.Event):
         '''Callback for when the new child button is pressed.'''
         self.logger.debug(f"Create child button activated")
@@ -670,6 +736,7 @@ class DataEntry(SuperWidget):
             self.w_bu_photo.config(image=img)
             self.w_bu_photo.image = img
             self.logger.info(f"Photo cleared from data pane")
+            self.data_change()
 
         def fetch_photo():
             '''Updates the photoframe with a new photo.'''
@@ -973,14 +1040,17 @@ class DataEntry(SuperWidget):
             self.logger.debug(f"Did not open read window, as button is disabled")
 
 
+    @busy
     def remove(self, *args):
         '''Callback for when the flag remove button is pressed'''
         self.logger.debug(f"Remove flag button activated")
         sel, *_ = self.w_li_flags.curselection()
         self.w_li_flags.delete(sel)
         self.logger.info(f"Removed flag from flag list with index {sel}")
+        self.data_change()
 
 
+    @busy
     def save(self, *args):
         '''Callback for when the save button is pressed.'''
         self.logger.debug(f"Save button activated")
@@ -1040,6 +1110,7 @@ class DataEntry(SuperWidget):
         return False
 
 
+    @busy
     def show(self, doc: dict = None):
         '''Displays a new document.
         
@@ -1291,6 +1362,7 @@ class DataEntry(SuperWidget):
         self.logger.debug("Current show completed")
 
 
+    @busy
     def showlist(self, event: tk.Event, source: str):
         '''Callback for when the 'show' button is pressed for a given list field.
         
@@ -1377,7 +1449,7 @@ class SearchTree(SuperWidget):
         self.logger.debug(f"Preparing widgets")
         self.w_fr_search = ttk.Frame(master=self.w_fr)
 
-        self.w_fr.columnconfigure(0, weight=1000, minsize=96)
+        self.w_fr.columnconfigure(0, weight=1, minsize=128)
         self.w_fr.columnconfigure(1, weight=1, minsize=16)
         self.w_fr.columnconfigure(2, weight=1000, minsize=48)
         self.w_fr.columnconfigure(3, weight=1000, minsize=48)
@@ -2365,39 +2437,3 @@ class ContainerManager(SuperWidget):
         top, *_ = self.w_se_top.selection
         bot, *_ = self.w_se_bottom.selection
         return (top, bot)
-
-
-# ----------------------------------------------------------------------------
-
-class StatusBar(SuperWidget):
-    '''A SuperWidget representing a database status bar.
-    
-    db: The database object which the widget uses for database transactions.
-    logger: The logger object used for logging.
-    master: The widget that the StatusBar's component widgets will be instantiated under.
-    '''
-
-    def __init__(self, master: tk.Misc, db: md.DEHCDatabase, *, level: str = "NOTSET", prepare: bool = True):
-        '''Constructs a StatusBar object.
-        
-        master: The widget that the StatusBar's component widgets will be instantiated under.
-        level: Minimum level of logging messages to report; "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NONE".
-        prepare: If true, automatically prepares widgets for packing.
-        '''
-        super().__init__(master=master, db=db, level=level)
-
-        if prepare == True:
-            self.prepare()
-
-
-    def prepare(self):
-        '''Constructs the frames and widgets of the StatusBar.'''
-        self.logger.debug(f"Preparing widgets")
-        self.w_status = ttk.Label(master=self.w_fr, text="Status Online", justify=tk.LEFT, anchor="w")
-        
-    
-    def _pack_children(self):
-        '''Packs & grids children frames and widgets of the StatusBar.'''
-        self.logger.debug(f"Packing and gridding widgets")
-        self.w_status.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-

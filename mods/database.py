@@ -901,6 +901,7 @@ class DEHCDatabase:
         self.logger.debug(f"Done finding physical IDs associated with {item}")
         return [row['physid'] for row in res]
 
+
     def get_item_by_any_id(self,searchID: str):
         '''Returns item doc when given any ID either _id or physicalID.
         returns False on failure
@@ -914,12 +915,8 @@ class DEHCDatabase:
             try:
                 return self.item_get(self.ids_find(searchID)[0]) 
             except:
-                 return False
-            
-            
+                return False
 
-
-        
 
     def index_prepare(self):
         '''Prepares certain known indexes used by database queries.'''
