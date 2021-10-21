@@ -388,7 +388,6 @@ class DataEntry(SuperWidget):
             self.scales = None
 
 
-    @busy
     def add(self, *args):
         '''Callback for when the flag add button is pressed.'''
         self.logger.debug(f"Add flag button activated")
@@ -420,17 +419,21 @@ class DataEntry(SuperWidget):
                 webbrowser.open(f"{url}/gatecheck?contid={id}")
 
         def buttonb(*args):
-            webbrowser.open(f"{url}/function?somedataname=somedata&someotherdataname=someotherdata")
+            id = self.last_doc.get("_id","")
+            if id != "":
+                self.db.flag_assign_tree(container=id, flag="Ub-Unboarded")
 
         def buttonc(*args):
-            webbrowser.open(f"{url}/function?somedataname=somedata&someotherdataname=someotherdata")
+            id = self.last_doc.get("_id","")
+            if id != "":
+                self.db.flag_revoke_tree(container=id, flag="Ub-Unboarded")
 
         def buttond(*args):
             webbrowser.open(f"{url}/function?somedataname=somedata&someotherdataname=someotherdata")
 
         w_bu_a = ttk.Button(master=window, text="Gate Check", command=buttona)
-        w_bu_b = ttk.Button(master=window, text="Button B", command=buttonb)
-        w_bu_c = ttk.Button(master=window, text="Button C", command=buttonc)
+        w_bu_b = ttk.Button(master=window, text="Assign All Unboarded", command=buttonb)
+        w_bu_c = ttk.Button(master=window, text="Revoke All Unboarded", command=buttonc)
         w_bu_d = ttk.Button(master=window, text="Button D", command=buttond)
 
         window.columnconfigure(index=0, weight=1000)
@@ -439,13 +442,12 @@ class DataEntry(SuperWidget):
         window.rowconfigure(index=2, weight=1000)
         window.rowconfigure(index=3, weight=1000)
 
-        w_bu_a.grid(column=0, row=0, sticky="nsew", padx=2, pady=2)
+        #w_bu_a.grid(column=0, row=0, sticky="nsew", padx=2, pady=2)
         w_bu_b.grid(column=0, row=1, sticky="nsew", padx=2, pady=2)
         w_bu_c.grid(column=0, row=2, sticky="nsew", padx=2, pady=2)
-        w_bu_d.grid(column=0, row=3, sticky="nsew", padx=2, pady=2)
+        #w_bu_d.grid(column=0, row=3, sticky="nsew", padx=2, pady=2)
 
 
-    @busy
     def back(self, *args):
         '''Callback for when the back button is pressed.'''
         self.logger.debug(f"Back button activated")
@@ -467,7 +469,6 @@ class DataEntry(SuperWidget):
             self.logger.debug(f"Didn't go back, as user declined")
 
 
-    @busy
     def cancel(self, *args):
         '''Callback for when the cancel button is pressed.'''
         self.logger.debug(f"Cancel button activated")
@@ -569,7 +570,6 @@ class DataEntry(SuperWidget):
             self.logger.info(f"Item edited, setting edit mode to {self.editing}")
 
 
-    @busy
     def delete(self, *args):
         '''Callback for when the delete button is pressed'''
         self.logger.debug(f"Delete item button activated")
@@ -620,7 +620,6 @@ class DataEntry(SuperWidget):
                 self.logger.debug(f"Not recycling item, as user declined")
 
 
-    @busy
     def edit(self, *args):
         '''Callback for when the edit button is pressed'''
         cat = self.last_doc.get('category','')
@@ -659,7 +658,6 @@ class DataEntry(SuperWidget):
         self.logger.debug(f"Data pane buttons are now active")
 
 
-    @busy
     def new(self, *args):
         '''Callback for when the new button is pressed.'''
         self.logger.debug(f"New item button activated")
@@ -687,7 +685,6 @@ class DataEntry(SuperWidget):
             self.logger.debug(f"Did not open a new item, as user declined")
 
 
-    @busy
     def newchild(self, event: tk.Event):
         '''Callback for when the new child button is pressed.'''
         self.logger.debug(f"Create child button activated")
@@ -1040,7 +1037,6 @@ class DataEntry(SuperWidget):
             self.logger.debug(f"Did not open read window, as button is disabled")
 
 
-    @busy
     def remove(self, *args):
         '''Callback for when the flag remove button is pressed'''
         self.logger.debug(f"Remove flag button activated")
@@ -1050,7 +1046,6 @@ class DataEntry(SuperWidget):
         self.data_change()
 
 
-    @busy
     def save(self, *args):
         '''Callback for when the save button is pressed.'''
         self.logger.debug(f"Save button activated")
@@ -1110,7 +1105,6 @@ class DataEntry(SuperWidget):
         return False
 
 
-    @busy
     def show(self, doc: dict = None):
         '''Displays a new document.
         
@@ -1362,7 +1356,6 @@ class DataEntry(SuperWidget):
         self.logger.debug("Current show completed")
 
 
-    @busy
     def showlist(self, event: tk.Event, source: str):
         '''Callback for when the 'show' button is pressed for a given list field.
         
@@ -1616,19 +1609,21 @@ class SearchTree(SuperWidget):
                 self.logger.debug(f"Mouse released. Time: {dragtime}; Root xy: {(mx, my)}; Target tree: {tree}; Start ID: {repr(self.dragstartid)}")
 
                 if tree != None and tree.winfo_class() == "Treeview" and self.dragstartid not in [None, ""] and self.dragstarttree not in [None, ""]:
+                    dragstarttree = self.dragstarttree
                     dragendtree = tree.SearchTree
                     x = mx - tree.winfo_rootx()
                     y = my - tree.winfo_rooty()
+                    dragstartid = self.dragstartid
                     dragendid = tree.identify_row(y)
                     self.logger.debug(f"Mouse released cont. Target tree xy: {(x, y)}; Target row: {repr(dragendid)}")
                     
-                    if self.dragstartid != dragendid and dragendid not in [None, ""] and dragendtree not in [None, ""]:
-                        if self.yes_no == None or (self.dragstarttree.w_var_autoopen.get() == 0 and dragendtree.w_var_autoopen.get() == 0):
+                    if dragstartid != dragendid and dragendid not in [None, ""] and dragendtree not in [None, ""]:
+                        if self.yes_no == None or (dragstarttree.w_var_autoopen.get() == 0 and dragendtree.w_var_autoopen.get() == 0):
                             permitted = True
                         else:
                             permitted = self.yes_no("Unsaved Changes","There are unsaved changes. Are you sure you want to move an item?")
                         
-                        target = self.dragstartid
+                        target = dragstartid
                         target_doc = self.db.item_get(id=target)
                         name = target_doc[self.db.schema_name(id=target)]
                         lock = self.db.schema_lock(id=target)
@@ -1654,18 +1649,18 @@ class SearchTree(SuperWidget):
                                 self.logger.debug(f"Recursion risk list: {recur_risk_list}")
                                 if target not in recur_risk_list:
                                     self.db.container_move(from_con=source, to_con=destination, item=target)
-                                    if self.dragstarttree == dragendtree:
+                                    if dragstarttree == dragendtree:
                                         dragendtree.tree_refresh(selection=destination)
                                         dragendtree.tree_focus(goal=source, rebase=True, dragreset=False)
                                         dragendtree.tree_focus(goal=destination, rebase=True, dragreset=False)
                                         dragendtree.tree_open(node=source, dragreset=False)
                                         dragendtree.tree_open(node=destination, dragreset=False)
                                     else:
-                                        self.dragstarttree.tree_refresh(selection=source)
+                                        dragstarttree.tree_refresh(selection=source)
                                         dragendtree.tree_refresh(selection=destination)
-                                        self.dragstarttree.tree_focus(goal=source, rebase=True, dragreset=False)
+                                        dragstarttree.tree_focus(goal=source, rebase=True, dragreset=False)
                                         dragendtree.tree_focus(goal=destination, rebase=True, dragreset=False)
-                                        self.dragstarttree.tree_open(node=source, dragreset=False)
+                                        dragstarttree.tree_open(node=source, dragreset=False)
                                         dragendtree.tree_open(node=destination, dragreset=False)
                                     self.logger.debug(f"Move completed")
                                 else:
