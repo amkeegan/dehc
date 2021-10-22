@@ -750,47 +750,67 @@ class DataEntry(SuperWidget):
             self.logger.info(f"Photo cleared from data pane")
             self.data_change()
 
-        def fetch_photo():
+        def fetch_photo(feed: int = 0):
             '''Updates the photoframe with a new photo.'''
-            try:
-                img = ImageTk.PhotoImage(self.photomanager.take_photo())
-                photoframe.config(image=img)
-                photoframe.image = img
-                window.after(250, fetch_photo)
-            except:
-                self.logger.warning("Could not take photo. Webcam may be unavailable")
+            photo = self.photomanager.take_photo(feed)
+            if photo != None:
+                img = ImageTk.PhotoImage(image=photo)
+                photoframe[feed].config(image=img)
+                photoframe[feed].image = img
+                window.after(ms=250, func=lambda *_: fetch_photo(feed=feed))
 
-        def update(*args):
+        def from_file():
+            '''Loads a file from disk.'''
+            self.logger.debug(f"From file button activated")
+
+        def update(feed: int = 0):
             '''Pushes current photo to data pane. Can function as a callback.'''
             self.logger.debug(f"Photo update button activated")
-            self.current_photo = self.photomanager.take_photo()
-            try:
+            self.current_photo = self.photomanager.take_photo(feed)
+            if self.current_photo != None:
                 img = ImageTk.PhotoImage(self.current_photo)
                 self.w_bu_photo.config(image=img)
                 self.w_bu_photo.image = img
                 self.logger.info(f"Photo pushed to data pane")
-            except:
-                self.logger.warning("Could not take photo. Webcam may be unavailable")
             window.destroy()
             self.logger.debug(f"Closed photo window")
             self.data_change()
 
         self.logger.debug(f"Preparing photo window widgets")
-        photoframe = ttk.Label(master=window)
+
         clearbut = ttk.Button(master=window, text="Clear", command=clear)
-        updatebut = ttk.Button(master=window, text="Update", command=update)
+        fromfilebut = ttk.Button(master=window, text="From File", command=from_file)
         window.bind("<Return>", update, add="+")
 
         window.columnconfigure(index=0, weight=1000)
         window.columnconfigure(index=1, weight=1000)
         window.rowconfigure(index=0, weight=1000)
         window.rowconfigure(index=1, weight=1000)
+        window.rowconfigure(index=2, weight=1, minsize=25)
 
         self.logger.debug(f"Packing and gridding photo window widgets")
-        photoframe.grid(column=0, row=0, columnspan=2, sticky='nsew', padx=2, pady=2)
-        clearbut.grid(column=0, row=1, sticky='nsew', padx=2, pady=2)
-        updatebut.grid(column=1, row=1, sticky='nsew', padx=2, pady=2)
-        fetch_photo()
+
+        clearbut.grid(column=0, row=2, sticky='nsew', padx=2, pady=2)
+        fromfilebut.grid(column=1, row=2, sticky='nsew', padx=2, pady=2)
+
+        cameras = len(self.photomanager.cameras)
+        photoframe = []
+        if cameras > 0:
+            photoframe.append(ttk.Button(master=window, command=lambda *_: update(feed=0)))
+            photoframe[0].grid(column=0, row=0, columnspan=2, sticky='nsew', padx=2, pady=2)
+            fetch_photo(0)
+        if cameras > 1:
+            photoframe.append(ttk.Button(master=window, command=lambda *_: update(feed=1)))
+            photoframe[1].grid(column=1, row=0, columnspan=2, sticky='nsew', padx=2, pady=2)
+            fetch_photo(1)
+        if cameras > 2:
+            photoframe.append(ttk.Button(master=window, command=lambda *_: update(feed=2)))
+            photoframe[2].grid(column=0, row=1, columnspan=2, sticky='nsew', padx=2, pady=2)
+            fetch_photo(2)
+        if cameras > 3:
+            photoframe.append(ttk.Button(master=window, command=lambda *_: update(feed=3)))
+            photoframe[3].grid(column=1, row=1, columnspan=2, sticky='nsew', padx=2, pady=2)
+            fetch_photo(3)
 
 
     def read(self, event: tk.Event, source: str):
@@ -1784,7 +1804,7 @@ class SearchTree(SuperWidget):
         cat = self.w_var_cat.get()
         field = self.w_var_field.get()
         op = self.w_var_op.get()
-        value = self.w_var_value.get()
+        value = self.w_var_value.get().strip()
         opvalue = {
             "=": {"$eq": value}, 
             "<": {"$lt": value}, 
@@ -1816,7 +1836,6 @@ class SearchTree(SuperWidget):
             self.w_li_search.config(state="disabled")
 
         self.logger.debug(f"Search returned {len(self.search_result)} results")
-
 
 
     def search_cat(self, *args):
