@@ -18,3 +18,4 @@ pycache/
 
 # Ignore local VS Code project settings
 .vscode/
+program.prof
