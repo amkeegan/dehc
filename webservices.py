@@ -190,6 +190,7 @@ class MyServer(BaseHTTPRequestHandler):
         tempstr = "<tr><td>No.</td>"
         for display_field in display_fields:
             tempstr += "<td>%s</td>" % display_field
+        tempstr += "<td> LB</td>" 
         tempstr += "</tr>"
         self.wfile.write(bytes(tempstr, "utf-8"))
         for evacuee in evacuees:
@@ -197,6 +198,13 @@ class MyServer(BaseHTTPRequestHandler):
             tempstr = "<tr><td>%s</td>" % passenger_num
             for display_field in display_fields:
                 tempstr += "<td>%s</td>" % self.wash_item(display_field,evacuee)
+
+            try:
+                tempstr += "<td>%s</td>" % (float(self.wash_item(display_field,evacuee)) * 2.2)
+            except:
+                tempstr += "<td>&nbsp;</td>"
+
+
 
 #            tempstr = "<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>\r\n" %  (passenger_num,self.wash_item("Title or Rank",evacuee),self.wash_item("Display Name",evacuee),self.wash_item("Passport Number",evacuee),self.wash_item("Passport Expiry",evacuee),self.wash_item("Nationality",evacuee),self.wash_item("Date Of Birth",evacuee) )
             tempstr += "</tr>"
